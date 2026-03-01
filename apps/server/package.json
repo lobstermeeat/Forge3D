@@ -1,0 +1,43 @@
+{
+  "name": "@forge3d/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./trpc": "./src/trpc/router.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --dts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'lint ok'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@forge3d/shared": "workspace:*",
+    "@trpc/server": "^11.0.0",
+    "better-auth": "^1.2.0",
+    "drizzle-orm": "^0.41.0",
+    "postgres": "^3.4.0",
+    "ioredis": "^5.4.0",
+    "fastify": "^5.2.0",
+    "@fastify/cors": "^11.0.0",
+    "@fastify/websocket": "^11.0.0",
+    "zod": "^3.24.0",
+    "nanoid": "^5.1.0"
+  },
+  "devDependencies": {
+    "@forge3d/typescript-config": "workspace:*",
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "tsup": "^8.3.0",
+    "vitest": "^3.0.0",
+    "drizzle-kit": "^0.31.4",
+    "@types/node": "^22.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+export { Entity } from './ecs';
+export { SceneManager, SceneBridge } from './scene';
+export { CommandHistory, AddEntityCommand, RemoveEntityCommand, TransformCommand, RenameEntityCommand } from './history';
+export type { Command } from './history';
+export { Renderer } from './renderer';
+export type { RendererOptions, RendererType } from './renderer';
+export { ViewportControls, GizmoControls } from './controls';
+export type { TransformMode } from './controls';
+export { MaterialFactory } from './materials';
+export { MeshFactory } from './core';
+export { AssetLoader, exportSceneAsGLB, importGroupToScene } from './io';
+export type { LoadResult } from './io';

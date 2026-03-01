@@ -1,0 +1,9 @@
+{
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/engine" },
+    { "path": "apps/client" },
+    { "path": "apps/server" }
+  ],
+  "files": []
+}

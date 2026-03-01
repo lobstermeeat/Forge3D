@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.turbo/
+.env
+.env.local
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+.vite/
+drizzle/meta/
