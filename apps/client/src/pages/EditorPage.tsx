@@ -1,14 +1,20 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Viewport from '@/components/Viewport';
 import { Toolbar } from '@/components/Toolbar';
+import { PublishDialog } from '@/components/PublishDialog';
 import { HierarchyPanel } from '@/components/HierarchyPanel';
 import { InspectorPanel } from '@/components/InspectorPanel';
+import { PresencePanel } from '@/components/PresencePanel';
+import { CursorOverlay } from '@/components/CursorOverlay';
 import { useEngine } from '@/hooks/useEngine';
 import { useSceneBridge } from '@/hooks/useSceneBridge';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useCollaboration } from '@/hooks/useCollaboration';
 import { useEditorStore } from '@/stores/editorStore';
+import { useFormatStore } from '@/stores/formatStore';
+import { TimelinePanel } from '@/components/TimelinePanel';
 import {
   AddEntityCommand,
   RemoveEntityCommand,
@@ -29,7 +35,9 @@ export function EditorPage() {
   const { controls, sceneManager, history, rendererType, ready, getScene, getCamera } =
     useEngine(canvasRef);
 
+  const [publishOpen, setPublishOpen] = useState(false);
   const selectEntity = useEditorStore((s) => s.selectEntity);
+  const formatType = useFormatStore((s) => s.formatType);
 
   // Load scene from server when route params present
   const sceneQuery = trpc.scene.getById.useQuery(
@@ -52,6 +60,9 @@ export function EditorPage() {
 
   // Auto-save to server when scene changes
   const saveStatus = useAutoSave(sceneManager, sceneId, ready && sceneLoadedRef.current);
+
+  // Real-time collaboration via Yjs
+  const collab = useCollaboration(sceneId, sceneManager, ready && sceneLoadedRef.current);
 
   const { bridge, hierarchyNodes, handleCanvasClick } = useSceneBridge({
     threeScene: ready ? getScene() : null,
@@ -127,8 +138,9 @@ export function EditorPage() {
     (id: string) => {
       selectEntity(id);
       sceneManager.selectEntity(id);
+      collab?.updateSelection(id);
     },
-    [selectEntity, sceneManager],
+    [selectEntity, sceneManager, collab],
   );
 
   const handleDelete = useCallback(
@@ -156,14 +168,19 @@ export function EditorPage() {
         onAddPrimitive={addPrimitive}
         onAddLight={addLight}
         onImportGLTF={handleImportGLTF}
+        onPublish={() => setPublishOpen(true)}
         sceneManager={sceneManager}
         history={history}
         bridge={bridge}
         threeScene={ready ? getScene() : null}
         saveStatus={sceneId ? saveStatus : undefined}
+        canPublish={!!sceneId}
       />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ width: 240, flexShrink: 0, borderRight: '1px solid #313244' }}>
+          {collab && (
+            <PresencePanel connected={collab.connected} peers={collab.peers} />
+          )}
           <HierarchyPanel
             nodes={hierarchyNodes}
             onSelect={handleSelect}
@@ -171,13 +188,37 @@ export function EditorPage() {
             onRename={handleRename}
           />
         </div>
-        <div style={{ flex: 1 }}>
-          <Viewport ref={canvasRef} rendererType={rendererType} ready={ready} onClick={handleCanvasClick} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+            <Viewport ref={canvasRef} rendererType={rendererType} ready={ready} onClick={handleCanvasClick} />
+            {collab && collab.peers.length > 0 && (
+              <CursorOverlay
+                peers={collab.peers}
+                camera={ready ? (getCamera() as THREE.PerspectiveCamera | null) : null}
+                canvasElement={canvasRef.current}
+              />
+            )}
+          </div>
+          {formatType === 'video' && (
+            <TimelinePanel
+              camera={ready ? (getCamera() as THREE.PerspectiveCamera | null) : null}
+              orbitControls={controls}
+            />
+          )}
         </div>
         <div style={{ width: 280, flexShrink: 0, borderLeft: '1px solid #313244' }}>
           <InspectorPanel sceneManager={sceneManager} history={history} bridge={bridge} />
         </div>
       </div>
+      {sceneId && (
+        <PublishDialog
+          open={publishOpen}
+          onClose={() => setPublishOpen(false)}
+          sceneId={sceneId}
+          sceneManager={sceneManager}
+          canvasElement={canvasRef.current}
+        />
+      )}
     </div>
   );
 }

@@ -54,6 +54,11 @@ export class ViewportControls {
     this.controls.update();
   }
 
+  /** Get the orbit target (look-at point). */
+  get target(): THREE.Vector3 {
+    return this.controls.target;
+  }
+
   setEnabled(enabled: boolean): void {
     this.controls.enabled = enabled;
   }

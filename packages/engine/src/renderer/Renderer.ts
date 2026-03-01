@@ -37,6 +37,7 @@ export class Renderer {
         const gpuRenderer = new WebGPURenderer({
           canvas: this.canvas,
           antialias: this.options.antialias ?? true,
+          preserveDrawingBuffer: true,
         });
         await gpuRenderer.init();
         this.renderer = gpuRenderer;
@@ -61,6 +62,7 @@ export class Renderer {
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: this.options.antialias ?? true,
+      preserveDrawingBuffer: true,
     });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;

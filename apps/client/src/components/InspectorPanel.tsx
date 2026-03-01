@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import { useEditorStore } from '@/stores/editorStore';
+import { useFormatStore } from '@/stores/formatStore';
 import type { SceneManager, CommandHistory, SceneBridge } from '@forge3d/engine';
 import { TransformCommand, RenameEntityCommand } from '@forge3d/engine';
 import type { TransformData, MeshRendererData, MaterialDescriptor, LightData } from '@forge3d/shared';
+import { InteractionEditor } from './InteractionEditor';
 
 interface InspectorPanelProps {
   sceneManager: SceneManager;
@@ -13,6 +15,7 @@ interface InspectorPanelProps {
 
 export function InspectorPanel({ sceneManager, history, bridge }: InspectorPanelProps) {
   const selectedId = useEditorStore((s) => s.selectedEntityId);
+  const formatType = useFormatStore((s) => s.formatType);
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
@@ -138,6 +141,8 @@ export function InspectorPanel({ sceneManager, history, bridge }: InspectorPanel
           />
         </>
       )}
+
+      {formatType === 'interactive' && <InteractionEditor />}
     </div>
   );
 }

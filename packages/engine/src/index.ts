@@ -10,3 +10,5 @@ export { MaterialFactory } from './materials';
 export { MeshFactory } from './core';
 export { AssetLoader, exportSceneAsGLB, importGroupToScene } from './io';
 export type { LoadResult } from './io';
+export { YjsSceneBinding } from './collab';
+export { ease, type EasingName } from './math';

@@ -1,0 +1,1 @@
+export { YjsSceneBinding } from './YjsSceneBinding';

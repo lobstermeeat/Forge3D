@@ -6,6 +6,11 @@ import { trpc, trpcClient } from '@/api/trpc';
 import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { EditorPage } from '@/pages/EditorPage';
+import { FeedPage } from '@/pages/FeedPage';
+import { ProfilePage } from '@/pages/ProfilePage';
+import { EditProfilePage } from '@/pages/EditProfilePage';
+import { SearchPage } from '@/pages/SearchPage';
+import { AdminPage } from '@/pages/AdminPage';
 import { RequireAuth } from '@/components/RequireAuth';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -51,7 +56,27 @@ export function App() {
               />
               <Route path="/editor" element={<EditorPage />} />
               <Route path="/editor/:projectId/:sceneId" element={<EditorPage />} />
-              <Route path="*" element={<Navigate to="/login" replace />} />
+              <Route path="/feed" element={<FeedPage />} />
+              <Route path="/explore" element={<FeedPage />} />
+              <Route path="/creator/:username" element={<ProfilePage />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route
+                path="/settings/profile"
+                element={
+                  <RequireAuth>
+                    <EditProfilePage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <RequireAuth>
+                    <AdminPage />
+                  </RequireAuth>
+                }
+              />
+              <Route path="*" element={<Navigate to="/explore" replace />} />
             </Routes>
           </BrowserRouter>
         </QueryClientProvider>

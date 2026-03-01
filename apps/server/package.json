@@ -19,25 +19,33 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/static": "^9.0.0",
+    "@fastify/websocket": "^11.0.0",
     "@forge3d/shared": "workspace:*",
+    "@hocuspocus/extension-database": "^3.4.4",
+    "@hocuspocus/server": "^3.4.4",
     "@trpc/server": "^11.0.0",
     "better-auth": "^1.2.0",
     "drizzle-orm": "^0.41.0",
-    "postgres": "^3.4.0",
-    "ioredis": "^5.4.0",
     "fastify": "^5.2.0",
-    "@fastify/cors": "^11.0.0",
-    "@fastify/websocket": "^11.0.0",
-    "zod": "^3.24.0",
-    "nanoid": "^5.1.0"
+    "ioredis": "^5.4.0",
+    "meilisearch": "^0.55.0",
+    "mime-types": "^3.0.2",
+    "nanoid": "^5.1.6",
+    "postgres": "^3.4.0",
+    "sharp": "^0.34.5",
+    "yjs": "^13.6.29",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@forge3d/typescript-config": "workspace:*",
-    "typescript": "^5.7.0",
-    "tsx": "^4.19.0",
-    "tsup": "^8.3.0",
-    "vitest": "^3.0.0",
+    "@types/mime-types": "^3.0.1",
+    "@types/node": "^22.0.0",
     "drizzle-kit": "^0.31.4",
-    "@types/node": "^22.0.0"
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }

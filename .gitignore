@@ -9,3 +9,5 @@ coverage/
 Thumbs.db
 .vite/
 drizzle/meta/
+uploads/
+*.tsbuildinfo

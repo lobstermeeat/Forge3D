@@ -31,22 +31,26 @@ interface ToolbarProps {
   onAddPrimitive: (type: MeshRendererData['geometryType']) => void;
   onAddLight?: (type: LightData['type']) => void;
   onImportGLTF?: (file: File) => void;
+  onPublish?: () => void;
   sceneManager: SceneManager;
   history: CommandHistory;
   bridge: React.RefObject<SceneBridge | null>;
   threeScene?: THREE.Scene | null;
   saveStatus?: SaveStatus;
+  canPublish?: boolean;
 }
 
 export function Toolbar({
   onAddPrimitive,
   onAddLight,
   onImportGLTF,
+  onPublish,
   sceneManager,
   history,
   bridge,
   threeScene,
   saveStatus,
+  canPublish,
 }: ToolbarProps) {
   const transformMode = useEditorStore((s) => s.transformMode);
   const setTransformMode = useEditorStore((s) => s.setTransformMode);
@@ -238,6 +242,26 @@ export function Toolbar({
       )}
 
       <div style={{ flex: 1 }} />
+
+      {/* Publish */}
+      {canPublish && (
+        <button
+          title="Publish experience"
+          onClick={onPublish}
+          style={{
+            padding: '4px 14px',
+            border: 'none',
+            borderRadius: 4,
+            background: '#2563eb',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          Publish
+        </button>
+      )}
 
       {/* Grid toggle */}
       <button

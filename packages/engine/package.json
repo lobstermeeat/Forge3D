@@ -15,8 +15,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@forge3d/shared": "workspace:*",
     "three": "^0.172.0",
-    "@forge3d/shared": "workspace:*"
+    "yjs": "^13.6.29"
   },
   "devDependencies": {
     "@types/three": "^0.172.0",
