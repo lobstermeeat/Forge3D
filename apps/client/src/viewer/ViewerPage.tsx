@@ -14,6 +14,7 @@ import { InfoPopup } from './components/InfoPopup';
 import { LikeButton } from '../components/LikeButton';
 import { CommentSection } from '../components/CommentSection';
 import { ReportButton } from '../components/ReportButton';
+import { useRemoteControl } from '../hooks/useRemoteControl';
 import { MOCK_EXPERIENCES, getMockExperienceData, USE_MOCKS } from '../mocks/experiences';
 
 interface InfoPopupData {
@@ -35,6 +36,64 @@ export function ViewerPage() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [infoPopup, setInfoPopup] = useState<InfoPopupData | null>(null);
+
+  // Remote control presenter state
+  const [rcSessionId, setRcSessionId] = useState<string | null>(null);
+  const [rcLinkCopied, setRcLinkCopied] = useState(false);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<ViewerControls | null>(null);
+
+  const rc = useRemoteControl(rcSessionId ?? undefined, 'controller');
+
+  // Broadcast camera state ~10 times per second when presenting
+  useEffect(() => {
+    if (!rcSessionId || !rc.connected) return;
+    const interval = setInterval(() => {
+      const camera = cameraRef.current;
+      const controls = controlsRef.current;
+      if (!camera || !controls) return;
+      const pos = camera.position;
+      const tgt = controls.controls.target;
+      rc.sendCameraSync(
+        [pos.x, pos.y, pos.z],
+        [tgt.x, tgt.y, tgt.z],
+        camera.fov,
+      );
+    }, 100);
+    return () => clearInterval(interval);
+  }, [rcSessionId, rc.connected, rc.sendCameraSync]);
+
+  const handleStartPresenting = useCallback(async () => {
+    if (!slug) return;
+    try {
+      const res = await fetch('/trpc/remoteControl.createSession', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ experienceSlug: slug }),
+      });
+      const json = await res.json();
+      const sessionId = json.result?.data?.sessionId;
+      if (sessionId) {
+        setRcSessionId(sessionId);
+      }
+    } catch {
+      // Ignore errors
+    }
+  }, [slug]);
+
+  const handleStopPresenting = useCallback(() => {
+    setRcSessionId(null);
+    setRcLinkCopied(false);
+  }, []);
+
+  const handleCopyRemoteLink = useCallback(() => {
+    if (!rcSessionId) return;
+    const url = `${window.location.origin}/remote/${rcSessionId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setRcLinkCopied(true);
+      setTimeout(() => setRcLinkCopied(false), 2000);
+    });
+  }, [rcSessionId]);
 
   // Store controller in a ref so React re-renders don't affect it
   const controllerRef = useRef<FormatController | null>(null);
@@ -149,6 +208,10 @@ export function ViewerPage() {
           initialTarget: cam.target,
         });
 
+        // Store refs for remote control broadcasting
+        cameraRef.current = camera;
+        controlsRef.current = controls;
+
         // Create format controller based on type
         const fmt = experienceData.format;
         setFormatType(fmt.type);
@@ -243,6 +306,8 @@ export function ViewerPage() {
       cancelAnimationFrame(animId);
       formatCtrl?.dispose();
       controllerRef.current = null;
+      cameraRef.current = null;
+      controlsRef.current = null;
       controls?.dispose();
       renderer?.dispose();
       sceneBuilder.dispose();
@@ -299,13 +364,43 @@ export function ViewerPage() {
         {!loading && !error && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-4 py-3">
             {hasTimeline ? (
-              <TimelineScrubber
-                currentTime={currentTime}
-                duration={duration}
-                playing={playing}
-                onTogglePlay={handleTogglePlay}
-                onSeek={handleSeek}
-              />
+              <div className="space-y-2">
+                <TimelineScrubber
+                  currentTime={currentTime}
+                  duration={duration}
+                  playing={playing}
+                  onTogglePlay={handleTogglePlay}
+                  onSeek={handleSeek}
+                />
+                <div className="flex justify-end">
+                  {rcSessionId ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#a6e3a1]">
+                        Presenting ({rc.viewerCount} viewer{rc.viewerCount !== 1 ? 's' : ''})
+                      </span>
+                      <button
+                        onClick={handleCopyRemoteLink}
+                        className="rounded bg-[#89b4fa]/20 px-3 py-1.5 text-xs font-medium text-[#89b4fa] backdrop-blur-sm hover:bg-[#89b4fa]/30"
+                      >
+                        {rcLinkCopied ? 'Copied!' : 'Copy Link'}
+                      </button>
+                      <button
+                        onClick={handleStopPresenting}
+                        className="rounded bg-[#f38ba8]/20 px-3 py-1.5 text-xs font-medium text-[#f38ba8] backdrop-blur-sm hover:bg-[#f38ba8]/30"
+                      >
+                        Stop
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleStartPresenting}
+                      className="rounded bg-[#cba6f7]/20 px-3 py-1.5 text-xs font-medium text-[#cba6f7] backdrop-blur-sm hover:bg-[#cba6f7]/30"
+                    >
+                      Present
+                    </button>
+                  )}
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -326,6 +421,34 @@ export function ViewerPage() {
                   >
                     Reset View
                   </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  {rcSessionId ? (
+                    <>
+                      <span className="text-xs text-[#a6e3a1]">
+                        Presenting ({rc.viewerCount} viewer{rc.viewerCount !== 1 ? 's' : ''})
+                      </span>
+                      <button
+                        onClick={handleCopyRemoteLink}
+                        className="rounded bg-[#89b4fa]/20 px-3 py-1.5 text-xs font-medium text-[#89b4fa] backdrop-blur-sm hover:bg-[#89b4fa]/30"
+                      >
+                        {rcLinkCopied ? 'Copied!' : 'Copy Link'}
+                      </button>
+                      <button
+                        onClick={handleStopPresenting}
+                        className="rounded bg-[#f38ba8]/20 px-3 py-1.5 text-xs font-medium text-[#f38ba8] backdrop-blur-sm hover:bg-[#f38ba8]/30"
+                      >
+                        Stop
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleStartPresenting}
+                      className="rounded bg-[#cba6f7]/20 px-3 py-1.5 text-xs font-medium text-[#cba6f7] backdrop-blur-sm hover:bg-[#cba6f7]/30"
+                    >
+                      Present
+                    </button>
+                  )}
                 </div>
               </div>
             )}

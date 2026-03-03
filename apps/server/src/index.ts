@@ -10,6 +10,7 @@ import { toNodeHandler } from 'better-auth/node';
 import { auth } from './auth';
 import { db } from './db';
 import { createHocuspocus } from './collab/hocuspocus';
+import { handleConnection as handleRemoteControl } from './remoteControl/sessions';
 
 const PORT = parseInt(process.env['PORT'] ?? '4000', 10);
 const APP_URL = process.env['APP_URL'] ?? 'http://localhost:5173';
@@ -58,6 +59,13 @@ async function main() {
   server.get('/ws/collab/:sceneId', { websocket: true }, (socket, req) => {
     const sceneId = (req.params as { sceneId: string }).sceneId;
     hocuspocus.handleConnection(socket, req.raw, sceneId);
+  });
+
+  // WebSocket for remote control (presenter → viewers camera sync)
+  server.get('/ws/remote/:sessionId', { websocket: true }, (socket, req) => {
+    const sessionId = (req.params as { sessionId: string }).sessionId;
+    const role = (req.query as { role?: string }).role === 'controller' ? 'controller' : 'viewer';
+    handleRemoteControl(socket as unknown as import('ws').WebSocket, sessionId, role);
   });
 
   // Health check

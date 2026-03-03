@@ -8,6 +8,7 @@ import { interactionRouter } from './routers/interaction';
 import { categoryRouter } from './routers/category';
 import { searchRouter } from './routers/search';
 import { moderationRouter } from './routers/moderation';
+import { remoteControlRouter } from './routers/remoteControl';
 
 export const appRouter = router({
   project: projectRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   category: categoryRouter,
   search: searchRouter,
   moderation: moderationRouter,
+  remoteControl: remoteControlRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { trpc, trpcClient } from '@/api/trpc';
 import { ViewerPage } from './ViewerPage';
 import { EmbedPage } from './EmbedPage';
+import { RemotePage } from './RemotePage';
 
 export function ViewerApp() {
   const [queryClient] = useState(
@@ -22,6 +23,7 @@ export function ViewerApp() {
           <Routes>
             <Route path="/view/:slug" element={<ViewerPage />} />
             <Route path="/embed/:slug" element={<EmbedPage />} />
+            <Route path="/remote/:sessionId" element={<RemotePage />} />
           </Routes>
         </BrowserRouter>
       </QueryClientProvider>

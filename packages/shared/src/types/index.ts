@@ -5,3 +5,4 @@ export * from './api';
 export * from './experience';
 export * from './social';
 export * from './discovery';
+export * from './remoteControl';
