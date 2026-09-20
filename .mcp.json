@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "yippieeeeeeeeiokayay-yippieblox-mcp-server": {
+      "command": "roblox-studio-yippieblox-mcp-server",
+      "args": [
+        "--stdio"
+      ],
+      "env": {
+        "YIPPIE_TOKEN": "${YIPPIE_TOKEN}",
+        "YIPPIE_PORT": "${YIPPIE_PORT:-3334}"
+      }
+    }
+  }
+}
