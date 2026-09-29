@@ -31,6 +31,8 @@ interface ActionDeps {
   bridge: React.RefObject<SceneBridge | null>;
   controls: React.RefObject<ViewportControls | null>;
   getCamera: () => THREE.Camera | null;
+  /** The three.js renderer; KTX2 textures (AI models) need it to pick a GPU format. */
+  getRenderer?: () => unknown;
   onSelectionChange?: (id: string | null) => void;
 }
 
@@ -53,7 +55,7 @@ function download(blob: Blob, name: string) {
 export type EditorActions = ReturnType<typeof createActions>;
 
 function createActions(d: ActionDeps) {
-  const { sceneManager, history, bridge, controls, getCamera } = d;
+  const { sceneManager, history, bridge, controls, getCamera, getRenderer } = d;
   const store = () => useEditorStore.getState();
 
   const select = (id: string | null) => {
@@ -126,7 +128,7 @@ function createActions(d: ActionDeps) {
         return;
       }
       logOutput('info', `Importing ${file.name}…`);
-      const loader = new AssetLoader();
+      const loader = new AssetLoader({ renderer: getRenderer?.() ?? undefined });
       try {
         const { scene: group } = await loader.loadFromFile(file);
         const base = file.name.replace(/\.(gltf|glb)$/i, '');
@@ -336,9 +338,19 @@ function createActions(d: ActionDeps) {
 }
 
 export function useEditorActions(deps: ActionDeps): EditorActions {
-  const { sceneManager, history, bridge, controls, getCamera, onSelectionChange } = deps;
+  const { sceneManager, history, bridge, controls, getCamera, getRenderer, onSelectionChange } =
+    deps;
   return useMemo(
-    () => createActions({ sceneManager, history, bridge, controls, getCamera, onSelectionChange }),
-    [sceneManager, history, bridge, controls, getCamera, onSelectionChange],
+    () =>
+      createActions({
+        sceneManager,
+        history,
+        bridge,
+        controls,
+        getCamera,
+        getRenderer,
+        onSelectionChange,
+      }),
+    [sceneManager, history, bridge, controls, getCamera, getRenderer, onSelectionChange],
   );
 }

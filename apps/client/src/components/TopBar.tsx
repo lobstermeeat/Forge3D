@@ -44,6 +44,7 @@ interface TopBarProps {
   canPublish: boolean;
   onPublish: () => void;
   onRequestImport: () => void;
+  onAbout: () => void;
   actions: EditorActions;
   collab: { connected: boolean; peers: AwarenessUser[] } | null;
 }
@@ -59,6 +60,7 @@ export function TopBar({
   canPublish,
   onPublish,
   onRequestImport,
+  onAbout,
   actions,
   collab,
 }: TopBarProps) {
@@ -134,6 +136,15 @@ export function TopBar({
             {!canPublish && (
               <div className="f3-pop-note">Open a scene from your dashboard to publish it.</div>
             )}
+            <div className="f3-pop-sep" />
+            <MenuItem
+              icon="info"
+              label="About FORGE 3D Studio"
+              onSelect={() => {
+                close();
+                onAbout();
+              }}
+            />
           </>
         )}
       </MenuAnchor>

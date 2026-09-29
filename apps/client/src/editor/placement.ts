@@ -62,9 +62,10 @@ export function freeSpot(
   if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
   right.normalize();
 
+  // Top-level parts and models (an imported or generated model's root has no mesh of its own)
   const occupied = sceneManager
     .getAllEntities()
-    .filter((e) => e.hasComponent('meshRenderer') && !e.parentId)
+    .filter((e) => !e.parentId && !e.hasComponent('light'))
     .map((e) => e.transform.position);
 
   for (let i = 0; i < 12; i++) {
