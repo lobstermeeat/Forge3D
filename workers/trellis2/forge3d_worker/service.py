@@ -19,6 +19,14 @@ class Runtime(Protocol):
 
 Pack = Callable[[bytes, int], bytes]
 
+_GPU_FAULTS = ("cuda", "out of memory", "outofmemory", "cublas", "cudnn", "device-side assert")
+
+
+def needs_restart(err: BaseException) -> bool:
+    """A GPU fault can leave CUDA unusable in this process; other failures (storage, network) can't."""
+    text = f"{type(err).__name__}: {err}".lower()
+    return any(marker in text for marker in _GPU_FAULTS)
+
 
 def handle_job(
     job: dict,
@@ -55,10 +63,15 @@ def handle_job(
         lap("compress_s")
         stored = storage.put(spec.output_key, packed, "model/gltf-binary")
         lap("upload_s")
+    except InputError as err:
+        # e.g. no object found in the image
+        return {"error": f"invalid input: {err}"}
     except Exception as err:  # noqa: BLE001 - report any failure to the caller
         traceback.print_exc()
-        # A fresh process is the safest recovery after a GPU error (e.g. out of memory)
-        return {"error": f"generation failed: {type(err).__name__}: {err}", "refresh_worker": True}
+        result = {"error": f"generation failed: {type(err).__name__}: {err}"}
+        if needs_restart(err):
+            result["refresh_worker"] = True
+        return result
 
     return {
         "request_id": spec.request_id,

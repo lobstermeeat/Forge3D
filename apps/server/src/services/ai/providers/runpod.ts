@@ -42,7 +42,11 @@ export class RunPodEndpoint {
       body: JSON.stringify({ input }),
     });
     while (job.status === 'IN_QUEUE' || job.status === 'IN_PROGRESS') {
-      if (Date.now() - started > timeoutMs) throw new Error(`RunPod job ${job.id} timed out`);
+      if (Date.now() - started > timeoutMs) {
+        // Don't leave it running (and billing) when a retry will queue it again
+        await this.cancel(job.id).catch(() => {});
+        throw new Error(`RunPod job ${job.id} timed out`);
+      }
       await new Promise((resolve) => setTimeout(resolve, 2000));
       job = await this.status<T>(job.id);
     }
@@ -51,6 +55,10 @@ export class RunPodEndpoint {
 
   status<T>(jobId: string): Promise<RunPodJob<T>> {
     return this.request<RunPodJob<T>>(`status/${encodeURIComponent(jobId)}`, { method: 'GET' });
+  }
+
+  async cancel(jobId: string): Promise<void> {
+    await this.request(`cancel/${encodeURIComponent(jobId)}`, { method: 'POST' });
   }
 
   private async request<T>(path: string, init: RequestInit): Promise<T> {

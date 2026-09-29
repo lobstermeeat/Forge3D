@@ -186,13 +186,47 @@ describe('SelfHostedProvider', () => {
     });
   });
 
+  it('sends inline reference images as data instead of a URL', async () => {
+    const { calls, fetchImpl } = fakeRunPod([{ id: 'job-5', status: 'IN_QUEUE' }]);
+    const provider = new SelfHostedProvider(new RunPodEndpoint('ep', 'k', fetchImpl), null);
+    await provider.generate({
+      type: 'image-to-3d',
+      imageUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      userId: 'u',
+      quality: 'preview',
+    });
+    expect(calls[0]!.body).toEqual({ input: { image_base64: 'iVBORw0KGgo=', mode: 'preview' } });
+  });
+
+  it('cancels a reference job that outlives the timeout', async () => {
+    const { calls, fetchImpl } = fakeRunPod([{ id: 'ref-slow', status: 'IN_PROGRESS' }, {}]);
+    const endpoint = new RunPodEndpoint('ref-ep', 'k', fetchImpl);
+    await expect(endpoint.runSync({ prompt: 'x' }, -1)).rejects.toThrow(
+      'RunPod job ref-slow timed out',
+    );
+    expect(calls[1]).toMatchObject({
+      url: 'https://api.runpod.ai/v2/ref-ep/cancel/ref-slow',
+      method: 'POST',
+    });
+  });
+
   it('is only registered when RunPod is configured', () => {
     expect(createSelfHostedProvider({})).toBeNull();
     expect(createAIOrchestrator({}).getAvailableProviders('image-to-3d')).toEqual([]);
-    const orchestrator = createAIOrchestrator({
+    const imageOnly = createAIOrchestrator({
       RUNPOD_API_KEY: 'k',
       RUNPOD_TRELLIS2_ENDPOINT_ID: 'ep',
     });
-    expect(orchestrator.selectProvider('image-to-3d').name).toBe('forge3d-trellis2');
+    expect(imageOnly.selectProvider('image-to-3d').name).toBe('forge3d-trellis2');
+    // Text prompts need the reference-image endpoint
+    expect(() => imageOnly.selectProvider('text-to-3d')).toThrow(
+      'No providers available for text-to-3d',
+    );
+    const both = createAIOrchestrator({
+      RUNPOD_API_KEY: 'k',
+      RUNPOD_TRELLIS2_ENDPOINT_ID: 'ep',
+      RUNPOD_REFERENCE_ENDPOINT_ID: 'ref',
+    });
+    expect(both.selectProvider('text-to-3d').name).toBe('forge3d-trellis2');
   });
 });

@@ -28,8 +28,8 @@ from typing import Optional, Sequence, Tuple
 
 import torch
 
-# Texel candidates tested per batch; bounds peak memory (~50 bytes each).
-MAX_CANDIDATES = 1 << 22
+# Texel candidates tested per batch; bounds peak memory (~180 bytes each, ~380 MB per batch).
+MAX_CANDIDATES = 1 << 21
 # Barycentric tolerance: pixel centres exactly on an edge count as inside.
 EDGE_EPS = 1e-6
 

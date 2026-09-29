@@ -30,8 +30,8 @@ def test_generates_consecutive_seeds_and_uploads_pngs():
     assert [c[1] for c in calls] == [10, 11, 12]
     assert calls[0][0].startswith("a brass pocket watch. A single object, centered")
     assert [img["seed"] for img in out["images"]] == [10, 11, 12]
-    assert out["images"][0]["url"] == "https://assets.example.com/ai/gen_7/reference-0.png"
-    data, content_type = storage.saved["ai/gen_7/reference-2.png"]
+    assert out["images"][0]["url"] == "https://assets.example.com/ai/gen_7/reference-10.png"
+    data, content_type = storage.saved["ai/gen_7/reference-12.png"]
     assert content_type == "image/png" and data[:8] == b"\x89PNG\r\n\x1a\n"
 
 
@@ -58,12 +58,20 @@ def test_rejects_bad_input(payload, message):
         parse(payload, "job")
 
 
-def test_failures_are_reported_and_restart_the_worker():
-    def broken(prompt, seed):
-        raise RuntimeError("CUDA error")
+def test_gpu_faults_restart_the_worker_but_other_failures_dont():
+    def gpu_fault(prompt, seed):
+        raise RuntimeError("CUDA error: an illegal memory access was encountered")
 
-    out = handle_job({"id": "j", "input": {"prompt": "a lamp"}}, broken, FakeStorage())
-    assert out == {"error": "generation failed: RuntimeError: CUDA error", "refresh_worker": True}
+    out = handle_job({"id": "j", "input": {"prompt": "a lamp"}}, gpu_fault, FakeStorage())
+    assert out["refresh_worker"] is True
+    assert out["error"].startswith("generation failed: RuntimeError: CUDA error")
+
+    class BrokenStorage:
+        def put(self, key, data, content_type):
+            raise ConnectionError("R2 unreachable")
+
+    out = handle_job({"id": "j", "input": {"prompt": "a lamp"}}, fake_generate([]), BrokenStorage())
+    assert out == {"error": "generation failed: ConnectionError: R2 unreachable"}
 
 
 def test_template_does_not_double_the_full_stop():

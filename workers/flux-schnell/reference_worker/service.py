@@ -30,6 +30,15 @@ class InputError(ValueError):
     pass
 
 
+_GPU_FAULTS = ("cuda", "out of memory", "outofmemory", "cublas", "cudnn", "device-side assert")
+
+
+def needs_restart(err: BaseException) -> bool:
+    """A GPU fault can leave CUDA unusable in this process; other failures (storage, network) can't."""
+    text = f"{type(err).__name__}: {err}".lower()
+    return any(marker in text for marker in _GPU_FAULTS)
+
+
 class Generator(Protocol):
     def __call__(self, prompt: str, seed: int) -> Any: ...  # returns a PIL image
 
@@ -79,11 +88,16 @@ def handle_job(job: dict, generate: Generator, storage: Storage) -> dict:
             image = generate(full_prompt, seed + i)
             buf = io.BytesIO()
             image.save(buf, format="PNG")
-            stored = storage.put(f"ai/{request_id}/reference-{i}.png", buf.getvalue(), "image/png")
+            # The seed keeps each image at its own URL, so caches never serve a stale one
+            key = f"ai/{request_id}/reference-{seed + i}.png"
+            stored = storage.put(key, buf.getvalue(), "image/png")
             images.append({**stored, "seed": seed + i})
     except Exception as err:  # noqa: BLE001
         traceback.print_exc()
-        return {"error": f"generation failed: {type(err).__name__}: {err}", "refresh_worker": True}
+        result = {"error": f"generation failed: {type(err).__name__}: {err}"}
+        if needs_restart(err):
+            result["refresh_worker"] = True
+        return result
 
     return {
         "request_id": request_id,

@@ -7,6 +7,7 @@ import os
 from typing import Any
 
 from . import uv_raster
+from .inputs import InputError
 from .settings import Preset
 
 MODEL_DIR = os.environ.get("TRELLIS2_MODEL_DIR", "/models/TRELLIS.2-4B")
@@ -68,8 +69,15 @@ class Trellis2Runtime:
         self.pipeline = pipeline
 
     def generate(self, image: Any, preset: Preset, seed: int) -> Any:
+        try:
+            # Background removal and cropping; fails when nothing stands out from the background
+            prepared = self.pipeline.preprocess_image(image)
+        except ValueError as err:
+            raise InputError("no object found in the image: use one object on a plain background") from err
         # Same seed, same sparse structure: the final pass refines the preview the user approved
-        return self.pipeline.run(image, seed=seed, pipeline_type=preset.pipeline_type)[0]
+        return self.pipeline.run(
+            prepared, seed=seed, pipeline_type=preset.pipeline_type, preprocess_image=False
+        )[0]
 
     def export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]:
         glb = self._o_voxel.postprocess.to_glb(

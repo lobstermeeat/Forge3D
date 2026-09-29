@@ -32,7 +32,14 @@ class R2Storage:
         )
 
     def put(self, key: str, data: bytes, content_type: str) -> dict:
-        self._client.put_object(Bucket=self.bucket, Key=key, Body=data, ContentType=content_type)
+        self._client.put_object(
+            Bucket=self.bucket,
+            Key=key,
+            Body=data,
+            ContentType=content_type,
+            # Keys include the seed, so a key's content never changes
+            CacheControl="public, max-age=31536000, immutable",
+        )
         url = f"{self.public_base_url.rstrip('/')}/{key}" if self.public_base_url else None
         return {"key": key, "url": url}
 

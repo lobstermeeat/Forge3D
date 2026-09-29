@@ -15,7 +15,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 from .settings import PRESETS, Mode
 
@@ -37,7 +37,8 @@ class Job:
 
     @property
     def output_key(self) -> str:
-        return f"ai/{self.request_id}/{self.mode}.glb"
+        # The seed keeps each result at its own URL, so caches never serve a stale model
+        return f"ai/{self.request_id}/{self.mode}-{self.seed}.glb"
 
 
 Fetch = Callable[[str], bytes]
@@ -49,16 +50,24 @@ def _allowed_hosts() -> set[str]:
 
 
 def _check_url(url: str) -> None:
-    parsed = urllib.parse.urlparse(url)
+    try:
+        parsed = urllib.parse.urlparse(url)
+        port = parsed.port
+    except ValueError as err:
+        raise InputError("image_url is not a valid URL") from err
     if parsed.scheme != "https" or not parsed.hostname:
         raise InputError("image_url must be an https URL")
     host = parsed.hostname.lower()
+    # Only fetch from known hosts (e.g. the R2 bucket). An open fetcher could be pointed at
+    # internal addresses, including via DNS that changes between this check and the fetch.
     allowed = _allowed_hosts()
-    if allowed and host not in allowed:
+    if not allowed:
+        raise InputError("image_url is disabled: set ALLOWED_IMAGE_HOSTS or send image_base64")
+    if host not in allowed:
         raise InputError(f"image_url host {host} is not in ALLOWED_IMAGE_HOSTS")
-    # Refuse private, loopback and link-local targets (e.g. cloud metadata endpoints)
+    # Defence in depth: refuse private, loopback and link-local targets
     try:
-        infos = socket.getaddrinfo(host, parsed.port or 443, proto=socket.IPPROTO_TCP)
+        infos = socket.getaddrinfo(host, port or 443, proto=socket.IPPROTO_TCP)
     except socket.gaierror as err:
         raise InputError(f"image_url host {host} does not resolve") from err
     for info in infos:
@@ -85,8 +94,9 @@ def fetch_url(url: str) -> bytes:
             data = response.read(MAX_IMAGE_BYTES + 1)
     except InputError:
         raise
-    except (urllib.error.URLError, OSError) as err:
-        raise InputError(f"image_url could not be fetched: {err}") from err
+    except (urllib.error.URLError, OSError, ValueError) as err:
+        print(f"[forge3d] fetching {url} failed: {err}")
+        raise InputError("image_url could not be fetched") from err
     if len(data) > MAX_IMAGE_BYTES:
         raise InputError("image is larger than 20 MB")
     return data
@@ -95,11 +105,17 @@ def fetch_url(url: str) -> bytes:
 def _decode_image(data: bytes) -> Image.Image:
     try:
         image = Image.open(io.BytesIO(data))
-        image.load()
     except Exception as err:  # PIL raises many types for bad data
         raise InputError("image could not be decoded") from err
+    # The header gives the size, so check it before decoding the pixels
     if max(image.size) > MAX_IMAGE_SIDE:
         raise InputError(f"image is larger than {MAX_IMAGE_SIDE}px on a side")
+    try:
+        image.load()
+        # Phone photos store their rotation in EXIF; apply it or the model comes out sideways
+        image = ImageOps.exif_transpose(image)
+    except Exception as err:
+        raise InputError("image could not be decoded") from err
     # Keep transparency: TRELLIS.2 skips background removal when alpha is present
     return image.convert("RGBA") if "A" in image.getbands() else image.convert("RGB")
 

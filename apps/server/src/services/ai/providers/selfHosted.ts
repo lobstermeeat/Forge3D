@@ -1,5 +1,6 @@
 import type {
   AIProvider,
+  GenerationType,
   GenerationProgress,
   GenerationRequest,
   GenerationResult,
@@ -46,12 +47,15 @@ interface ReferenceOutput {
  */
 export class SelfHostedProvider implements AIProvider, ReferenceImageProvider {
   readonly name = 'forge3d-trellis2';
-  readonly supportedTypes = ['image-to-3d', 'text-to-3d'] as const;
+  /** Text prompts need the reference-image endpoint. */
+  readonly supportedTypes: readonly GenerationType[];
 
   constructor(
     private readonly trellis2: RunPodEndpoint,
     private readonly reference: RunPodEndpoint | null,
-  ) {}
+  ) {
+    this.supportedTypes = reference ? ['image-to-3d', 'text-to-3d'] : ['image-to-3d'];
+  }
 
   async referenceImages(
     prompt: string,
@@ -84,8 +88,12 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider {
       if (!first) throw new Error('No reference image was generated');
       imageUrl = first.url;
     }
+    // Workers without R2 return images inline; send those as data, not as a URL to fetch
+    const image = imageUrl.startsWith('data:')
+      ? { image_base64: imageUrl.slice(imageUrl.indexOf(',') + 1) }
+      : { image_url: imageUrl };
     return this.trellis2.run({
-      image_url: imageUrl,
+      ...image,
       mode: request.quality ?? 'final',
       seed: request.seed,
       request_id: request.requestId,

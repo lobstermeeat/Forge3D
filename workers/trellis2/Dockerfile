@@ -4,7 +4,7 @@
 #
 #   docker build --secret id=hf_token,env=HF_TOKEN -t forge3d/trellis2-worker workers/trellis2
 #
-# Targets Ampere, Ada and Hopper GPUs (A40, RTX A6000, RTX 4090, L40S, H100) with the CUDA 12.4
+# Targets Ampere, Ada and Hopper GPUs (A100, A40, RTX A6000, RTX 4090, L40S, H100) with the CUDA 12.4
 # stack TRELLIS.2 is tested on. Blackwell cards (RTX 5090) need CUDA 12.8 and a rebuild: see README.
 
 FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
@@ -13,7 +13,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    TORCH_CUDA_ARCH_LIST="8.6;8.9;9.0" \
+    TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0" \
     MAX_JOBS=8 \
     ATTN_BACKEND=flash_attn \
     TRELLIS2_MODEL_DIR=/models/TRELLIS.2-4B \

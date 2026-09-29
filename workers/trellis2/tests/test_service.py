@@ -59,12 +59,12 @@ def test_final_job_runs_every_stage_and_reports_credits():
 
     assert "error" not in out
     assert out["mode"] == "final" and out["seed"] == 1234 and out["request_id"] == "gen_42"
-    assert out["glb"]["url"] == "https://assets.example.com/ai/gen_42/final.glb"
+    assert out["glb"]["url"] == "https://assets.example.com/ai/gen_42/final-1234.glb"
     assert out["bytes"] == 20 and out["raw_bytes"] == 70 and out["triangles"] == 100_000
     assert set(out["timings"]) == {"generate_s", "export_s", "compress_s", "upload_s"}
     assert "Built with DINOv3" in out["credits"]
     assert runtime.calls[0] == ("generate", "1024_cascade", 1234, (64, 48))
-    assert storage.saved["ai/gen_42/final.glb"][1] == "model/gltf-binary"
+    assert storage.saved["ai/gen_42/final-1234.glb"][1] == "model/gltf-binary"
 
 
 def test_preview_uses_the_cheap_preset_and_returns_its_seed():
@@ -73,7 +73,7 @@ def test_preview_uses_the_cheap_preset_and_returns_its_seed():
     assert out["mode"] == "preview"
     assert isinstance(out["seed"], int)  # generated, so the final pass can reuse it
     assert runtime.calls[0][1] == PRESETS["preview"].pipeline_type == "512"
-    assert out["glb"]["key"] == "ai/rp-2/preview.glb"
+    assert out["glb"]["key"] == f"ai/rp-2/preview-{out['seed']}.glb"
 
 
 def test_invalid_input_is_reported_without_running_the_model():
@@ -87,6 +87,24 @@ def test_gpu_failure_is_reported_and_restarts_the_worker():
     out = handle_job({"id": "x", "input": {"image_base64": b64(png_bytes())}}, FakeRuntime(fail=True), FakeStorage(), pack)
     assert out["error"] == "generation failed: RuntimeError: CUDA out of memory"
     assert out["refresh_worker"] is True
+
+
+def test_storage_failure_does_not_restart_the_worker():
+    class BrokenStorage:
+        def put(self, key, data, content_type):
+            raise ConnectionError("R2 unreachable")
+
+    out = handle_job({"id": "x", "input": {"image_base64": b64(png_bytes())}}, FakeRuntime(), BrokenStorage(), pack)
+    assert out == {"error": "generation failed: ConnectionError: R2 unreachable"}
+
+
+def test_no_object_in_the_image_is_an_input_error():
+    class NothingFound(FakeRuntime):
+        def generate(self, image, preset, seed):
+            raise InputError("no object found in the image: use one object on a plain background")
+
+    out = handle_job({"id": "x", "input": {"image_base64": b64(png_bytes())}}, NothingFound(), FakeStorage(), pack)
+    assert out == {"error": "invalid input: no object found in the image: use one object on a plain background"}
 
 
 @pytest.mark.parametrize(
@@ -119,10 +137,34 @@ def test_rejects_oversized_images():
         parse_job({"image_base64": b64(png_bytes(size=(4097, 8)))}, fallback_id="job")
 
 
+def test_url_fetch_is_off_without_an_allowlist(monkeypatch):
+    monkeypatch.delenv("ALLOWED_IMAGE_HOSTS", raising=False)
+    with pytest.raises(InputError, match="image_url is disabled"):
+        inputs._check_url("https://assets.forge3d.app/x.png")
+
+
 def test_url_fetch_refuses_private_addresses(monkeypatch):
+    monkeypatch.setenv("ALLOWED_IMAGE_HOSTS", "metadata.internal")
     monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: [(None, None, None, None, ("169.254.169.254", 443))])
     with pytest.raises(InputError, match="public address"):
         inputs._check_url("https://metadata.internal/latest")
+
+
+@pytest.mark.parametrize("url", ["https://[::1/x.png", "https://assets.forge3d.app:99999/x.png"])
+def test_malformed_urls_are_input_errors(monkeypatch, url):
+    monkeypatch.setenv("ALLOWED_IMAGE_HOSTS", "assets.forge3d.app")
+    with pytest.raises(InputError, match="not a valid URL"):
+        inputs._check_url(url)
+
+
+def test_exif_rotation_is_applied():
+    image = Image.new("RGB", (64, 32), (10, 20, 30))
+    exif = image.getexif()
+    exif[0x0112] = 6  # rotated 90 degrees
+    buf = io.BytesIO()
+    image.save(buf, "JPEG", exif=exif)
+    job = parse_job({"image_base64": b64(buf.getvalue())}, fallback_id="job")
+    assert job.image.size == (32, 64)
 
 
 def test_url_fetch_respects_the_host_allowlist(monkeypatch):
@@ -153,6 +195,7 @@ def test_fetch_errors_become_input_errors(monkeypatch):
         def open(self, *a, **k):
             raise urllib.error.URLError("connection refused")
 
+    monkeypatch.setenv("ALLOWED_IMAGE_HOSTS", "assets.forge3d.app")
     monkeypatch.setattr(inputs, "_OPENER", Broken())
-    with pytest.raises(InputError, match="could not be fetched"):
+    with pytest.raises(InputError, match="^image_url could not be fetched$"):
         inputs.fetch_url("https://assets.forge3d.app/x.png")
