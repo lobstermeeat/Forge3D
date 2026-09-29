@@ -20,7 +20,7 @@
 - [x] CommandHistory (undo/redo stacks with Command interface)
 - [x] MeshFactory (box, sphere, plane, cylinder, torus)
 - [x] MaterialFactory (standard/physical PBR with caching)
-- [x] AssetLoader (GLTF/GLB with DRACO support)
+- [x] AssetLoader (GLTF/GLB with Draco, meshopt and KTX2 support)
 
 ### Server
 - [x] Fastify server with CORS, health check
@@ -28,7 +28,7 @@
 - [x] Drizzle ORM schema (users, sessions, accounts, projects, scenes, assets, ai_generations)
 - [x] tRPC router with project CRUD + scene save/load
 - [x] Protected procedures (auth middleware)
-- [x] AI Orchestrator skeleton (Tripo + Meshy providers)
+- [x] AI Orchestrator with the self-hosted TRELLIS.2 provider (RunPod serverless, see workers/)
 
 ### Client Shell
 - [x] Vite + React 19 setup with path aliases
@@ -134,7 +134,9 @@ Login page exists but bypasses auth entirely.
 - [ ] AI panel component in sidebar
 - [ ] Text prompt input for text-to-3D
 - [ ] Image upload for image-to-3D
-- [ ] Provider selection (Tripo / Meshy)
+- [ ] Reference-image picker for text prompts (FLUX.1 [schnell] worker)
+- [ ] Preview (512³) → keep → final (1024³) flow, reusing the preview seed
+- [ ] Show the provider's credits ("Built with DINOv3") next to generated models
 - [ ] Progress bar during generation
 - [ ] Auto-import generated model into scene
 
@@ -145,7 +147,7 @@ Login page exists but bypasses auth entirely.
 - [ ] Drag-and-drop from library to scene
 
 #### 12. Advanced Rendering
-- [ ] Environment map / HDRI skybox
+- [x] Environment lighting (procedural studio environment, shared by editor and viewer)
 - [ ] Shadows toggle
 - [ ] Post-processing (SSAO, bloom)
 - [ ] Camera presets (front, top, side, perspective)
