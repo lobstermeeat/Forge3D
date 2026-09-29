@@ -108,7 +108,7 @@ export function PublishDialog({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.6)',
+        background: 'rgba(6,7,9,0.62)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -117,21 +117,25 @@ export function PublishDialog({
     >
       <div
         style={{
-          background: '#1e1e2e',
-          borderRadius: 12,
-          width: 520,
-          maxHeight: '85vh',
+          background: 'var(--bg2)',
+          borderRadius: 16,
+          width: 540,
+          maxHeight: '86vh',
           overflow: 'auto',
           padding: 24,
-          border: '1px solid #313244',
-          color: '#cdd6f4',
+          boxShadow: 'inset 0 0 0 1px var(--line2), 0 30px 80px rgba(0,0,0,0.55)',
+          color: 'var(--tx1)',
+          userSelect: 'none',
         }}
       >
         {step === 'form' && (
           <>
-            <h2 style={{ margin: '0 0 16px', fontSize: 20, color: '#cdd6f4' }}>
-              Publish Experience
+            <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: 'var(--tx1)' }}>
+              Publish to FORGE 3D
             </h2>
+            <p style={{ margin: '0 0 18px', fontSize: 12.5, color: 'var(--tx2)' }}>
+              Viewers can explore your scene but can’t download its models.
+            </p>
 
             {/* Thumbnail */}
             <div style={{ marginBottom: 16 }}>
@@ -141,7 +145,7 @@ export function PublishDialog({
                   <img
                     src={thumbnailDataUrl}
                     alt="Thumbnail preview"
-                    style={{ width: '100%', borderRadius: 8, border: '1px solid #313244' }}
+                    style={{ width: '100%', borderRadius: 10, border: '1px solid var(--line2)' }}
                   />
                   <button onClick={captureThumbnail} style={{ ...smallBtnStyle, position: 'absolute', bottom: 8, right: 8 }}>
                     Recapture
@@ -203,15 +207,15 @@ export function PublishDialog({
                     style={{
                       padding: '10px 12px',
                       borderRadius: 8,
-                      border: formatType === opt.value ? '2px solid #2563eb' : '1px solid #313244',
-                      background: formatType === opt.value ? '#1e3a5f' : '#181825',
-                      color: '#cdd6f4',
+                      border: formatType === opt.value ? '1.5px solid var(--acc)' : '1px solid var(--line2)',
+                      background: formatType === opt.value ? 'var(--acc-soft)' : 'var(--bg1)',
+                      color: 'var(--tx1)',
                       cursor: 'pointer',
                       textAlign: 'left',
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{opt.label}</div>
-                    <div style={{ fontSize: 11, color: '#a6adc8', marginTop: 2 }}>{opt.description}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--tx2)', marginTop: 3 }}>{opt.description}</div>
                   </button>
                 ))}
               </div>
@@ -221,7 +225,7 @@ export function PublishDialog({
             <div style={{ marginBottom: 16 }}>
               {formatType === 'turntable' && (
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <label style={{ fontSize: 12, color: '#a6adc8' }}>Speed</label>
+                  <label style={{ fontSize: 12, color: 'var(--tx2)' }}>Speed</label>
                   <input
                     type="range"
                     min={0.1}
@@ -231,8 +235,8 @@ export function PublishDialog({
                     onChange={(e) => formatStore.setTurntableSpeed(parseFloat(e.target.value))}
                     style={{ flex: 1 }}
                   />
-                  <span style={{ fontSize: 11, color: '#6c7086', minWidth: 24 }}>{formatStore.turntableSpeed.toFixed(1)}</span>
-                  <label style={{ fontSize: 12, color: '#a6adc8', marginLeft: 8 }}>Axis</label>
+                  <span style={{ fontSize: 11, color: 'var(--tx3)', minWidth: 24 }}>{formatStore.turntableSpeed.toFixed(1)}</span>
+                  <label style={{ fontSize: 12, color: 'var(--tx2)', marginLeft: 8 }}>Axis</label>
                   <select
                     value={formatStore.turntableAxis}
                     onChange={(e) => formatStore.setTurntableAxis(e.target.value as 'y' | 'x')}
@@ -244,20 +248,20 @@ export function PublishDialog({
                 </div>
               )}
               {formatType === 'video' && (
-                <div style={{ fontSize: 12, color: '#a6adc8' }}>
+                <div style={{ fontSize: 12, color: 'var(--tx2)' }}>
                   {formatStore.keyframes.length} keyframe{formatStore.keyframes.length !== 1 ? 's' : ''} configured
                   {formatStore.keyframes.length < 2 && (
-                    <span style={{ color: '#f38ba8', marginLeft: 8 }}>
+                    <span style={{ color: 'var(--err)', marginLeft: 8 }}>
                       (min 2 required — use Timeline in editor)
                     </span>
                   )}
                 </div>
               )}
               {formatType === 'interactive' && (
-                <div style={{ fontSize: 12, color: '#a6adc8' }}>
+                <div style={{ fontSize: 12, color: 'var(--tx2)' }}>
                   {formatStore.interactions.length} interaction{formatStore.interactions.length !== 1 ? 's' : ''} configured
                   {formatStore.interactions.length === 0 && (
-                    <span style={{ color: '#6c7086', marginLeft: 8 }}>
+                    <span style={{ color: 'var(--tx3)', marginLeft: 8 }}>
                       (assign interactions via Inspector panel)
                     </span>
                   )}
@@ -265,7 +269,7 @@ export function PublishDialog({
               )}
               {formatType === 'animated' && (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <label style={{ fontSize: 12, color: '#a6adc8' }}>Duration (seconds)</label>
+                  <label style={{ fontSize: 12, color: 'var(--tx2)' }}>Duration (seconds)</label>
                   <input
                     type="number"
                     min={1}
@@ -301,7 +305,7 @@ export function PublishDialog({
         {step === 'publishing' && (
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <div style={{ fontSize: 18, marginBottom: 8 }}>Publishing...</div>
-            <div style={{ color: '#a6adc8', fontSize: 13 }}>Preparing your experience for the world</div>
+            <div style={{ color: 'var(--tx2)', fontSize: 13 }}>Preparing your experience for the world</div>
           </div>
         )}
 
@@ -309,7 +313,7 @@ export function PublishDialog({
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>&#10003;</div>
             <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Published!</div>
-            <div style={{ color: '#a6adc8', fontSize: 13, marginBottom: 16 }}>
+            <div style={{ color: 'var(--tx2)', fontSize: 13, marginBottom: 16 }}>
               Your experience is live and ready to share.
             </div>
             {publishedSlug && (
@@ -331,10 +335,10 @@ export function PublishDialog({
 
         {step === 'error' && (
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: '#f38ba8' }}>
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--err)' }}>
               Publishing Failed
             </div>
-            <div style={{ color: '#a6adc8', fontSize: 13, marginBottom: 16 }}>{errorMessage}</div>
+            <div style={{ color: 'var(--tx2)', fontSize: 13, marginBottom: 16 }}>{errorMessage}</div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button onClick={() => setStep('form')} style={cancelBtnStyle}>
                 Back
@@ -354,17 +358,17 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 12,
   fontWeight: 600,
-  color: '#a6adc8',
+  color: 'var(--tx2)',
   marginBottom: 4,
 };
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 12px',
-  borderRadius: 6,
-  border: '1px solid #313244',
-  background: '#181825',
-  color: '#cdd6f4',
+  borderRadius: 7,
+  border: '1px solid transparent',
+  background: 'var(--bg3)',
+  color: 'var(--tx1)',
   fontSize: 13,
   outline: 'none',
   boxSizing: 'border-box',
@@ -372,10 +376,10 @@ const inputStyle: React.CSSProperties = {
 
 const actionBtnStyle: React.CSSProperties = {
   padding: '10px 16px',
-  borderRadius: 8,
-  border: '1px dashed #313244',
-  background: '#181825',
-  color: '#a6adc8',
+  borderRadius: 10,
+  border: '1px dashed var(--line2)',
+  background: 'var(--bg1)',
+  color: 'var(--tx2)',
   cursor: 'pointer',
   width: '100%',
   fontSize: 13,
@@ -383,30 +387,30 @@ const actionBtnStyle: React.CSSProperties = {
 
 const smallBtnStyle: React.CSSProperties = {
   padding: '4px 10px',
-  borderRadius: 6,
-  border: '1px solid #313244',
-  background: '#181825',
-  color: '#cdd6f4',
+  borderRadius: 7,
+  border: '1px solid var(--line2)',
+  background: 'rgba(14,15,18,0.8)',
+  color: 'var(--tx1)',
   cursor: 'pointer',
   fontSize: 11,
 };
 
 const cancelBtnStyle: React.CSSProperties = {
   padding: '8px 20px',
-  borderRadius: 6,
-  border: '1px solid #313244',
-  background: '#313244',
-  color: '#cdd6f4',
+  borderRadius: 7,
+  border: '1px solid var(--line2)',
+  background: 'transparent',
+  color: 'var(--tx1)',
   cursor: 'pointer',
   fontSize: 13,
 };
 
 const publishBtnStyle: React.CSSProperties = {
   padding: '8px 20px',
-  borderRadius: 6,
+  borderRadius: 7,
   border: 'none',
-  background: '#2563eb',
-  color: '#fff',
+  background: 'var(--acc)',
+  color: 'var(--acc-ink)',
   cursor: 'pointer',
   fontSize: 13,
   fontWeight: 600,

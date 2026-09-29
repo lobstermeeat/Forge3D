@@ -26,7 +26,7 @@ export class SceneBridge {
     this.unsubscribe?.();
     this.unsubscribe = null;
     for (const obj of this.entityToObject.values()) {
-      this.threeScene.remove(obj);
+      obj.removeFromParent();
     }
     this.entityToObject.clear();
     this.objectToEntity.clear();
@@ -39,29 +39,30 @@ export class SceneBridge {
     // Remove stale objects
     for (const [id, obj] of this.entityToObject) {
       if (!currentIds.has(id)) {
-        this.threeScene.remove(obj);
+        obj.removeFromParent();
         this.objectToEntity.delete(obj);
         this.entityToObject.delete(id);
       }
     }
 
-    // Add or update
+    // Create objects for new entities first, so parents exist before children attach
     for (const entity of entities) {
-      let obj = this.entityToObject.get(entity.id);
-
-      if (!obj) {
-        obj = this.createObject(entity) ?? undefined;
-        if (obj) {
-          this.entityToObject.set(entity.id, obj);
-          this.objectToEntity.set(obj, entity.id);
-          this.threeScene.add(obj);
-        }
-      }
-
+      if (this.entityToObject.has(entity.id)) continue;
+      const obj = this.createObject(entity);
       if (obj) {
-        this.applyTransform(obj, entity.transform);
-        obj.name = entity.name;
+        this.entityToObject.set(entity.id, obj);
+        this.objectToEntity.set(obj, entity.id);
       }
+    }
+
+    // Entity transforms are local to the parent entity, so mirror the hierarchy
+    for (const entity of entities) {
+      const obj = this.entityToObject.get(entity.id);
+      if (!obj) continue;
+      const parent = this.parentObjectFor(entity);
+      if (obj.parent !== parent) parent.add(obj);
+      this.applyTransform(obj, entity.transform);
+      obj.name = entity.name;
     }
   }
 
@@ -140,6 +141,11 @@ export class SceneBridge {
     return Array.from(this.entityToObject.values());
   }
 
+  /** Objects of top-level entities (their children come along when traversed or exported). */
+  getRootObjects(): THREE.Object3D[] {
+    return this.getManagedObjects().filter((o) => o.parent === this.threeScene);
+  }
+
   readTransform(entityId: string): TransformData | null {
     const obj = this.entityToObject.get(entityId);
     if (!obj) return null;
@@ -159,16 +165,29 @@ export class SceneBridge {
 
   /** Register an already-created Three.js object (e.g. from GLTF import) */
   addExternalObject(entityId: string, obj: THREE.Object3D): void {
+    // sync() already made a placeholder for this entity when it was added; drop it
+    const placeholder = this.entityToObject.get(entityId);
+    if (placeholder && placeholder !== obj) {
+      placeholder.removeFromParent();
+      this.objectToEntity.delete(placeholder);
+    }
     this.entityToObject.set(entityId, obj);
     this.objectToEntity.set(obj, entityId);
-    this.threeScene.add(obj);
+    const entity = this.sceneManager.getEntity(entityId);
+    (entity ? this.parentObjectFor(entity) : this.threeScene).add(obj);
+  }
+
+  /** The object an entity's object should live under: its parent entity's object, or the scene. */
+  private parentObjectFor(entity: Entity): THREE.Object3D {
+    const parent = entity.parentId ? this.entityToObject.get(entity.parentId) : undefined;
+    return parent ?? this.threeScene;
   }
 
   /** Replace a light object after property changes */
   updateLight(entityId: string, data: LightData): void {
     const oldObj = this.entityToObject.get(entityId);
     if (oldObj) {
-      this.threeScene.remove(oldObj);
+      oldObj.removeFromParent();
       this.objectToEntity.delete(oldObj);
     }
     const entity = this.sceneManager.getEntity(entityId);
@@ -178,7 +197,7 @@ export class SceneBridge {
     }
     this.entityToObject.set(entityId, newLight);
     this.objectToEntity.set(newLight, entityId);
-    this.threeScene.add(newLight);
+    (entity ? this.parentObjectFor(entity) : this.threeScene).add(newLight);
   }
 
   dispose(): void {

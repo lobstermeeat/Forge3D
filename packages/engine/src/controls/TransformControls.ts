@@ -9,15 +9,29 @@ export interface TransformControlsOptions {
   scene: THREE.Scene;
 }
 
+/** Snap increments. `null` turns snapping off for that operation. */
+export interface SnapSettings {
+  translate: number | null;
+  rotateDegrees: number | null;
+  scale: number | null;
+}
+
+/** Increments used while Shift is held and persistent snapping is off. */
+const SHIFT_SNAP: SnapSettings = { translate: 1, rotateDegrees: 15, scale: 0.25 };
+
 export class GizmoControls {
   private controls: ThreeTransformControls;
   private scene: THREE.Scene;
+  private domElement: HTMLElement;
+  private snap: SnapSettings = { translate: null, rotateDegrees: null, scale: null };
+  private shiftHeld = false;
   private onChange: ((object: THREE.Object3D) => void) | null = null;
   private onDragStart: (() => void) | null = null;
   private onDragEnd: (() => void) | null = null;
 
   constructor(options: TransformControlsOptions) {
     this.scene = options.scene;
+    this.domElement = options.domElement;
     this.controls = new ThreeTransformControls(options.camera, options.domElement);
     this.controls.setSize(0.75);
     this.scene.add(this.controls.getHelper());
@@ -36,38 +50,48 @@ export class GizmoControls {
       }
     });
 
-    // Keyboard shortcuts for mode switching
-    const onKeyDown = (e: KeyboardEvent) => {
-      switch (e.key.toLowerCase()) {
-        case 'g':
-          this.setMode('translate');
-          break;
-        case 'r':
-          this.setMode('rotate');
-          break;
-        case 's':
-          if (!e.ctrlKey && !e.metaKey) this.setMode('scale');
-          break;
-      }
+    this.domElement.addEventListener('keydown', this.onKeyDown);
+    this.domElement.addEventListener('keyup', this.onKeyUp);
+  }
 
-      // Snap toggle with Shift
-      if (e.shiftKey) {
-        this.controls.setTranslationSnap(1);
-        this.controls.setRotationSnap(THREE.MathUtils.degToRad(15));
-        this.controls.setScaleSnap(0.25);
-      }
-    };
+  // Shift gives temporary snapping when persistent snapping is off
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === 'Shift' && !this.shiftHeld) {
+      this.shiftHeld = true;
+      this.applySnap();
+    }
+  };
 
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (!e.shiftKey) {
-        this.controls.setTranslationSnap(null);
-        this.controls.setRotationSnap(null);
-        this.controls.setScaleSnap(null);
-      }
-    };
+  private onKeyUp = (e: KeyboardEvent): void => {
+    if (e.key === 'Shift') {
+      this.shiftHeld = false;
+      this.applySnap();
+    }
+  };
 
-    options.domElement.addEventListener('keydown', onKeyDown);
-    options.domElement.addEventListener('keyup', onKeyUp);
+  private applySnap(): void {
+    const s = this.shiftHeld
+      ? {
+          translate: this.snap.translate ?? SHIFT_SNAP.translate,
+          rotateDegrees: this.snap.rotateDegrees ?? SHIFT_SNAP.rotateDegrees,
+          scale: this.snap.scale ?? SHIFT_SNAP.scale,
+        }
+      : this.snap;
+    this.controls.setTranslationSnap(s.translate);
+    this.controls.setRotationSnap(
+      s.rotateDegrees === null ? null : THREE.MathUtils.degToRad(s.rotateDegrees),
+    );
+    this.controls.setScaleSnap(s.scale);
+  }
+
+  /** Persistent snapping used for every drag. */
+  setSnap(snap: SnapSettings): void {
+    this.snap = { ...snap };
+    this.applySnap();
+  }
+
+  setSpace(space: 'world' | 'local'): void {
+    this.controls.setSpace(space);
   }
 
   attach(object: THREE.Object3D): void {
@@ -90,6 +114,11 @@ export class GizmoControls {
     return this.controls.dragging;
   }
 
+  /** True while the pointer is over a gizmo handle. */
+  isHovered(): boolean {
+    return this.controls.axis !== null;
+  }
+
   onTransformChange(callback: (object: THREE.Object3D) => void): void {
     this.onChange = callback;
   }
@@ -103,6 +132,8 @@ export class GizmoControls {
   }
 
   dispose(): void {
+    this.domElement.removeEventListener('keydown', this.onKeyDown);
+    this.domElement.removeEventListener('keyup', this.onKeyUp);
     this.scene.remove(this.controls.getHelper());
     this.controls.dispose();
   }

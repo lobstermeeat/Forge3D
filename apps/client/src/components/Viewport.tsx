@@ -1,42 +1,24 @@
 import { forwardRef } from 'react';
 
 interface ViewportProps {
-  rendererType: string | null;
-  ready: boolean;
   onClick?: React.MouseEventHandler<HTMLCanvasElement>;
 }
 
-const Viewport = forwardRef<HTMLCanvasElement, ViewportProps>(
-  ({ rendererType, ready, onClick }, ref) => {
-    return (
-      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-        <canvas
-          ref={ref}
-          style={{ width: '100%', height: '100%', display: 'block' }}
-          tabIndex={0}
-          onClick={onClick}
-        />
-        {ready && rendererType && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 8,
-              right: 8,
-              padding: '4px 8px',
-              background: 'rgba(0,0,0,0.6)',
-              color: '#aaa',
-              fontSize: 12,
-              borderRadius: 4,
-              fontFamily: 'monospace',
-            }}
-          >
-            {rendererType.toUpperCase()}
-          </div>
-        )}
-      </div>
-    );
-  },
-);
+/** The WebGPU/WebGL canvas. Overlays and the renderer label live in the editor chrome. */
+const Viewport = forwardRef<HTMLCanvasElement, ViewportProps>(({ onClick }, ref) => {
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <canvas
+        ref={ref}
+        aria-label="3D viewport"
+        style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
+        tabIndex={0}
+        onClick={onClick}
+        onContextMenu={(e) => e.preventDefault()}
+      />
+    </div>
+  );
+});
 
 Viewport.displayName = 'Viewport';
 export default Viewport;

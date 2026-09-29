@@ -1,76 +1,116 @@
-import { useEffect } from 'react';
-import * as THREE from 'three';
-import { RemoveEntityCommand } from '@forge3d/engine';
-import type { CommandHistory, SceneManager, ViewportControls } from '@forge3d/engine';
+import { useEffect, useRef } from 'react';
 import { useEditorStore } from '@/stores/editorStore';
+import type { EditorActions } from '@/hooks/useEditorActions';
 
 interface ShortcutArgs {
-  history: CommandHistory;
-  sceneManager: SceneManager;
-  controls: React.RefObject<ViewportControls | null>;
-  canvas: HTMLCanvasElement | null;
+  actions: EditorActions;
+  play: () => void;
+  stop: () => void;
+  save: () => void;
 }
 
-export function useKeyboardShortcuts({ history, sceneManager, controls, canvas }: ShortcutArgs) {
+function isTyping(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    target.isContentEditable
+  );
+}
+
+/** Blur the focused field so a half-typed value is committed before play or save. */
+function commitFocusedField(target: EventTarget | null): void {
+  if (isTyping(target)) (target as HTMLElement).blur();
+}
+
+/**
+ * Editor keyboard shortcuts.
+ * G / R / S — move / rotate / scale · F — focus selection · Del — delete
+ * Ctrl+D — duplicate · Ctrl+Z / Ctrl+Shift+Z — undo / redo · Ctrl+S — save
+ * F5 / Shift+F5 — play / stop · Esc — stop or deselect
+ */
+export function useKeyboardShortcuts({ actions, play, stop, save }: ShortcutArgs) {
+  const argsRef = useRef({ actions, play, stop, save });
+  argsRef.current = { actions, play, stop, save };
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const isInput =
-        e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-      if (isInput) return;
+      const { actions: a, play: startPlay, stop: stopPlay, save: saveScene } = argsRef.current;
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
 
-      // Ctrl+Z = Undo
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      // These work even while a field has focus: F5 would otherwise reload the page,
+      // and Ctrl+S would open the browser's "Save page" dialog.
+      if (e.key === 'F5') {
         e.preventDefault();
-        history.undo();
-        sceneManager.notifyChange();
+        commitFocusedField(e.target);
+        if (e.shiftKey) stopPlay();
+        else startPlay();
+        return;
       }
-
-      // Ctrl+Shift+Z = Redo
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) {
+      if (mod && !e.shiftKey && !e.altKey && key === 's') {
         e.preventDefault();
-        history.redo();
-        sceneManager.notifyChange();
+        commitFocusedField(e.target);
+        saveScene();
+        return;
       }
 
-      // Delete selected
-      if ((e.key === 'Delete' || e.key === 'Backspace')) {
-        const selectedEntityId = useEditorStore.getState().selectedEntityId;
-        if (selectedEntityId) {
-          e.preventDefault();
-          const cmd = new RemoveEntityCommand(sceneManager, selectedEntityId);
-          history.execute(cmd);
-          useEditorStore.getState().selectEntity(null);
-          sceneManager.selectEntity(null);
-        }
-      }
+      if (isTyping(e.target)) return;
+      const state = useEditorStore.getState();
 
-      // F = focus on selected
-      if (e.key === 'f') {
-        const selectedEntityId = useEditorStore.getState().selectedEntityId;
-        if (selectedEntityId && controls.current) {
-          const entity = sceneManager.getEntity(selectedEntityId);
-          if (entity) {
-            const t = entity.transform;
-            const target = new THREE.Vector3(t.position[0], t.position[1], t.position[2]);
-            controls.current.focusOn(target);
-          }
-        }
-      }
-
-      // G / R / S = transform mode
-      const { setTransformMode } = useEditorStore.getState();
-      if (e.key === 'g') setTransformMode('translate');
-      if (e.key === 'r') setTransformMode('rotate');
-      if (e.key === 's' && !e.ctrlKey && !e.metaKey) setTransformMode('scale');
-
-      // Escape = deselect
       if (e.key === 'Escape') {
-        useEditorStore.getState().selectEntity(null);
-        sceneManager.selectEntity(null);
+        if (state.isPlaying) stopPlay();
+        else a.select(null);
+        return;
+      }
+
+      // Editing is paused while play-testing
+      if (state.isPlaying) return;
+
+      if (mod && key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) a.redo();
+        else a.undo();
+        return;
+      }
+      if (mod && key === 'y') {
+        e.preventDefault();
+        a.redo();
+        return;
+      }
+      if (mod && key === 'd') {
+        e.preventDefault();
+        a.duplicate();
+        return;
+      }
+      if (mod || e.altKey) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (state.selectedEntityId) {
+          e.preventDefault();
+          a.remove();
+        }
+        return;
+      }
+
+      switch (key) {
+        case 'f':
+          a.focus();
+          break;
+        case 'g':
+          state.setTransformMode('translate');
+          break;
+        case 'r':
+          state.setTransformMode('rotate');
+          break;
+        case 's':
+          state.setTransformMode('scale');
+          break;
       }
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [history, sceneManager, controls, canvas]);
+  }, []);
 }

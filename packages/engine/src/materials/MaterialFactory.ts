@@ -18,9 +18,7 @@ export class MaterialFactory {
         color,
         metalness: descriptor.metalness,
         roughness: descriptor.roughness,
-        emissive: descriptor.emissive
-          ? new THREE.Color(...descriptor.emissive)
-          : undefined,
+        ...(descriptor.emissive ? { emissive: new THREE.Color(...descriptor.emissive) } : {}),
         emissiveIntensity: descriptor.emissiveIntensity ?? 0,
         opacity: descriptor.opacity ?? 1,
         transparent: descriptor.transparent ?? false,
@@ -30,9 +28,7 @@ export class MaterialFactory {
         color,
         metalness: descriptor.metalness,
         roughness: descriptor.roughness,
-        emissive: descriptor.emissive
-          ? new THREE.Color(...descriptor.emissive)
-          : undefined,
+        ...(descriptor.emissive ? { emissive: new THREE.Color(...descriptor.emissive) } : {}),
         emissiveIntensity: descriptor.emissiveIntensity ?? 0,
         opacity: descriptor.opacity ?? 1,
         transparent: descriptor.transparent ?? false,
