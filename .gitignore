@@ -11,3 +11,9 @@ Thumbs.db
 drizzle/meta/
 uploads/
 *.tsbuildinfo
+
+# Python (AI workers)
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
