@@ -1,8 +1,21 @@
+export type GenerationType = 'text-to-3d' | 'image-to-3d';
+
+/**
+ * `preview` is the cheap pass (TRELLIS.2 at 512³, ~30k triangles) shown while the user decides;
+ * `final` is the asset that gets published (1024³, ~100k triangles, 2K textures).
+ */
+export type GenerationQuality = 'preview' | 'final';
+
 export interface GenerationRequest {
-  type: 'text-to-3d' | 'image-to-3d';
+  type: GenerationType;
   prompt?: string;
   imageUrl?: string;
   userId: string;
+  quality?: GenerationQuality;
+  /** Pass the preview's seed to the final run so it refines the shape the user approved. */
+  seed?: number;
+  /** Stable id (letters, digits, - and _) used to name the stored outputs. */
+  requestId?: string;
 }
 
 export interface GenerationResult {
@@ -10,6 +23,11 @@ export interface GenerationResult {
   format: 'glb' | 'gltf' | 'obj' | 'fbx';
   thumbnailUrl?: string;
   durationMs: number;
+  seed?: number;
+  triangles?: number;
+  bytes?: number;
+  /** Attribution to show with the asset, e.g. "Built with DINOv3" (a license requirement). */
+  credits?: string[];
 }
 
 export interface GenerationProgress {
@@ -20,9 +38,25 @@ export interface GenerationProgress {
 
 export interface AIProvider {
   readonly name: string;
-  readonly supportedTypes: readonly ('text-to-3d' | 'image-to-3d')[];
+  readonly supportedTypes: readonly GenerationType[];
 
   generate(request: GenerationRequest): Promise<string>; // returns job ID
   pollStatus(jobId: string): Promise<GenerationProgress>;
   getResult(jobId: string): Promise<GenerationResult>;
+}
+
+export interface ReferenceImage {
+  url: string;
+  seed: number;
+}
+
+/**
+ * Text prompts become a few reference images first. Picking one costs seconds of GPU;
+ * throwing away a generated model costs a minute.
+ */
+export interface ReferenceImageProvider {
+  referenceImages(
+    prompt: string,
+    options?: { count?: number; seed?: number; requestId?: string },
+  ): Promise<ReferenceImage[]>;
 }
