@@ -2,8 +2,13 @@ export { Entity } from './ecs';
 export { SceneManager, SceneBridge } from './scene';
 export { CommandHistory, AddEntityCommand, RemoveEntityCommand, TransformCommand, RenameEntityCommand } from './history';
 export type { Command } from './history';
-export { Renderer } from './renderer';
-export type { RendererOptions, RendererType } from './renderer';
+export {
+  Renderer,
+  createStudioEnvironment,
+  VIEWER_TONE_MAPPING,
+  STUDIO_ENVIRONMENT_INTENSITY,
+} from './renderer';
+export type { RendererOptions, RendererType, PMREMGeneratorClass } from './renderer';
 export { ViewportControls, GizmoControls } from './controls';
 export type { TransformMode, SnapSettings, MouseScheme } from './controls';
 export { MaterialFactory } from './materials';

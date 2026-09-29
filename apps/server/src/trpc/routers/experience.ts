@@ -3,7 +3,11 @@ import { eq, desc, and, sql, inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import { schema } from '../../db';
-import { publishExperienceSchema, experienceListSchema } from '@forge3d/shared';
+import {
+  publishExperienceSchema,
+  experienceListSchema,
+  DEFAULT_ENVIRONMENT,
+} from '@forge3d/shared';
 import { getStorage } from '../../services/storage';
 import { processThumbnail } from '../../services/thumbnail';
 import { indexExperience, removeExperience } from '../../services/search';
@@ -110,10 +114,7 @@ export const experienceRouter = router({
           target: [0, 0, 0],
           fov: 60,
         },
-        environment: {
-          backgroundColor: [0.067, 0.067, 0.106], // #11111b
-          ambientIntensity: 0.4,
-        },
+        environment: { ...DEFAULT_ENVIRONMENT },
         format: input.formatConfig ?? { type: 'turntable', speed: 1, axis: 'y' },
       };
 

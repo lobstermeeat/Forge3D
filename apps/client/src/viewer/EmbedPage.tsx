@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import * as THREE from 'three';
+import {
+  createStudioEnvironment,
+  STUDIO_ENVIRONMENT_INTENSITY,
+  VIEWER_TONE_MAPPING,
+} from '@forge3d/engine';
 import type { ExperienceData } from '@forge3d/shared';
 import { SceneBuilder } from './SceneBuilder';
 import { ViewerControls } from './ViewerControls';
@@ -64,13 +69,16 @@ export function EmbedPage() {
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setSize(canvas.clientWidth, canvas.clientHeight);
         renderer.shadowMap.enabled = true;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMapping = VIEWER_TONE_MAPPING;
 
         const cam = experienceData.camera;
         const camera = new THREE.PerspectiveCamera(cam.fov, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
 
         const scene = new THREE.Scene();
         sceneBuilder.build(experienceData, scene);
+        // Same studio lighting as the editor, so PBR and metal surfaces don't render black
+        scene.environment = createStudioEnvironment(renderer);
+        scene.environmentIntensity = STUDIO_ENVIRONMENT_INTENSITY;
 
         controls = new ViewerControls({
           camera,

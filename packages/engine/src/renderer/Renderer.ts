@@ -1,4 +1,12 @@
 import * as THREE from 'three';
+import { DEFAULT_ENVIRONMENT } from '@forge3d/shared';
+import {
+  createStudioEnvironment,
+  preToneMapped,
+  STUDIO_ENVIRONMENT_INTENSITY,
+  VIEWER_TONE_MAPPING,
+  type PMREMGeneratorClass,
+} from './environment';
 
 export type RendererType = 'webgpu' | 'webgl';
 
@@ -20,11 +28,16 @@ export class Renderer {
   /** Editor-only helpers (grid, sky). Never serialized or published. */
   private grid: THREE.Group | null = null;
   private sky: THREE.Mesh | null = null;
+  private editorBackground = new THREE.Color(0x1b1e24);
+  private viewerBackground = new THREE.Color(...DEFAULT_ENVIRONMENT.backgroundColor);
+  /** WebGPU needs its own PMREM generator; WebGL uses the core one. */
+  private pmremGenerator: PMREMGeneratorClass =
+    THREE.PMREMGenerator as unknown as PMREMGeneratorClass;
 
   constructor(private options: RendererOptions) {
     this.canvas = options.canvas;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1b1e24);
+    this.scene.background = this.editorBackground;
 
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
     this.camera.position.set(6, 5, 8);
@@ -37,7 +50,7 @@ export class Renderer {
     if (preferWebGPU && 'gpu' in navigator) {
       try {
         // Dynamic import — three/webgpu ships separately and has no type declarations yet
-        const { WebGPURenderer } = await import('three/webgpu' as string);
+        const { WebGPURenderer, PMREMGenerator } = await import('three/webgpu' as string);
         const gpuRenderer = new WebGPURenderer({
           canvas: this.canvas,
           antialias: this.options.antialias ?? true,
@@ -46,6 +59,7 @@ export class Renderer {
         await gpuRenderer.init();
         this.renderer = gpuRenderer;
         this.rendererType = 'webgpu';
+        this.pmremGenerator = PMREMGenerator;
         // WebGPURenderer silently falls back to a WebGL 2 backend when no adapter is available
         const onWebGPU = Boolean(
           (gpuRenderer as { backend?: { isWebGPUBackend?: boolean } }).backend?.isWebGPUBackend,
@@ -63,6 +77,7 @@ export class Renderer {
     this.setupResize();
     this.resize();
     this.addDefaultLights();
+    this.addEnvironment();
     this.addEditorHelpers();
 
     return this.rendererType;
@@ -81,23 +96,46 @@ export class Renderer {
     console.log('[Forge3D] Renderer: WebGL');
   }
 
+  /**
+   * The published viewer lights scenes with this ambient level, the studio environment
+   * and the scene's own lights, so the editor uses exactly the same.
+   */
   private addDefaultLights(): void {
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-    this.scene.add(ambient);
+    this.scene.add(new THREE.AmbientLight(0xffffff, DEFAULT_ENVIRONMENT.ambientIntensity));
+  }
 
-    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
-    directional.position.set(10, 10, 5);
-    directional.castShadow = true;
-    this.scene.add(directional);
+  /** Play preview: swap the editor sky for the viewer's background, so Play looks like the viewer. */
+  setPlayPreview(active: boolean): void {
+    if (this.sky) this.sky.visible = !active;
+    this.scene.background = active ? this.viewerBackground : this.editorBackground;
+  }
+
+  /** Image-based lighting and tone mapping that match the published viewer. */
+  private addEnvironment(): void {
+    this.renderer.toneMapping = VIEWER_TONE_MAPPING;
+    // WebGPURenderer tone-maps the whole frame, background included; the viewer's WebGL
+    // renderer leaves the background alone, so pre-compensate to show the same colour
+    if (this.rendererType === 'webgpu') {
+      this.editorBackground = preToneMapped(this.editorBackground);
+      this.viewerBackground = preToneMapped(this.viewerBackground);
+      this.scene.background = this.editorBackground;
+    }
+    try {
+      this.scene.environment = createStudioEnvironment(this.renderer, this.pmremGenerator);
+      this.scene.environmentIntensity = STUDIO_ENVIRONMENT_INTENSITY;
+    } catch (err) {
+      console.warn('[Forge3D] Environment lighting unavailable', err);
+    }
   }
 
   /** Sky dome and a two-level ground grid, like an editor baseplate. */
   private addEditorHelpers(): void {
     // Sky: vertex-coloured dome (works on both WebGL and WebGPU backends)
     const skyGeo = new THREE.SphereGeometry(400, 32, 16);
-    const zenith = new THREE.Color(0x283246);
-    const horizon = new THREE.Color(0x5b6478);
-    const ground = new THREE.Color(0x1d2026);
+    // Pre-compensated so they show as designed after tone mapping
+    const zenith = preToneMapped(new THREE.Color(0x283246));
+    const horizon = preToneMapped(new THREE.Color(0x5b6478));
+    const ground = preToneMapped(new THREE.Color(0x1d2026));
     const colors: number[] = [];
     const pos = skyGeo.attributes.position!;
     const c = new THREE.Color();
@@ -125,8 +163,8 @@ export class Renderer {
     // Grid: fine 1-unit cells plus stronger 10-unit lines
     const grid = new THREE.Group();
     grid.name = '__editor_grid';
-    const fine = Renderer.gridLines(100, 1, 0x8a93a6, 0.16);
-    const major = Renderer.gridLines(100, 10, 0xc3c9d4, 0.3);
+    const fine = Renderer.gridLines(100, 1, preToneMapped(new THREE.Color(0x8a93a6)), 0.16);
+    const major = Renderer.gridLines(100, 10, preToneMapped(new THREE.Color(0xc3c9d4)), 0.3);
     major.position.y = 0.002;
     grid.add(fine, major);
     this.grid = grid;
@@ -140,7 +178,7 @@ export class Renderer {
   private static gridLines(
     size: number,
     step: number,
-    color: number,
+    color: THREE.Color,
     opacity: number,
   ): THREE.LineSegments {
     const half = size / 2;

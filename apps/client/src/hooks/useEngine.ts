@@ -71,6 +71,10 @@ export function useEngine(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     rendererRef.current?.setGridVisible(visible);
   }, []);
 
+  const setPlayPreview = useCallback((active: boolean) => {
+    rendererRef.current?.setPlayPreview(active);
+  }, []);
+
   return {
     renderer: rendererRef,
     controls: controlsRef,
@@ -83,5 +87,6 @@ export function useEngine(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     getCamera,
     addFrameCallback,
     setGridVisible,
+    setPlayPreview,
   };
 }

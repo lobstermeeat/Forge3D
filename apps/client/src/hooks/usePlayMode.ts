@@ -32,6 +32,7 @@ interface PlayDeps {
   sceneManager: SceneManager;
   addFrameCallback: (cb: FrameCallback) => () => void;
   setGridVisible: (visible: boolean) => void;
+  setPlayPreview: (active: boolean) => void;
 }
 
 interface PlaySession {
@@ -76,6 +77,7 @@ export function usePlayMode(d: PlayDeps) {
       controls.update();
     }
     deps.sceneManager.notifyChange(); // re-applies every entity transform
+    deps.setPlayPreview(false);
     deps.setGridVisible(useEditorStore.getState().showGrid);
     setInfo(null);
     useEditorStore.getState().setPlaying(false);
@@ -112,6 +114,7 @@ export function usePlayMode(d: PlayDeps) {
     const savedTarget = controls.target.clone();
     controls.setEnabled(false);
     deps.setGridVisible(false);
+    deps.setPlayPreview(true);
 
     const viewer = new ViewerControls({
       camera,

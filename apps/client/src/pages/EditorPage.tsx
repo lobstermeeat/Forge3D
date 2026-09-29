@@ -40,7 +40,18 @@ export function EditorPage() {
   const [dropActive, setDropActive] = useState(false);
 
   const engine = useEngine(canvasRef);
-  const { controls, sceneManager, history, backendLabel, ready, getScene, getCamera, addFrameCallback, setGridVisible } = engine;
+  const {
+    controls,
+    sceneManager,
+    history,
+    backendLabel,
+    ready,
+    getScene,
+    getCamera,
+    addFrameCallback,
+    setGridVisible,
+    setPlayPreview,
+  } = engine;
 
   const selectedId = useEditorStore((s) => s.selectedEntityId);
   const panels = useEditorStore((s) => s.panels);
@@ -110,6 +121,7 @@ export function EditorPage() {
     sceneManager,
     addFrameCallback,
     setGridVisible,
+    setPlayPreview,
   });
 
   // Ctrl+S: save now on a dashboard scene; a scratch scene has nowhere to save to

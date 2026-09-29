@@ -37,8 +37,8 @@ export const MATERIAL_PRESETS: MaterialPreset[] = [
     key: 'metal',
     label: 'Metal',
     patch: {
-      metalness: 0.6,
-      roughness: 0.35,
+      metalness: 1,
+      roughness: 0.3,
       opacity: 1,
       transparent: false,
       emissiveIntensity: 0,

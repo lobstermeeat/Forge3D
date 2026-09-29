@@ -128,7 +128,7 @@ export class SceneBuilder {
       color,
       metalness: desc.metalness,
       roughness: desc.roughness,
-      emissive: desc.emissive ? new THREE.Color(...desc.emissive) : undefined,
+      ...(desc.emissive ? { emissive: new THREE.Color(...desc.emissive) } : {}),
       emissiveIntensity: desc.emissiveIntensity ?? 0,
       opacity: desc.opacity ?? 1,
       transparent: desc.transparent ?? false,
