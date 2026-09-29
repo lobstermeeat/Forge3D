@@ -121,14 +121,6 @@ export function TopBar({
                 actions.saveToFile();
               }}
             />
-            <MenuItem
-              icon="export"
-              label="Export as .glb"
-              onSelect={() => {
-                close();
-                void actions.exportGLB();
-              }}
-            />
             <div className="f3-pop-sep" />
             <MenuItem
               icon="publish"

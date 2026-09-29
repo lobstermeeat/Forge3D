@@ -141,11 +141,6 @@ export class SceneBridge {
     return Array.from(this.entityToObject.values());
   }
 
-  /** Objects of top-level entities (their children come along when traversed or exported). */
-  getRootObjects(): THREE.Object3D[] {
-    return this.getManagedObjects().filter((o) => o.parent === this.threeScene);
-  }
-
   readTransform(entityId: string): TransformData | null {
     const obj = this.entityToObject.get(entityId);
     if (!obj) return null;

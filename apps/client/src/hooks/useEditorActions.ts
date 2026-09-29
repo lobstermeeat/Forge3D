@@ -7,7 +7,6 @@ import {
   TransformCommand,
   AssetLoader,
   importGroupToScene,
-  exportSceneAsGLB,
 } from '@forge3d/engine';
 import type { CommandHistory, SceneBridge, SceneManager, ViewportControls } from '@forge3d/engine';
 import type { LightData, MeshRendererData, TransformData } from '@forge3d/shared';
@@ -330,24 +329,6 @@ function createActions(d: ActionDeps) {
         }
       };
       reader.readAsText(file);
-    },
-
-    async exportGLB() {
-      const objects = bridge.current?.getRootObjects();
-      if (!objects || objects.length === 0) {
-        logOutput('warn', 'Nothing to export yet');
-        return;
-      }
-      try {
-        const buffer = await exportSceneAsGLB(objects);
-        download(new Blob([buffer], { type: 'model/gltf-binary' }), 'scene.glb');
-        logOutput('ok', 'Exported scene.glb');
-      } catch (err) {
-        logOutput(
-          'error',
-          `GLB export failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
     },
   };
 
