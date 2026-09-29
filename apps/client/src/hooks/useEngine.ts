@@ -29,6 +29,7 @@ export function useEngine(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
         return;
       }
 
+      renderer.addStudioEnvironment();
       setRendererType(type);
       setBackendLabel(renderer.getBackendLabel());
 

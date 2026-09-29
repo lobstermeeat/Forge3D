@@ -77,7 +77,7 @@ export class Renderer {
     this.setupResize();
     this.resize();
     this.addDefaultLights();
-    this.addEnvironment();
+    this.configureToneMapping();
     this.addEditorHelpers();
 
     return this.rendererType;
@@ -111,7 +111,7 @@ export class Renderer {
   }
 
   /** Image-based lighting and tone mapping that match the published viewer. */
-  private addEnvironment(): void {
+  private configureToneMapping(): void {
     this.renderer.toneMapping = VIEWER_TONE_MAPPING;
     // WebGPURenderer tone-maps the whole frame, background included; the viewer's WebGL
     // renderer leaves the background alone, so pre-compensate to show the same colour
@@ -120,6 +120,15 @@ export class Renderer {
       this.viewerBackground = preToneMapped(this.viewerBackground);
       this.scene.background = this.editorBackground;
     }
+  }
+
+  /**
+   * Bake the studio environment (renders on the GPU). Call once the renderer is known to be
+   * the live one: React StrictMode starts a second renderer on the same canvas, and GPU work
+   * from the discarded one corrupts the shared context.
+   */
+  addStudioEnvironment(): void {
+    if (this.scene.environment) return;
     try {
       this.scene.environment = createStudioEnvironment(this.renderer, this.pmremGenerator);
       this.scene.environmentIntensity = STUDIO_ENVIRONMENT_INTENSITY;
