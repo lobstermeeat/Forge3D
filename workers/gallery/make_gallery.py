@@ -93,10 +93,17 @@ class Run:
     models: list[Model] = field(default_factory=list)
     failures: list[str] = field(default_factory=list)
     gpu_seconds: float = 0.0
+    photo: bool = False  # started from a photo rather than a prompt
 
     @property
     def cost(self) -> float:
         return self.gpu_seconds * DOLLARS_PER_GPU_SECOND
+
+
+def _photo_name(file: str) -> str:
+    """A heading for a photo run: input-toy-car.jpg -> Toy car."""
+    words = pathlib.Path(file).stem.removeprefix("input-").replace("-", " ").replace("_", " ").strip()
+    return words[:1].upper() + words[1:] if words else "Photo"
 
 
 def _save_webp(image, target: pathlib.Path, quality: int = 82) -> None:
@@ -132,7 +139,8 @@ def load_runs(root: pathlib.Path, out: pathlib.Path) -> list[tuple[Run, pathlib.
         folder = progress.parent
         state = json.loads(progress.read_text())
         steps = state.get("steps", {})
-        run = Run(name=folder.name, subject=state.get("prompt") or f"Image: {state.get('input', '')}")
+        prompt = state.get("prompt")
+        run = Run(name=folder.name, subject=prompt or _photo_name(state.get("input", "")), photo=not prompt)
         for step, info in steps.items():
             if info.get("status") == "failed":
                 run.failures.append(f"{step}: {info.get('error')}")
@@ -228,8 +236,9 @@ def page(runs: list[Run], title: str, subtitle: str, three_version: Optional[str
     cards = []
     for run in runs:
         refs = "".join(
-            f'<img class="ref{" chosen" if src == run.chosen else ""}" src="{e(src)}" alt="Reference image'
-            f'{" used for 3D" if src == run.chosen else ""}" loading="lazy" width="200" height="200">'
+            f'<img class="ref{" chosen" if src == run.chosen else ""}" src="{e(src)}" '
+            f'alt="{"Input photo" if run.photo else "Reference image" + (" used for 3D" if src == run.chosen else "")}" '
+            'loading="lazy" width="200" height="200">'
             for src in run.references
         )
         models = []

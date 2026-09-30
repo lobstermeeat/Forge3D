@@ -141,11 +141,13 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
 **Without your computer:** the `AI ops (Modal)` GitHub workflow runs the same commands on
 GitHub's servers. Add the repository secrets `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` (Modal >
 Settings > API Tokens), put the commands in `ops/run.sh` and push it to the `ai-ops` branch.
-The log and anything the script writes to `ops-out/` land on the `ai-results` branch under
-`runs/<id>/`, with the tokens scrubbed. In a public repository that branch is public, so what
-the script writes to `ops-out/private/` is saved only encrypted, for the holder of the private
-key matching `ops/results-public-key.pem` (`ops/seal.sh` explains how to make one and open the
-results). `bash ops/gallery.sh "<title>"` puts a test set's gallery and final models there.
+The log and anything the script writes to `ops-out/` are saved under `runs/<id>/` in
+`refs/ops/results` (`git fetch origin refs/ops/results`), a ref rather than a branch so that
+Vercel and similar integrations don't try to deploy it, with the tokens scrubbed. In a public
+repository it is public, so what the script writes to `ops-out/private/` is saved only
+encrypted, for the holder of the private key matching `ops/results-public-key.pem`
+(`ops/seal.sh` explains how to make one and open the results).
+`bash ops/gallery.sh orainge-outputs/<set> "<title>"` puts a test set's gallery there.
 
 **Review a test set:** a set is a text file with one prompt, or the path of a photo, per line;
 `workers/test-sets/starter.txt` covers eight kinds of game assets, and `renders.txt` six photos
@@ -163,7 +165,9 @@ zoom, wireframe) for each final. It needs `pnpm install` and Playwright's Chromi
 for 60 s after their last job (idle time is billed; a cold start takes about a minute) and are
 capped at 2 TRELLIS.2 containers and 1 FLUX container to bound spending. `TRELLIS2_GPU = "A10"`
 costs about half as much per second but is slower and has only 24 GB; set
-`TRELLIS2_LOW_VRAM = "1"` with it.
+`TRELLIS2_LOW_VRAM = "1"` with it. Compiled GPU kernels and FlexGEMM's kernel tuning are kept
+in the `orainge-cache` volume, so only the first containers spend time compiling and
+benchmarking them.
 
 **R2 storage** (for production): put the storage variables from the RunPod table below in a
 Modal secret, then deploy with its name in `ORAINGE_R2_SECRET`:

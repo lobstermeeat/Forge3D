@@ -57,6 +57,10 @@ app = modal.App(APP_NAME)
 models = modal.Volume.from_name("orainge-models", create_if_missing=True)
 # What `make` produces, one folder per run, so results outlive the computer that asked for them
 outputs = modal.Volume.from_name("orainge-outputs", create_if_missing=True)
+# Compiled Triton kernels and FlexGEMM's kernel tuning, kept between containers. Without them each
+# new container spends most of its first minute compiling and benchmarking kernel variants.
+cache = modal.Volume.from_name("orainge-cache", create_if_missing=True)
+CACHE = "/cache"
 
 # Results are returned inline (base64, 8 MB limit) unless R2 is configured: create a Modal secret
 # with the R2_* variables (see README) and deploy with ORAINGE_R2_SECRET set to its name.
@@ -124,6 +128,7 @@ trellis2_image = (
             "HF_HUB_OFFLINE": "1",
             "TRELLIS2_MODEL_DIR": f"{MODELS}/TRELLIS.2-4B",
             "TRELLIS2_LOW_VRAM": TRELLIS2_LOW_VRAM,
+            "TRITON_CACHE_DIR": f"{CACHE}/triton",
         }
     )
     .add_local_dir(WORKERS / "trellis2" / "forge3d_worker", "/root/forge3d_worker")
@@ -181,12 +186,57 @@ def _require_weights(name: str) -> None:
         )
 
 
+# FlexGEMM keeps its tuning results in a local file (device -> kernel -> input shape -> config)
+LOCAL_TUNING = pathlib.Path.home() / ".flex_gemm" / "autotune_cache.json"
+SHARED_TUNING = pathlib.Path(CACHE) / "flex_gemm" / "autotune_cache.json"
+
+
+def merge_tuning(into: pathlib.Path, source: pathlib.Path) -> bool:
+    """Adds FlexGEMM tuning results from `source` to `into`. Returns whether `into` changed."""
+    try:
+        found = json.loads(source.read_text())
+    except (OSError, ValueError):
+        return False
+    try:
+        merged = json.loads(into.read_text())
+    except (OSError, ValueError):
+        merged = {}
+    changed = False
+    for device, kernels in found.items():
+        for kernel, shapes in kernels.items():
+            known = merged.setdefault(device, {}).setdefault(kernel, {})
+            for shape, config in shapes.items():
+                if known.get(shape) != config:
+                    known[shape] = config
+                    changed = True
+    if changed:
+        into.parent.mkdir(parents=True, exist_ok=True)
+        partial = into.with_name(into.name + ".partial")
+        partial.write_text(json.dumps(merged))
+        partial.replace(into)
+    return changed
+
+
+def share_caches() -> None:
+    """After a job: saves new compiled kernels and tuning results for the containers to come."""
+    import modal.exception as mx
+
+    try:
+        cache.commit()  # Triton writes its kernels straight into the volume
+        cache.reload()  # tuning results other containers saved since this one started
+        if merge_tuning(SHARED_TUNING, LOCAL_TUNING):
+            cache.commit()
+    except (mx.Error, OSError) as err:
+        # Only speed is at stake, so a failed save never fails the job
+        print(f"[orainge] kernel caches not saved: {type(err).__name__}: {err}")
+
+
 @app.cls(
     image=trellis2_image,
     gpu=TRELLIS2_GPU,
     cpu=4.0,
     memory=16384,
-    volumes={MODELS: models},
+    volumes={MODELS: models, CACHE: cache},
     secrets=storage_secrets,
     timeout=600,
     startup_timeout=600,
@@ -204,13 +254,18 @@ class Trellis2:
         from forge3d_worker.storage import storage_from_env
 
         _require_weights("trellis2")
+        # FlexGEMM reads its tuning results when it is imported, so bring in the shared ones first
+        merge_tuning(LOCAL_TUNING, SHARED_TUNING)
         storage = storage_from_env()
         runtime = Trellis2Runtime(f"{MODELS}/TRELLIS.2-4B")
         self.handle = lambda job: handle_job(job, runtime, storage, pack_glb)
 
     @modal.method()
     def generate(self, job: dict) -> dict:
-        return run_job(self.handle, job)
+        try:
+            return run_job(self.handle, job)
+        finally:
+            share_caches()
 
 
 @app.cls(
