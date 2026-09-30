@@ -38,7 +38,8 @@ interface Trellis2Output {
 interface ReferenceOutput {
   request_id: string;
   prompt: string;
-  images: (StoredAsset & { seed: number })[];
+  /** `score` (0..1) and `issues`: how good a start for 3D the worker rates the picture, if it does */
+  images: (StoredAsset & { seed: number; score?: unknown; issues?: unknown })[];
   seconds: number;
   error?: string;
 }
@@ -80,7 +81,11 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
   async references(jobId: string): Promise<WorkerJobState<ReferencesOutput>> {
     if (!this.reference) throw new Error('Text prompts need the reference-image worker');
     return jobState(await this.reference.status<ReferenceOutput>(jobId), (output) => ({
-      images: output.images.map((image) => ({ file: workerFile(image), seed: image.seed })),
+      images: output.images.map((image) => ({
+        file: workerFile(image),
+        seed: image.seed,
+        ...rating(image),
+      })),
     }));
   }
 
@@ -207,6 +212,28 @@ function jobState<T extends { error?: string }, R>(
         message: job.error ?? `The job was ${job.status.toLowerCase().replace('_', ' ')}`,
       };
   }
+}
+
+/**
+ * How the worker rated a picture as a start for 3D, keeping only what it could read: workers from
+ * before ratings send neither field.
+ */
+function rating(image: { score?: unknown; issues?: unknown }): {
+  score?: number;
+  issues?: string[];
+} {
+  const score =
+    typeof image.score === 'number' && Number.isFinite(image.score) ? image.score : undefined;
+  const issues = Array.isArray(image.issues)
+    ? image.issues
+        .filter((issue): issue is string => typeof issue === 'string')
+        .map((issue) => issue.trim())
+        .filter(Boolean)
+    : [];
+  return {
+    ...(score === undefined ? {} : { score }),
+    ...(issues.length ? { issues } : {}),
+  };
 }
 
 function workerFile(asset: StoredAsset): WorkerFile {

@@ -386,4 +386,48 @@ describe('SelfHostedProvider', () => {
       },
     });
   });
+
+  it('passes on how the worker rated each picture, when it did', async () => {
+    const picture = (seed: number) => ({
+      key: `ai/gen-5/reference-${seed}.png`,
+      url: `https://r2.test/ai/gen-5/reference-${seed}.png`,
+      seed,
+    });
+    const api = fakeJobApi([
+      {
+        id: 'fc-ref',
+        status: 'COMPLETED',
+        output: {
+          request_id: 'gen-5',
+          prompt: 'a lamp',
+          seconds: 3.2,
+          images: [
+            { ...picture(7), score: 0.35, issues: ['cut off at the bottom', ' two objects '] },
+            { ...picture(8), score: 0.88, issues: [] },
+            picture(9), // a worker from before ratings
+            // What can't be read is left out
+            { ...picture(10), score: null, issues: ['', 7, null, 'small in the frame'] },
+            { ...picture(11), score: '0.9', issues: 'cut off' },
+          ],
+        },
+      },
+    ]);
+    const provider = createSelfHostedProvider(
+      { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
+      api.fetchImpl,
+    )!;
+    const file = (seed: number) => ({ url: `https://r2.test/ai/gen-5/reference-${seed}.png` });
+    expect(await provider.references('fc-ref')).toStrictEqual({
+      status: 'done',
+      output: {
+        images: [
+          { file: file(7), seed: 7, score: 0.35, issues: ['cut off at the bottom', 'two objects'] },
+          { file: file(8), seed: 8, score: 0.88 },
+          { file: file(9), seed: 9 },
+          { file: file(10), seed: 10, issues: ['small in the frame'] },
+          { file: file(11), seed: 11 },
+        ],
+      },
+    });
+  });
 });

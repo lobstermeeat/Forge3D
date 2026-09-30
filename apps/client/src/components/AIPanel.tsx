@@ -65,6 +65,12 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** A picture's tooltip: what the worker found that makes it a worse start for 3D, one per line. */
+function issuesText(issues: string[] | undefined): string | undefined {
+  if (!issues?.length) return undefined;
+  return issues.map((issue) => issue.charAt(0).toUpperCase() + issue.slice(1)).join('\n');
+}
+
 export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?: string }) {
   const navigate = useNavigate();
   const { data: session, isPending: sessionPending } = useSession();
@@ -155,8 +161,10 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
     if (g?.status) void utils.ai.recent.invalidate();
   }, [g?.id, g?.status, utils]);
 
-  // A new step starts with no picture chosen
-  useEffect(() => setPicked(null), [g?.id, g?.status]);
+  // A new step starts with no picture chosen, except that picking starts on the one rated the
+  // best start for 3D (if the worker rated them). The user can still choose any.
+  const preselected = g?.status === 'picking' ? g.recommended : null;
+  useEffect(() => setPicked(preselected), [g?.id, g?.status, preselected]);
 
   const elapsed = useElapsed(`${g?.id}:${g?.status}`, !!g && RUNNING.has(g.status));
 
@@ -445,21 +453,26 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
                 role="radiogroup"
                 aria-label="Pictures to make 3D from"
               >
-                {g.references.map((ref, i) => (
-                  <button
-                    key={ref.url}
-                    type="button"
-                    role="radio"
-                    className="f3-ai-pick"
-                    aria-checked={picked === i}
-                    aria-label={`Picture ${i + 1}`}
-                    data-current={g.image === ref.url || undefined}
-                    onClick={() => setPicked(i)}
-                    onDoubleClick={() => pick.mutate({ id: g.id, index: i })}
-                  >
-                    <img src={ref.url} alt="" />
-                  </button>
-                ))}
+                {g.references.map((ref, i) => {
+                  const best = i === g.recommended;
+                  return (
+                    <button
+                      key={ref.url}
+                      type="button"
+                      role="radio"
+                      className="f3-ai-pick"
+                      aria-checked={picked === i}
+                      aria-label={best ? `Picture ${i + 1}, best for 3D` : `Picture ${i + 1}`}
+                      title={issuesText(ref.issues)}
+                      data-current={g.image === ref.url || undefined}
+                      data-recommended={best || undefined}
+                      onClick={() => setPicked(i)}
+                      onDoubleClick={() => pick.mutate({ id: g.id, index: i })}
+                    >
+                      <img src={ref.url} alt="" />
+                    </button>
+                  );
+                })}
               </div>
               <button
                 type="button"
@@ -500,7 +513,7 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
         <section className="f3-ai-recent" aria-label="Recent AI models">
           <p className="f3-ai-label">Recent</p>
           {history.map((r) => {
-            const thumb = r.image ?? r.references[0]?.url;
+            const thumb = r.image ?? r.references[r.recommended ?? 0]?.url;
             return (
               <button
                 key={r.id}

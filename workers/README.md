@@ -192,6 +192,10 @@ object or upload a photo, pick one of the four pictures, get a preview placed in
 keep it to replace the preview with the final where it stands. Scenes store models by URL (the
 `model` component), so they survive saving, reloading, collaboration and publishing.
 
+When the FLUX worker rates its pictures (`score` and `issues` on each image), the panel marks the
+highest-scoring one "Best for 3D" and chooses it to begin with, and a picture's issues show when
+the pointer rests on it. The user can still pick any of them.
+
 The server needs `AI_WORKERS_URL` and `AI_WORKERS_TOKEN` (Modal, above) or the RunPod variables,
 and the `ai_generations` table as in `apps/server/src/db/schema.ts`
 (`pnpm --filter @forge3d/server exec drizzle-kit push` in development). Pictures and models are
@@ -200,8 +204,9 @@ user can have 3 models in progress and 30 an hour until credits exist
 (`apps/server/src/services/ai/studio.ts`).
 
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
-labelled pictures and return a small house model after a second or two. A prompt with the word
-"fail", or a photo under 64 px, shows the error states. It refuses to run in production.
+labelled pictures (rated, with the second always the best) and return a small house model after
+a second or two. A prompt with the word "fail", or a photo under 64 px, shows the error states.
+It refuses to run in production.
 
 ## Deploying on RunPod
 

@@ -223,7 +223,12 @@ describe('AIStudio', () => {
       .jpeg()
       .toBuffer();
     const gen = await studio.startFromPhoto('u1', photo);
-    expect(gen).toMatchObject({ status: 'previewing', source: 'photo' });
+    expect(gen).toMatchObject({
+      status: 'previewing',
+      source: 'photo',
+      references: [],
+      recommended: null,
+    });
     expect(gen.image).toBe(`https://files.test/ai/${gen.id}/input.jpg`);
     const stored = storage.files.get(`ai/${gen.id}/input.jpg`)!;
     expect(await sharp(stored).metadata()).toMatchObject({
@@ -374,5 +379,93 @@ describe('AIStudio', () => {
     release();
     expect((await slow).status).toBe('finishing');
     expect((await studio.get('u1', gen.id)).status).toBe('finishing');
+  });
+
+  it('keeps how the worker rated each picture and recommends the best start for 3D', async () => {
+    const { studio, store, references } = setup();
+    let gen = await studio.startFromPrompt('u1', 'a desk lamp');
+    expect(gen.recommended).toBeNull();
+
+    const ratings = [
+      { score: 0.42, issues: ['cut off at the bottom', 'more than one object'] },
+      { score: 0.91 },
+      { score: 0.91, issues: [] },
+      {},
+    ];
+    references.set('ref-1', {
+      status: 'done',
+      output: {
+        images: await Promise.all(
+          ratings.map(async (rating, i) => ({
+            file: { data: await png('#abc') },
+            seed: 20 + i,
+            ...rating,
+          })),
+        ),
+      },
+    });
+    gen = await studio.get('u1', gen.id);
+    // The first of equal scores; a picture without one is never recommended
+    expect(gen).toMatchObject({ status: 'picking', recommended: 1 });
+    const url = (seed: number) => `https://files.test/ai/${gen.id}/reference-${seed}.png`;
+    // Stored with each picture, leaving out what the worker didn't say
+    expect(store.rows.get(gen.id)!.referenceImages).toStrictEqual([
+      {
+        url: url(20),
+        seed: 20,
+        score: 0.42,
+        issues: ['cut off at the bottom', 'more than one object'],
+      },
+      { url: url(21), seed: 21, score: 0.91 },
+      { url: url(22), seed: 22, score: 0.91 },
+      { url: url(23), seed: 23 },
+    ]);
+    expect(gen.references).toStrictEqual(store.rows.get(gen.id)!.referenceImages);
+
+    // The user still chooses, and the recommendation stays for trying another picture later
+    gen = await studio.pick('u1', gen.id, 3);
+    expect(gen).toMatchObject({ status: 'previewing', image: url(23), recommended: 1 });
+  });
+
+  it('recommends the highest score, however low', async () => {
+    const { studio, references } = setup();
+    const gen = await studio.startFromPrompt('u1', 'a forest clearing with three tents');
+    references.set('ref-1', {
+      status: 'done',
+      output: {
+        images: await Promise.all(
+          [0.05, undefined, 0.12, 0].map(async (score, i) => ({
+            file: { data: await png('#abc') },
+            seed: 30 + i,
+            ...(score === undefined ? {} : { score, issues: ['more than one object'] }),
+          })),
+        ),
+      },
+    });
+    expect(await studio.get('u1', gen.id)).toMatchObject({ status: 'picking', recommended: 2 });
+  });
+
+  it('recommends nothing for pictures drawn before the worker rated them', async () => {
+    const { studio, store } = setup();
+    // A row from before scores: its pictures have only a URL and a seed
+    const old = await store.create({
+      userId: 'u1',
+      provider: 'forge3d-trellis2',
+      prompt: 'a chair',
+      status: 'picking',
+      referenceImages: [
+        { url: 'https://files.test/ai/old/reference-1.png', seed: 1 },
+        { url: 'https://files.test/ai/old/reference-2.png', seed: 2 },
+      ],
+    });
+    expect(await studio.get('u1', old.id)).toMatchObject({
+      status: 'picking',
+      references: [{ seed: 1 }, { seed: 2 }],
+      recommended: null,
+    });
+    expect((await studio.recent('u1'))[0]).toMatchObject({ id: old.id, recommended: null });
+    expect((await studio.pick('u1', old.id, 1)).image).toBe(
+      'https://files.test/ai/old/reference-2.png',
+    );
   });
 });

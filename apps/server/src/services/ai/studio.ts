@@ -20,6 +20,9 @@ import type { StudioWorkers, WorkerFile } from './types';
  * Every job is started and then polled by `get`, so no request waits on a GPU. Pictures and
  * models are copied into the server's storage, so scenes keep working after the workers forget
  * their outputs.
+ *
+ * The FLUX worker rates each picture as a start for 3D (the object's size in the frame, not cut
+ * off, just one), and `recommended` points out the best one. The user still picks.
  */
 
 export type GenerationStatus =
@@ -35,6 +38,8 @@ type JobKind = 'references' | 'preview' | 'final';
 
 export type GenerationRecord = typeof schema.aiGenerations.$inferSelect;
 export type NewGeneration = typeof schema.aiGenerations.$inferInsert;
+/** A picture drawn for a prompt, with the worker's rating of it (score, issues) if it gave one */
+export type ReferencePicture = NonNullable<GenerationRecord['referenceImages']>[number];
 
 export interface GenerationStore {
   create(values: NewGeneration): Promise<GenerationRecord>;
@@ -59,7 +64,9 @@ export interface GenerationView {
   prompt: string | null;
   status: GenerationStatus;
   /** The pictures FLUX drew for a prompt, to pick from */
-  references: { url: string; seed: number }[];
+  references: ReferencePicture[];
+  /** The index of the picture with the highest score, or null when none has a score */
+  recommended: number | null;
   /** The picture that went (or goes) to 3D */
   image: string | null;
   preview: { url: string; triangles: number | null } | null;
@@ -256,13 +263,15 @@ export class AIStudio {
         const state = await workers.references(jobId);
         if (state.status === 'running') return record;
         if (state.status === 'failed') return this.settle(record, failure(kind, state.message));
-        const references = [];
-        for (const image of state.output.images) {
-          const data = await this.download(image.file);
-          const key = `ai/${record.id}/reference-${image.seed}.png`;
+        const references: ReferencePicture[] = [];
+        for (const { file, seed, score, issues } of state.output.images) {
+          const data = await this.download(file);
+          const key = `ai/${record.id}/reference-${seed}.png`;
           references.push({
             url: await this.deps.storage.write(key, data, 'image/png'),
-            seed: image.seed,
+            seed,
+            ...(score === undefined ? {} : { score }),
+            ...(issues?.length ? { issues } : {}),
           });
         }
         return await this.settle(record, {
@@ -389,12 +398,14 @@ function failure(kind: JobKind, reason: unknown): Partial<NewGeneration> {
 }
 
 function view(record: GenerationRecord): GenerationView {
+  const references = record.referenceImages ?? [];
   return {
     id: record.id,
     source: record.source === 'photo' ? 'photo' : 'prompt',
     prompt: record.prompt,
     status: record.status as GenerationStatus,
-    references: record.referenceImages ?? [],
+    references,
+    recommended: bestPicture(references),
     image: record.imageUrl,
     preview: record.previewUrl
       ? { url: record.previewUrl, triangles: record.previewTriangles }
@@ -405,6 +416,22 @@ function view(record: GenerationRecord): GenerationView {
     sceneId: record.sceneId,
     createdAt: record.createdAt.toISOString(),
   };
+}
+
+/**
+ * The picture with the highest score (the first of equals), or null when none has one, such as
+ * pictures drawn before the worker rated them.
+ */
+function bestPicture(references: ReferencePicture[]): number | null {
+  let best: number | null = null;
+  let bestScore = -Infinity;
+  for (const [index, { score }] of references.entries()) {
+    if (typeof score === 'number' && score > bestScore) {
+      best = index;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 /** Network trouble between us and the workers, as opposed to a job that failed. */

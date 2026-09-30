@@ -65,7 +65,14 @@ export interface ReferenceImageProvider {
 export type WorkerFile = { url: string } | { data: Buffer };
 
 export interface ReferencesOutput {
-  images: { file: WorkerFile; seed: number }[];
+  images: {
+    file: WorkerFile;
+    seed: number;
+    /** How good a start for 3D the worker rates the picture (0..1), when it rates them */
+    score?: number;
+    /** What makes it a worse start, e.g. "cut off at the bottom"; left out when nothing does */
+    issues?: string[];
+  }[];
 }
 
 export interface ModelOutput {
