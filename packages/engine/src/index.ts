@@ -1,5 +1,6 @@
 export { Entity } from './ecs';
 export { SceneManager, SceneBridge } from './scene';
+export type { ModelLoader, ModelLoadEvent } from './scene';
 export { CommandHistory, AddEntityCommand, RemoveEntityCommand, TransformCommand, RenameEntityCommand } from './history';
 export type { Command } from './history';
 export {
@@ -13,7 +14,13 @@ export { ViewportControls, GizmoControls } from './controls';
 export type { TransformMode, SnapSettings, MouseScheme } from './controls';
 export { MaterialFactory } from './materials';
 export { MeshFactory } from './core';
-export { AssetLoader, exportSceneAsGLB, importGroupToScene } from './io';
+export {
+  AssetLoader,
+  exportSceneAsGLB,
+  importGroupToScene,
+  prepareModel,
+  disposeObject,
+} from './io';
 export type { LoadResult } from './io';
 export { YjsSceneBinding } from './collab';
 export { ease, type EasingName } from './math';

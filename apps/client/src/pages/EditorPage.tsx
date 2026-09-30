@@ -1,6 +1,7 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import * as THREE from 'three';
+import { AssetLoader, type ModelLoader } from '@forge3d/engine';
 import Viewport from '@/components/Viewport';
 import { TopBar } from '@/components/TopBar';
 import { Ribbon } from '@/components/Ribbon';
@@ -94,6 +95,13 @@ export function EditorPage() {
   // The bridge needs a pick handler and the actions need the bridge; a ref breaks the cycle
   const actionsRef = useRef<EditorActions | null>(null);
 
+  // Generated models load from their files; KTX2 textures need the renderer, so wait for it
+  const modelLoader = useMemo<ModelLoader | undefined>(() => {
+    if (!ready) return undefined;
+    const loader = new AssetLoader({ renderer: getRenderer() });
+    return async (url) => (await loader.loadGLTF(url)).scene;
+  }, [ready, getRenderer]);
+
   const { bridge, hierarchyNodes, handleCanvasClick, sceneVersion } = useSceneBridge({
     threeScene: ready ? getScene() : null,
     camera: ready ? (getCamera() as THREE.PerspectiveCamera | null) : null,
@@ -103,6 +111,7 @@ export function EditorPage() {
     ready,
     addFrameCallback,
     onPick: (id) => actionsRef.current?.select(id),
+    modelLoader,
   });
 
   const editorActions = useEditorActions({

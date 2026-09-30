@@ -5,9 +5,11 @@ import {
   GizmoControls,
   type SceneManager,
   type CommandHistory,
+  type ModelLoader,
 } from '@forge3d/engine';
 import type { TransformData } from '@forge3d/shared';
 import { useEditorStore } from '@/stores/editorStore';
+import { logOutput } from '@/stores/outputStore';
 import type { FrameCallback } from '@/hooks/useEngine';
 
 interface UseSceneBridgeArgs {
@@ -20,6 +22,8 @@ interface UseSceneBridgeArgs {
   addFrameCallback?: (cb: FrameCallback) => () => void;
   /** Called when a click in the viewport picks (or clears) an entity. */
   onPick?: (entityId: string | null) => void;
+  /** Loads the model files of model entities (generated models). */
+  modelLoader?: ModelLoader;
 }
 
 export interface HierarchyNode {
@@ -80,6 +84,7 @@ function fitBoxLines(lines: THREE.LineSegments, obj: THREE.Object3D): boolean {
 
 export function useSceneBridge(args: UseSceneBridgeArgs) {
   const { threeScene, camera, canvas, sceneManager, history, ready, addFrameCallback, onPick } = args;
+  const { modelLoader } = args;
   const bridgeRef = useRef<SceneBridge | null>(null);
   const gizmoRef = useRef<GizmoControls | null>(null);
   const [hierarchyNodes, setHierarchyNodes] = useState<HierarchyNode[]>([]);
@@ -123,7 +128,7 @@ export function useSceneBridge(args: UseSceneBridgeArgs) {
       );
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObjects(bridge.getManagedObjects(), false);
+      const hits = raycaster.intersectObjects(bridge.getPickableObjects(), false);
       for (const hit of hits) {
         const entityId = bridge.getEntityId(hit.object);
         if (entityId) return topLevelId(entityId);
@@ -140,6 +145,12 @@ export function useSceneBridge(args: UseSceneBridgeArgs) {
     const bridge = new SceneBridge(sceneManager, threeScene);
     bridge.connect();
     bridgeRef.current = bridge;
+    const stopModelEvents = bridge.onModelLoad((event) => {
+      if (event.status !== 'failed') return;
+      const name = sceneManager.getEntity(event.entityId)?.name ?? 'a model';
+      const reason = event.error instanceof Error ? event.error.message : String(event.error);
+      logOutput('error', `Couldn't load ${name}: ${reason}`);
+    });
 
     const gizmo = new GizmoControls({ camera, domElement: canvas, scene: threeScene });
     gizmoRef.current = gizmo;
@@ -277,12 +288,18 @@ export function useSceneBridge(args: UseSceneBridgeArgs) {
       (select.material as THREE.Material).dispose();
       (hover.material as THREE.Material).dispose();
       unsub();
+      stopModelEvents();
       gizmo.dispose();
       bridge.dispose();
       bridgeRef.current = null;
       gizmoRef.current = null;
     };
   }, [ready, threeScene, camera, canvas, sceneManager, history, addFrameCallback, pickAt]);
+
+  // Model files load once there is a loader (it needs the renderer for KTX2 textures)
+  useEffect(() => {
+    bridgeRef.current?.setModelLoader(modelLoader ?? null);
+  }, [modelLoader, ready]);
 
   // Sync gizmo mode, snapping and space
   useEffect(() => {

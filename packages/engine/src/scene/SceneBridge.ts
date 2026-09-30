@@ -1,9 +1,26 @@
 import * as THREE from 'three';
-import type { TransformData, MeshRendererData, MaterialDescriptor, LightData } from '@forge3d/shared';
+import type {
+  TransformData,
+  MeshRendererData,
+  MaterialDescriptor,
+  LightData,
+  ModelData,
+} from '@forge3d/shared';
 import { SceneManager } from './SceneManager';
 import { Entity } from '../ecs/Entity';
 import { MeshFactory } from '../core/MeshFactory';
 import { MaterialFactory } from '../materials/MaterialFactory';
+import { disposeObject, prepareModel } from '../io/models';
+
+/** Loads a model file (a GLB) into three.js objects. The app supplies it: KTX2 needs the renderer. */
+export type ModelLoader = (url: string) => Promise<THREE.Object3D>;
+
+export interface ModelLoadEvent {
+  entityId: string;
+  url: string;
+  status: 'loaded' | 'failed';
+  error?: unknown;
+}
 
 export class SceneBridge {
   private entityToObject = new Map<string, THREE.Object3D>();
@@ -11,6 +28,10 @@ export class SceneBridge {
   private meshFactory = new MeshFactory();
   private materialFactory = new MaterialFactory();
   private unsubscribe: (() => void) | null = null;
+  private modelLoader: ModelLoader | null = null;
+  /** The file each model entity shows, or is loading: a changed url loads again */
+  private modelUrls = new Map<string, string>();
+  private modelListeners = new Set<(event: ModelLoadEvent) => void>();
 
   constructor(
     private sceneManager: SceneManager,
@@ -30,6 +51,23 @@ export class SceneBridge {
     }
     this.entityToObject.clear();
     this.objectToEntity.clear();
+    this.modelUrls.clear();
+  }
+
+  /**
+   * Sets how model files are loaded. Model entities (a `model` component) show nothing until one
+   * is set; setting it loads every model in the scene.
+   */
+  setModelLoader(loader: ModelLoader | null): void {
+    this.modelLoader = loader;
+    this.modelUrls.clear();
+    if (this.unsubscribe) this.sync();
+  }
+
+  /** Called whenever a model finishes loading or fails. Returns a function that stops it. */
+  onModelLoad(listener: (event: ModelLoadEvent) => void): () => void {
+    this.modelListeners.add(listener);
+    return () => this.modelListeners.delete(listener);
   }
 
   private sync(): void {
@@ -42,6 +80,7 @@ export class SceneBridge {
         obj.removeFromParent();
         this.objectToEntity.delete(obj);
         this.entityToObject.delete(id);
+        this.modelUrls.delete(id);
       }
     }
 
@@ -63,10 +102,52 @@ export class SceneBridge {
       if (obj.parent !== parent) parent.add(obj);
       this.applyTransform(obj, entity.transform);
       obj.name = entity.name;
+      const model = entity.getComponent<ModelData>('model');
+      if (model && this.modelUrls.get(entity.id) !== model.url) {
+        this.loadModel(entity.id, obj, model.url);
+      }
     }
   }
 
+  /** Loads a model entity's file into its object, replacing what it showed before. */
+  private loadModel(entityId: string, holder: THREE.Object3D, url: string): void {
+    if (!this.modelLoader) return;
+    // Recorded before loading, so later syncs don't start the same load again (or retry a failure)
+    this.modelUrls.set(entityId, url);
+    this.modelLoader(url).then(
+      (content) => {
+        // Superseded while it loaded: another file, or the entity was removed or rebuilt
+        if (this.modelUrls.get(entityId) !== url || this.entityToObject.get(entityId) !== holder) {
+          disposeObject(content);
+          return;
+        }
+        for (const old of holder.children.filter((child) => child.userData['modelContent'])) {
+          holder.remove(old);
+          disposeObject(old);
+        }
+        holder.add(prepareModel(content));
+        this.emitModel({ entityId, url, status: 'loaded' });
+      },
+      (error: unknown) => {
+        if (this.modelUrls.get(entityId) === url) {
+          this.emitModel({ entityId, url, status: 'failed', error });
+        }
+      },
+    );
+  }
+
+  private emitModel(event: ModelLoadEvent): void {
+    for (const listener of this.modelListeners) listener(event);
+  }
+
   private createObject(entity: Entity): THREE.Object3D | null {
+    // A model file loads into this group (see loadModel), so transforms and picking work at once
+    if (entity.hasComponent('model')) {
+      const group = new THREE.Group();
+      group.name = entity.name;
+      return group;
+    }
+
     // Check for light component
     const lightData = entity.getComponent<LightData>('light');
     if (lightData) {
@@ -139,6 +220,19 @@ export class SceneBridge {
 
   getManagedObjects(): THREE.Object3D[] {
     return Array.from(this.entityToObject.values());
+  }
+
+  /** What a click can hit: every entity's object, plus the meshes inside model entities. */
+  getPickableObjects(): THREE.Object3D[] {
+    const objects: THREE.Object3D[] = [];
+    for (const [id, obj] of this.entityToObject) {
+      objects.push(obj);
+      if (!this.modelUrls.has(id)) continue;
+      obj.traverse((child) => {
+        if (child !== obj && (child as THREE.Mesh).isMesh) objects.push(child);
+      });
+    }
+    return objects;
   }
 
   readTransform(entityId: string): TransformData | null {
