@@ -3,6 +3,7 @@ Orainge's AI workers on Modal (https://modal.com): serverless GPUs billed by the
 
     modal run --detach workers/modal_app.py::make --prompt "a brass pocket watch" --final
     python workers/modal_app.py status                   # what's ready, what's running, what's left
+    python workers/modal_app.py build                    # build the images ahead of time
     modal deploy workers/modal_app.py                    # the job API the server calls
 
 `make` runs the whole flow in Modal's cloud (weights on first use, reference images, preview,
@@ -514,10 +515,23 @@ def print_status() -> None:
         print(f"  Download: modal volume get orainge-outputs {run} .")
 
 
+def build_images() -> None:
+    """Builds every image ahead of the first run, so a later deploy or run starts at once.
+    Needs no secrets, so it can run while Hugging Face access is still pending."""
+    builder = modal.App.lookup("orainge-ai-images", create_if_missing=True)
+    images = [("download", download_image), ("api", api_image), ("reference", flux_image), ("trellis2", trellis2_image)]
+    with modal.enable_output():
+        for name, image in images:
+            started = time.monotonic()
+            image.build(builder)
+            print(f"[orainge] {name} image ready after {time.monotonic() - started:.0f} s")
+
+
 if __name__ == "__main__":
     import sys
 
-    if sys.argv[1:] == ["status"]:
-        print_status()
+    commands = {"status": print_status, "build": build_images}
+    if len(sys.argv) == 2 and sys.argv[1] in commands:
+        commands[sys.argv[1]]()
     else:
         print(__doc__)
