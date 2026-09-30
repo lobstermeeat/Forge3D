@@ -169,7 +169,7 @@ export function EmbedPage() {
         </div>
       )}
 
-      {/* Forge3D watermark */}
+      {/* Orainge watermark */}
       {!loading && !error && (
         <a
           href="/"
@@ -177,7 +177,7 @@ export function EmbedPage() {
           rel="noopener noreferrer"
           className="absolute bottom-2 right-2 rounded bg-black/40 px-2 py-1 text-[10px] text-white/50 backdrop-blur-sm hover:text-white/80"
         >
-          Forge3D
+          Orainge
         </a>
       )}
     </div>

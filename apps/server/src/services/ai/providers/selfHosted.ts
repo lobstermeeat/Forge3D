@@ -38,7 +38,7 @@ interface ReferenceOutput {
 }
 
 /**
- * FORGE 3D's own models on serverless GPUs (Modal or RunPod, see workers/): TRELLIS.2 for
+ * Orainge's own models on serverless GPUs (Modal or RunPod, see workers/): TRELLIS.2 for
  * image-to-3D and FLUX.1 [schnell] for the reference images text prompts start from. No
  * third-party AI APIs.
  *

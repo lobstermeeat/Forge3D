@@ -1,4 +1,4 @@
-"""RunPod serverless entry point for FORGE 3D's reference-image worker (FLUX.1 [schnell])."""
+"""RunPod serverless entry point for Orainge's reference-image worker (FLUX.1 [schnell])."""
 
 import os
 

@@ -77,7 +77,7 @@ export function TopBar({
           <path d="M3.5 7.3L12 12v9.5l-8.5-4.8z" style={{ fill: '#d9dce1' }} />
           <path d="M20.5 7.3L12 12v9.5l8.5-4.8z" style={{ fill: '#767d8a' }} />
         </svg>
-        <b>FORGE 3D</b>
+        <b>Orainge</b>
         <span>Studio</span>
       </Link>
       <div className="f3-vsep" />
@@ -139,7 +139,7 @@ export function TopBar({
             <div className="f3-pop-sep" />
             <MenuItem
               icon="info"
-              label="About FORGE 3D Studio"
+              label="About Orainge Studio"
               onSelect={() => {
                 close();
                 onAbout();
@@ -250,7 +250,7 @@ export function TopBar({
           disabled={!canPublish || isPlaying}
           title={
             canPublish
-              ? 'Publish this scene to FORGE 3D'
+              ? 'Publish this scene to Orainge'
               : 'Open a scene from your dashboard to publish it'
           }
           style={{ marginLeft: 8 }}

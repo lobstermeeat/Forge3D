@@ -131,7 +131,7 @@ export function PublishDialog({
         {step === 'form' && (
           <>
             <h2 style={{ margin: '0 0 4px', fontSize: 17, fontWeight: 600, color: 'var(--tx1)' }}>
-              Publish to FORGE 3D
+              Publish to Orainge
             </h2>
             <p style={{ margin: '0 0 18px', fontSize: 12.5, color: 'var(--tx2)' }}>
               Viewers can explore your scene but can’t download its models.

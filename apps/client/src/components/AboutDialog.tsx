@@ -6,7 +6,7 @@ interface Credit {
 }
 
 /**
- * The models behind FORGE 3D's AI generation. The DINOv3 License requires "Built with DINOv3"
+ * The models behind Orainge's AI generation. The DINOv3 License requires "Built with DINOv3"
  * to be shown in the product; keep it here and next to generated assets.
  */
 export const AI_CREDITS: Credit[] = [
@@ -64,7 +64,7 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
       >
         <div className="f3-modal-head">
           <div>
-            <h2 id="f3-about-title">FORGE 3D Studio</h2>
+            <h2 id="f3-about-title">Orainge Studio</h2>
             <p>Build interactive 3D experiences in the browser.</p>
           </div>
         </div>

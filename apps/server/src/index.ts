@@ -64,7 +64,7 @@ async function main() {
   server.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 
   await server.listen({ port: PORT, host: '0.0.0.0' });
-  console.log(`[Forge3D] Server running on http://localhost:${PORT}`);
+  console.log(`[Orainge] Server running on http://localhost:${PORT}`);
 }
 
 main().catch((err) => {

@@ -1,6 +1,6 @@
 # AI workers
 
-FORGE 3D generates 3D models with its own models on serverless GPUs, billed only while they
+Orainge generates 3D models with its own models on serverless GPUs, billed only while they
 work. There are no third-party AI APIs involved.
 
 | Worker                          | Model                         | Job                      | GPU                                              |
@@ -119,7 +119,7 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
    modal run workers/modal_app.py::try_image --image reference-123.png --mode final --seed 42
    ```
 
-   The GLBs are meshopt/KTX2-compressed, so open them in the FORGE 3D editor (File › Import
+   The GLBs are meshopt/KTX2-compressed, so open them in the Orainge editor (File › Import
    model) or another viewer that supports those extensions.
 
 6. Deploy the job API:

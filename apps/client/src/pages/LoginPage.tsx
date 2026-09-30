@@ -71,7 +71,7 @@ export function LoginPage() {
           border: '1px solid #313244',
         }}
       >
-        <h1 style={{ fontSize: 24, marginBottom: 8, textAlign: 'center' }}>Forge3D</h1>
+        <h1 style={{ fontSize: 24, marginBottom: 8, textAlign: 'center' }}>Orainge</h1>
         <p style={{ fontSize: 14, color: '#888', textAlign: 'center', marginBottom: 24 }}>
           {isSignUp ? 'Create your account' : 'Sign in to continue'}
         </p>

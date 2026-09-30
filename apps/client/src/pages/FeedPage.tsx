@@ -112,7 +112,7 @@ export function FeedPage() {
       <header className="border-b border-[#313244] bg-[#1e1e2e]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link to="/" className="text-lg font-bold text-[#cdd6f4]">
-            Forge3D
+            Orainge
           </Link>
           <div className="flex items-center gap-3">
             <SearchBar className="hidden w-64 sm:block" />

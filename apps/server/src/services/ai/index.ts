@@ -14,7 +14,7 @@ export type {
   ReferenceImageProvider,
 } from './types';
 
-/** The orchestrator with every configured provider. FORGE 3D only runs its own models. */
+/** The orchestrator with every configured provider. Orainge only runs its own models. */
 export function createAIOrchestrator(
   env: Record<string, string | undefined> = process.env,
 ): AIOrchestrator {

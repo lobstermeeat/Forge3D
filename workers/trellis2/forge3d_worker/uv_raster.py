@@ -176,7 +176,7 @@ def __getattr__(name: str):
     if name.startswith("__"):
         raise AttributeError(name)
     raise UnsupportedNvdiffrastCall(
-        f"nvdiffrast.torch.{name} is not available: FORGE 3D replaces nvdiffrast "
+        f"nvdiffrast.torch.{name} is not available: Orainge replaces nvdiffrast "
         "(research-only license) with forge3d_worker.uv_raster, which only covers UV baking"
     )
 

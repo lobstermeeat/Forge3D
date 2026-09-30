@@ -1,4 +1,4 @@
-"""RunPod serverless entry point for FORGE 3D's TRELLIS.2 worker."""
+"""RunPod serverless entry point for Orainge's TRELLIS.2 worker."""
 
 import runpod
 
