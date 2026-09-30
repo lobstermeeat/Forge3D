@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import gc
 import json
 import os
+import traceback
 from typing import Any
+
+from PIL import Image
 
 from . import uv_raster
 from .inputs import InputError
@@ -52,6 +56,17 @@ def verify_weights(models: dict[str, Any], model_dir: str) -> list[str]:
     return notes
 
 
+def is_out_of_memory(err: BaseException) -> bool:
+    """A failed GPU allocation, which a run with the weights off the GPU can get past."""
+    import torch
+
+    # torch.cuda.OutOfMemoryError is another name for this class
+    if isinstance(err, torch.OutOfMemoryError):
+        return True
+    # CuMesh (hole filling, inside run) checks its own cudaMalloc calls and raises a plain RuntimeError
+    return isinstance(err, RuntimeError) and "out of memory" in str(err)
+
+
 class Trellis2Runtime:
     """Holds the loaded pipeline between jobs (one per worker process)."""
 
@@ -69,15 +84,57 @@ class Trellis2Runtime:
         self.pipeline = pipeline
 
     def generate(self, image: Any, preset: Preset, seed: int) -> Any:
+        """Image to mesh. Running out of GPU memory gets one retry in low-VRAM mode."""
         try:
             # Background removal and cropping; fails when nothing stands out from the background
             prepared = self.pipeline.preprocess_image(image)
         except ValueError as err:
             raise InputError("no object found in the image: use one object on a plain background") from err
+        try:
+            return self._run(prepared, preset, seed)
+        except Exception as err:
+            if self.pipeline.low_vram or not is_out_of_memory(err):
+                raise
+            reason = " ".join(str(err).split())  # one line, whatever the message
+            print(f"[forge3d] out of GPU memory in {preset.pipeline_type}, retrying in low-VRAM mode: {reason}")
+        # Retried out here: inside the except block the traceback keeps the failed run's tensors,
+        # and so their GPU memory, alive
+        try:
+            self._offload()
+            return self._run(prepared, preset, seed)
+        except BaseException as err:
+            # This traceback holds the retry's tensors the same way; drop them so the weights fit back
+            traceback.clear_frames(err.__traceback__)
+            raise
+        finally:
+            self._restore()
+
+    def _run(self, prepared: Image.Image, preset: Preset, seed: int) -> Any:
         # Same seed, same sparse structure: the final pass refines the preview the user approved
         return self.pipeline.run(
             prepared, seed=seed, pipeline_type=preset.pipeline_type, preprocess_image=False
         )[0]
+
+    def _offload(self) -> None:
+        """Switches to upstream's low-VRAM mode, which puts each model on the GPU only while it runs."""
+        import torch
+
+        pipeline = self.pipeline
+        # Everything upstream's to() moves. Not pipeline.cpu(): that would also make the CPU the
+        # device the steps run on.
+        for model in (*pipeline.models.values(), pipeline.image_cond_model, pipeline.rembg_model):
+            if model is not None:
+                model.cpu()
+        pipeline.low_vram = True
+        # Free what the failed run left in reference cycles, then hand torch's cached blocks, the
+        # weights' old ones included, back to CUDA: CuMesh allocates outside that cache
+        gc.collect()
+        torch.cuda.empty_cache()
+
+    def _restore(self) -> None:
+        """Every model back on the GPU, the way __init__ put them there."""
+        self.pipeline.low_vram = False
+        self.pipeline.cuda()
 
     def export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]:
         glb = self._o_voxel.postprocess.to_glb(
