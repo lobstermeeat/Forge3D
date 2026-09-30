@@ -1,0 +1,102 @@
+{
+ "phase2-01-cute-low-poly-fox-sitting-down": {
+  "verdict": "publish",
+  "note": "A clean, charming faceted fox that matches the picture and holds up from every side, including the back and the tail wrapped around it.",
+  "group": "Everyday"
+ },
+ "phase2-02-red-high-top-sneaker": {
+  "verdict": "publish",
+  "note": "A convincing canvas high-top with real-looking laces and eyelets; only a faint streak on the heel, and the red leans slightly raspberry.",
+  "group": "Everyday"
+ },
+ "phase2-03-gaming-chair-black-and-purple": {
+  "verdict": "publish",
+  "note": "A complete black gaming chair with purple side stripes, armrests and a five-star base; the backrest insert is only slightly speckled.",
+  "group": "Everyday"
+ },
+ "phase2-04-retro-arcade-machine": {
+  "verdict": "edits",
+  "note": "The red cabinet is clean from the front and sides, but the back panel is a dark, smeared copy of the front with red streaks.",
+  "group": "Everyday"
+ },
+ "phase2-05-sci-fi-laser-pistol-white": {
+  "verdict": "edits",
+  "note": "A crisp white-and-orange pistol matching the picture, but the white body looks grubby with scuffs, and gold is smeared around the muzzle.",
+  "group": "Everyday"
+ },
+ "phase2-06-wooden-shield-with-a-lion": {
+  "verdict": "edits",
+  "note": "The wooden shield is clean, but the lion is a smeared, scribbly sketch with a creepy grin, and it's repeated on the back.",
+  "group": "Everyday"
+ },
+ "phase2-07-chibi-knight-with-a-big-helmet": {
+  "verdict": "publish",
+  "note": "A cute, clean chibi knight with a big visored helmet and flowing red cape, complete and tidy from every angle.",
+  "group": "Everyday"
+ },
+ "phase2-08-vintage-film-camera": {
+  "verdict": "edits",
+  "note": "The front is a convincing vintage camera, but the back is warped, with a dark smear and a see-through hole. Close to not usable.",
+  "group": "Everyday"
+ },
+ "phase2-09-donut-with-pink-frosting": {
+  "verdict": "publish",
+  "note": "A clean, appetizing frosted donut with red and white sprinkles, consistent all around; the frosting leans coral rather than baby pink.",
+  "group": "Everyday"
+ },
+ "phase2-10-astronaut-helmet": {
+  "verdict": "publish",
+  "note": "A clean, classic white astronaut helmet with black visor and red neck ring, complete from every angle; only faint scuffs.",
+  "group": "Everyday"
+ },
+ "phase2-11-stack-of-old-books-with-a-candle": {
+  "verdict": "reject",
+  "note": "No final: it ran out of GPU memory (a bug to fix, not a quality verdict). The preview was made and is shown.",
+  "group": "Everyday"
+ },
+ "phase2-12-skateboard-with-graffiti-art": {
+  "verdict": "edits",
+  "note": "A recognizable skateboard with wheels and trucks, but the graffiti lettering smeared into illegible blotches and the deck is pinched like a peanut.",
+  "group": "Everyday"
+ },
+ "phase2-13-cute-cartoon-car-bright-blue": {
+  "verdict": "publish",
+  "note": "A clean, charming blue cartoon car that holds up from every angle, with opaque white windows and only faint speckles on the roof.",
+  "group": "Everyday"
+ },
+ "phase2-14-bubble-tea-with-tapioca-pearls": {
+  "verdict": "reject",
+  "note": "The cup came out almost solid black on every side, with no milk-tea color or visible pearls, so it reads as cola.",
+  "group": "Weak spot"
+ },
+ "phase2-15-health-potion-in-a-round-glass": {
+  "verdict": "edits",
+  "note": "The round orange potion bottle is the right shape, but blocky square patches cover its upper body, with a dark smudge near the base.",
+  "group": "Weak spot"
+ },
+ "phase2-16-green-dragon-sitting-cartoon": {
+  "verdict": "edits",
+  "note": "A recognizable sitting cartoon dragon, but the skin is dark and blotchy and a detached tail fin floats beside the body.",
+  "group": "Weak spot"
+ },
+ "phase2-17-bowl-of-ramen-with-an-egg": {
+  "verdict": "publish",
+  "note": "Convincing ramen with egg, scallions, meat and both chopsticks, complete from every side; only faint orange hairlines mark the white bowl.",
+  "group": "Weak spot"
+ },
+ "phase2-18-electric-guitar": {
+  "verdict": "reject",
+  "note": "The body is warped into a curled, bloated shell and the fretboard is grey noise, though it reads as a guitar from the front.",
+  "group": "Weak spot"
+ },
+ "phase2-19-small-cabin-in-a-snowy-forest": {
+  "verdict": "publish",
+  "note": "A clean, complete snow-roofed cabin with doors, windows, deck and steps from every side; the forest was dropped, leaving just the cabin.",
+  "group": "Weak spot"
+ },
+ "phase2-20-hot-air-balloon": {
+  "verdict": "publish",
+  "note": "A clean cream hot air balloon with skirt, basket and cables, consistent from every side; only faint blotchy shading on the envelope.",
+  "group": "Weak spot"
+ }
+}
