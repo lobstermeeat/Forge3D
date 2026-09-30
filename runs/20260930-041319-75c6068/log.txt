@@ -1,0 +1,212 @@
+== Build the images (20-40 minutes the first time)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] download image ready after 0 s
+[orainge] api image ready after 0 s
+[orainge] reference image ready after 0 s
+Building image im-jdVvk01LE13LRM00zG8Rb9
+
+=> Step 0: FROM base
+
+=> Step 1: RUN python -m pip install --upgrade pip 'setuptools>=70' wheel
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Requirement already satisfied: pip in /usr/local/lib/python3.10/site-packages (23.2.1)
+Collecting pip
+  Obtaining dependency information for pip from http://pypi-mirror.modal.local:5555/simple/pip/pip-26.2.1-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/pip/pip-26.2.1-py3-none-any.whl.metadata (4.6 kB)
+Collecting setuptools>=70
+  Obtaining dependency information for setuptools>=70 from http://pypi-mirror.modal.local:5555/simple/setuptools/setuptools-84.0.0-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/setuptools/setuptools-84.0.0-py3-none-any.whl.metadata (6.6 kB)
+Collecting wheel
+  Obtaining dependency information for wheel from http://pypi-mirror.modal.local:5555/simple/wheel/wheel-0.48.0-py3-none-any.whl.metadata
+  Downloading http://pypi-mirror.modal.local:5555/simple/wheel/wheel-0.48.0-py3-none-any.whl.metadata (2.3 kB)
+Requirement already satisfied: packaging>=24.0 in /usr/local/lib/python3.10/site-packages (from wheel) (26.3)
+Downloading http://pypi-mirror.modal.local:5555/simple/pip/pip-26.2.1-py3-none-any.whl (1.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.8/1.8 MB 457.9 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/setuptools/setuptools-84.0.0-py3-none-any.whl (818 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 818.2/818.2 kB 463.8 MB/s eta 0:00:00
+Downloading http://pypi-mirror.modal.local:5555/simple/wheel/wheel-0.48.0-py3-none-any.whl (33 kB)
+Installing collected packages: wheel, setuptools, pip
+  Attempting uninstall: setuptools
+    Found existing installation: setuptools 68.1.2
+    Uninstalling setuptools-68.1.2:
+      Successfully uninstalled setuptools-68.1.2
+  Attempting uninstall: pip
+    Found existing installation: pip 23.2.1
+    Uninstalling pip-23.2.1:
+      Successfully uninstalled pip-23.2.1
+Successfully installed pip-26.2.1 setuptools-84.0.0 wheel-0.48.0
+Saving image...
+Image saved, took 1.41s
+
+Built image im-jdVvk01LE13LRM00zG8Rb9 in 6.80s
+
+
+Building image im-8mz4bgNTf9qUPb8DHOUovq
+
+=> Step 0: FROM base
+
+=> Step 1: RUN git clone https://github.com/JeffreyXiang/CuMesh /tmp/CuMesh && git -C /tmp/CuMesh checkout 12289e1062f0603f2f0d0771b02e1395d247f26f && git -C /tmp/CuMesh submodule update --init --recursive
+Cloning into '/tmp/CuMesh'...
+Note: switching to '12289e1062f0603f2f0d0771b02e1395d247f26f'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at 12289e1 Merge pull request #29 from cuzelac/fix/blackwell-stream-sync-upstream
+Submodule 'third_party/cubvh' (https://github.com/JeffreyXiang/cubvh.git) registered for path 'third_party/cubvh'
+Cloning into '/tmp/CuMesh/third_party/cubvh'...
+Submodule path 'third_party/cubvh': checked out 'ce92267a24ef6ad7d2c8ccbc2ae2c021a6597e70'
+Submodule 'third_party/eigen' (https://gitlab.com/libeigen/eigen) registered for path 'third_party/cubvh/third_party/eigen'
+Cloning into '/tmp/CuMesh/third_party/cubvh/third_party/eigen'...
+warning: redirecting to https://gitlab.com/libeigen/eigen.git/
+Submodule path 'third_party/cubvh/third_party/eigen': checked out 'e63d9f6ccb7f6f29f31241b87c542f3f0ab3112b'
+
+=> Step 2: RUN python -m pip install /tmp/CuMesh --no-build-isolation --no-deps && rm -rf /tmp/CuMesh
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Processing ./tmp/CuMesh
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: cumesh
+  Building wheel for cumesh (pyproject.toml): started
+  Building wheel for cumesh (pyproject.toml): still running...
+  Building wheel for cumesh (pyproject.toml): still running...
+  Building wheel for cumesh (pyproject.toml): still running...
+  Building wheel for cumesh (pyproject.toml): still running...
+  Building wheel for cumesh (pyproject.toml): finished with status 'error'
+  error: subprocess-exited-with-error
+  
+  × Building wheel for cumesh (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [97 lines of output]
+      No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda'
+      /usr/local/lib/python3.10/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+      !!
+      
+              ********************************************************************************
+              Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+      
+              By 2027-Feb-18, you need to update your project and remove deprecated calls
+              or your builds will no longer be supported.
+      
+              See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+              ********************************************************************************
+      
+      !!
+        corresp(dist, value, root_dir)
+      running bdist_wheel
+      running build
+      running build_py
+      creating build/lib.linux-x86_64-cpython-310/cumesh
+      copying cumesh/__init__.py -> build/lib.linux-x86_64-cpython-310/cumesh
+      copying cumesh/bvh.py -> build/lib.linux-x86_64-cpython-310/cumesh
+      copying cumesh/cumesh.py -> build/lib.linux-x86_64-cpython-310/cumesh
+      copying cumesh/remeshing.py -> build/lib.linux-x86_64-cpython-310/cumesh
+      copying cumesh/xatlas.py -> build/lib.linux-x86_64-cpython-310/cumesh
+      running egg_info
+      creating cumesh.egg-info
+      writing cumesh.egg-info/PKG-INFO
+      writing dependency_links to cumesh.egg-info/dependency_links.txt
+      writing requirements to cumesh.egg-info/requires.txt
+      writing top-level names to cumesh.egg-info/top_level.txt
+      writing manifest file 'cumesh.egg-info/SOURCES.txt'
+      reading manifest file 'cumesh.egg-info/SOURCES.txt'
+      adding license file 'LICENSE'
+      writing manifest file 'cumesh.egg-info/SOURCES.txt'
+      running build_ext
+      /usr/local/lib/python3.10/site-packages/torch/utils/cpp_extension.py:393: UserWarning:
+      
+                                     !! WARNING !!
+      
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      Your compiler (clang++) is not compatible with the compiler Pytorch was
+      built with for this platform, which is g++ on linux. Please
+      use g++ to to compile your extension. Alternatively, you may
+      compile PyTorch from source using clang++, and then you can also use
+      clang++ to compile your extension.
+      
+      See https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md for help
+      with compiling PyTorch from source.
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      
+                                    !! WARNING !!
+      
+        warnings.warn(WRONG_COMPILER_WARNING.format(
+      /usr/local/lib/python3.10/site-packages/torch/utils/cpp_extension.py:458: UserWarning: There are no clang++ version bounds defined for CUDA version 12.4
+        warnings.warn(f'There are no {compiler_name} version bounds defined for CUDA version {cuda_str_version}')
+      building 'cumesh._C' extension
+      Emitting ninja build file /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/build.ninja...
+      Compiling objects...
+      Using envvar MAX_JOBS (4) as the number of workers...
+      [1/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/cumesh.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/cumesh.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/cumesh.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [2/12] c++ -MMD -MF /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/ext.o.d -pthread -g0 -fPIC -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/ext.cpp -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/ext.o -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0
+      In file included from /usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/Exceptions.h:12,
+                       from /usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include/torch/python.h:11,
+                       from /usr/local/lib/python3.10/site-packages/torch/include/torch/extension.h:9,
+                       from /tmp/CuMesh/src/ext.cpp:1:
+      /usr/local/lib/python3.10/site-packages/torch/include/pybind11/pybind11.h: In instantiation of ‘class pybind11::class_<cumesh::CuMesh>’:
+      /tmp/CuMesh/src/ext.cpp:16:43:   required from here
+      /usr/local/lib/python3.10/site-packages/torch/include/pybind11/pybind11.h:1539:7: warning: ‘pybind11::class_<cumesh::CuMesh>’ declared with greater visibility than its base ‘pybind11::detail::generic_type’ [-Wattributes]
+       1539 | class class_ : public detail::generic_type {
+            |       ^~~~~~
+      /usr/local/lib/python3.10/site-packages/torch/include/pybind11/pybind11.h: In instantiation of ‘pybind11::class_< <template-parameter-1-1>, <template-parameter-1-2> >::class_(pybind11::handle, const char*, const Extra& ...) [with Extra = {}; type_ = cumesh::CuMesh; options = {}]’:
+      /tmp/CuMesh/src/ext.cpp:16:43:   required from here
+      /usr/local/lib/python3.10/site-packages/torch/include/pybind11/pybind11.h:1599:28: warning: ‘pybind11::class_<cumesh::CuMesh>::class_<>(pybind11::handle, const char*)::<lambda(pybind11::detail::internals&)>’ declared with greater visibility than the type of its field ‘pybind11::class_<cumesh::CuMesh>::class_<>(pybind11::handle, const char*)::<lambda(pybind11::detail::internals&)>::<record capture>’ [-Wattributes]
+       1599 |             with_internals([&](internals &internals) {
+            |                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+       1600 |                 auto &instances = record.module_local ? get_local_internals().registered_types_cpp
+            |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+       1601 |                                                       : internals.registered_types_cpp;
+            |                                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+       1602 |                 instances[std::type_index(typeid(type_alias))]
+            |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+       1603 |                     = instances[std::type_index(typeid(type))];
+            |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+       1604 |             });
+            |             ~
+      [3/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/connectivity.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/connectivity.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/connectivity.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [4/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/atlas.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/atlas.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/atlas.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [5/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/clean_up.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/clean_up.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/clean_up.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [6/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/geometry.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/geometry.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/geometry.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [7/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/hash/hash.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/hash/hash.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/hash/hash.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [8/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/io.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/io.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/io.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [9/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/remesh/simple_dual_contour.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/remesh/simple_dual_contour.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/remesh/simple_dual_contour.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [10/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/remesh/svox2vert.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/remesh/svox2vert.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/remesh/svox2vert.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [11/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/shared.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/shared.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/shared.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      [12/12] /usr/local/cuda/bin/nvcc --generate-dependencies-with-compile --dependency-output /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/simplify.o.d -I/usr/local/lib/python3.10/site-packages/torch/include -I/usr/local/lib/python3.10/site-packages/torch/include/torch/csrc/api/include -I/usr/local/lib/python3.10/site-packages/torch/include/TH -I/usr/local/lib/python3.10/site-packages/torch/include/THC -I/usr/local/cuda/include -I/usr/local/include/python3.10 -c -c /tmp/CuMesh/src/simplify.cu -o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/simplify.o -D__CUDA_NO_HALF_OPERATORS__ -D__CUDA_NO_HALF_CONVERSIONS__ -D__CUDA_NO_BFLOAT16_CONVERSIONS__ -D__CUDA_NO_HALF2_OPERATORS__ --expt-relaxed-constexpr --compiler-options ''"'"'-fPIC'"'"'' -O3 -std=c++17 -DTORCH_API_INCLUDE_EXTENSION_H '-DPYBIND11_COMPILER_TYPE="_gcc"' '-DPYBIND11_STDLIB="_libstdcpp"' '-DPYBIND11_BUILD_ABI="_cxxabi1011"' -DTORCH_EXTENSION_NAME=_C -D_GLIBCXX_USE_CXX11_ABI=0 -gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_89,code=sm_89 -gencode=arch=compute_90,code=sm_90
+      clang++ -pthread -Wno-unused-result -Wsign-compare -Wunreachable-code -DNDEBUG -g -fwrapv -O3 -Wall -fPIC -I/tools/deps/include -I/tools/deps/include/ncursesw -I/tools/deps/libedit/include -shared /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/atlas.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/clean_up.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/connectivity.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/cumesh.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/ext.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/geometry.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/hash/hash.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/io.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/remesh/simple_dual_contour.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/remesh/svox2vert.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/shared.o /tmp/CuMesh/build/temp.linux-x86_64-cpython-310/src/simplify.o -L/usr/local/lib/python3.10/site-packages/torch/lib -L/usr/local/cuda/lib64 -L/install/lib -lc10 -ltorch -ltorch_cpu -ltorch_python -lcudart -lc10_cuda -ltorch_cuda -o build/lib.linux-x86_64-cpython-310/cumesh/_C.cpython-310-x86_64-linux-gnu.so
+      error: [Errno 2] No such file or directory: 'clang++'
+      [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+  ERROR: Failed building wheel for cumesh
+Failed to build cumesh
+error: failed-wheel-build-for-install
+
+× Failed to build installable wheels for some pyproject.toml based projects
+╰─> cumesh
+Terminating task due to error: failed to run builder command "python -m pip install /tmp/CuMesh --no-build-isolation --no-deps && rm -rf /tmp/CuMesh": container exit status: 1
+Traceback (most recent call last):
+  File "/home/runner/work/Forge3D/Forge3D/workers/modal_app.py", line 545, in <module>
+    commands[sys.argv[1]]()
+  File "/home/runner/work/Forge3D/Forge3D/workers/modal_app.py", line 536, in build_images
+    image.build(builder)
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_image.py", line 1104, in build
+    await resolver.load(self, load_context)
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_image.py", line 792, in _load
+    raise ImageBuildError(msg, image_id)
+modal.exception.ImageBuildError: Image build for im-8mz4bgNTf9qUPb8DHOUovq failed.
+View the build logs:
+  modal image logs im-8mz4bgNTf9qUPb8DHOUovq
+exit status: 1
