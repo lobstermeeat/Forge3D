@@ -136,6 +136,12 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
    meshopt/KTX2-compressed: open them in the Orainge editor (File › Import model) or another
    viewer that supports those extensions.
 
+**Without your computer:** the `AI ops (Modal)` GitHub workflow runs the same commands on
+GitHub's servers. Add the repository secrets `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` (Modal >
+Settings > API Tokens), put the commands in `ops/run.sh` and push it to the `ai-ops` branch.
+The log and anything the script writes to `ops-out/` land on the `ai-results` branch under
+`runs/<id>/`, with the tokens scrubbed. In a public repository that branch is public.
+
 **Settings** (in `modal_app.py`): both workers run on an L40S (48 GB), scale to zero, stay warm
 for 60 s after their last job (idle time is billed; a cold start takes about a minute) and are
 capped at 2 TRELLIS.2 containers and 1 FLUX container to bound spending. `TRELLIS2_GPU = "A10"`
