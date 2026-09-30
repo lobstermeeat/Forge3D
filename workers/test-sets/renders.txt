@@ -1,0 +1,18 @@
+# Image to 3D without FLUX: product-style renders of CC0 models from Khronos's glTF sample
+# assets (https://github.com/KhronosGroup/glTF-Sample-Assets), on white, so the 3D step and its
+# background removal can be tested and compared on the same inputs every time.
+#
+#   modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/renders.txt
+
+# Thin parts and a hanging lamp (Lantern)
+renders/lantern.jpg
+# Glossy hard surface with small buttons (BoomBox)
+renders/boombox.jpg
+# A small car on draped cloth (ToyCar)
+renders/toycar.jpg
+# Soft upholstery and thin legs (SheenChair)
+renders/sheenchair.jpg
+# A creature with fins (BarramundiFish)
+renders/barramundifish.jpg
+# An organic cut shape (Avocado)
+renders/avocado.jpg
