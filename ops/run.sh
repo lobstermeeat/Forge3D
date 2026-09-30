@@ -4,11 +4,18 @@
 # ops-out/private/ only encrypted (see ops/seal.sh).
 set -euo pipefail
 
-echo "== Phase 2, step 1: four pictures for each of the twenty prompts"
-modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/phase2.txt --name phase2 --pictures-only
+# The picture chosen for each prompt, from the contact sheets of step 1
+picks="1=4,2=3,3=2,4=4,5=4,6=3,7=2,8=4,9=2,10=3,11=2,12=4,13=2,14=4,15=4,16=2,17=3,18=4,19=2,20=1"
+
+echo "== Phase 2, step 2: a preview and a final from each picked picture"
+modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/phase2.txt --name phase2 --picks "$picks"
 
 echo
-echo "== Contact sheets for picking"
-python -m pip install --quiet "pillow>=10.1"
-python ops/contact_sheets.py orainge-outputs/phase2 ops-out/private/phase2-pictures
-du -sh ops-out/private/phase2-pictures
+echo "== The runs, for the gallery and scoring"
+mkdir -p ops-out/private/phase2-runs
+cp -r orainge-outputs/phase2/. ops-out/private/phase2-runs/
+du -sh ops-out/private/phase2-runs
+
+echo
+echo "== Status"
+python workers/modal_app.py status | tail -45
