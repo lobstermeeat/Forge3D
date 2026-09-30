@@ -56,6 +56,25 @@ def verify_weights(models: dict[str, Any], model_dir: str) -> list[str]:
     return notes
 
 
+# The 1024 texture pass sometimes returns colour already multiplied by a spurious alpha, on up to
+# half a model's texels. The GLB is opaque, so those texels showed up dark (a blotchy dragon's skin).
+# Dividing by alpha is capped at 1/ALPHA_FLOOR so near-transparent texels' noise isn't blown up.
+ALPHA_FLOOR = 0.25
+
+
+def unpremultiply(texture: Image.Image, floor: float = ALPHA_FLOOR) -> Image.Image:
+    """Opaque RGB: colour divided by its alpha in linear light. Fully opaque texels stay as they are."""
+    import numpy as np
+
+    rgba = np.asarray(texture.convert("RGBA"), dtype=np.float32) / 255
+    rgb, alpha = rgba[..., :3], rgba[..., 3:]
+    linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    linear = np.clip(linear / np.maximum(alpha, floor), 0.0, 1.0)
+    srgb = np.where(linear <= 0.0031308, linear * 12.92, 1.055 * linear ** (1 / 2.4) - 0.055)
+    out = np.where(alpha < 1.0, srgb, rgb)
+    return Image.fromarray(np.round(out * 255).astype(np.uint8), "RGB")
+
+
 def is_out_of_memory(err: BaseException) -> bool:
     """A failed GPU allocation, which a run with the weights off the GPU can get past."""
     import torch
@@ -110,7 +129,8 @@ class Trellis2Runtime:
             self._restore()
 
     def _run(self, prepared: Image.Image, preset: Preset, seed: int) -> Any:
-        # Same seed, same sparse structure: the final pass refines the preview the user approved
+        # Same seed, same sparse structure: the final keeps the shape of the preview the user approved.
+        # Its texture is sampled afresh at the higher resolution, so details can differ
         return self.pipeline.run(
             prepared, seed=seed, pipeline_type=preset.pipeline_type, preprocess_image=False
         )[0]
@@ -151,4 +171,7 @@ class Trellis2Runtime:
             remesh_band=1,
             remesh_project=0,
         )
+        material = glb.visual.material
+        if getattr(material, "baseColorTexture", None) is not None:
+            material.baseColorTexture = unpremultiply(material.baseColorTexture)
         return glb.export(file_type="glb"), int(len(glb.faces))

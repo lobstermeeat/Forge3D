@@ -700,7 +700,7 @@ def set_run_names(name: str, runs: list[dict]) -> list[str]:
 def parse_picks(text: str, runs: list[dict]) -> dict[int, int]:
     """
     '3=2, 7=4' -> {3: 2, 7: 4}: the set's third run is made from its second picture and the
-    seventh from its fourth. Runs left out use their first picture.
+    seventh from its fourth. Runs left out use their best-scored picture.
     """
     picks = {}
     for item in filter(None, (part.strip() for part in text.split(","))):
@@ -748,7 +748,7 @@ def make_set(prompts: str, final: bool = True, name: str = "", pictures_only: bo
 
     Like a user in the Studio, you can choose which picture becomes 3D: run the set with
     --pictures-only, look at the pictures, then run it again with --picks "3=2,7=4" (run number =
-    picture number; runs left out use their first picture).
+    picture number; runs left out use their best-scored picture).
     """
     import modal.exception as mx
 

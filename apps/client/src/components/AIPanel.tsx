@@ -472,7 +472,7 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
                       role="radio"
                       className="f3-ai-pick"
                       aria-checked={picked === i}
-                      aria-label={best ? `Picture ${i + 1}, best for 3D` : `Picture ${i + 1}`}
+                      aria-label={best ? `Picture ${i + 1}, suggested` : `Picture ${i + 1}`}
                       title={issuesText(ref.issues)}
                       data-current={g.image === ref.url || undefined}
                       data-recommended={best || undefined}

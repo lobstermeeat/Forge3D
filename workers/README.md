@@ -22,9 +22,11 @@ to either through `apps/server/src/services/ai` (`SelfHostedProvider`).
 3. **User keeps it → final** (`mode: "final"`, _same seed_): 1024³ cascade, 100k triangles,
    2K textures. The same seed gives the same coarse structure, so the final refines the preview
    the user approved.
-4. Both passes are packed for the browser with gltfpack: meshopt geometry and KTX2 (Basis
-   Universal) textures. The editor's `AssetLoader` decodes them; the decoders are served from
-   `/decoders/` by the client's Vite config.
+4. Both passes are packed for the browser with gltfpack: meshopt geometry, WebP colour textures
+   and KTX2 (UASTC) metallic-roughness at a quarter of the colour's size. The editor's
+   `AssetLoader` decodes them; the decoders are served from `/decoders/` by the client's Vite
+   config. (ETC1S, Basis' smaller format, turned neighbouring UV charts into grime and specks
+   at the mip levels a model shows at normal viewing distance.)
 
 Uploaded images can skip step 1. Images with transparency skip background removal.
 
@@ -160,7 +162,7 @@ needed). `make_set` runs every line
 runs, names the runs `<set>-<nn>-<words>` and copies them to `orainge-outputs/<set>/`. Run it
 again with the same `--name` to retry what failed. To choose each prompt's picture the way a
 user does in the Studio, run the set with `--pictures-only` first, then again with
-`--picks "3=2,7=4"` (run number = picture number; runs left out use their first picture). Then
+`--picks "3=2,7=4"` (run number = picture number; runs left out use their best-scored picture). Then
 `python workers/gallery/make_gallery.py orainge-outputs/<set> -o gallery/` renders every preview and
 final from six angles, with the editor's decoders and lighting, and writes a page showing each
 run's reference images, triangles, file size, GPU time and cost, with a 3D viewer (orbit,
@@ -194,7 +196,7 @@ keep it to replace the preview with the final where it stands. Scenes store mode
 `model` component), so they survive saving, reloading, collaboration and publishing.
 
 When the FLUX worker rates its pictures (`score` and `issues` on each image), the panel marks the
-highest-scoring one "Best for 3D" and chooses it to begin with, and a picture's issues show when
+highest-scoring one "Suggested" and chooses it to begin with, and a picture's issues show when
 the pointer rests on it. The user can still pick any of them.
 
 A container that has scaled to zero takes about 45 s (FLUX) to 100 s (TRELLIS.2) to start, so
@@ -237,7 +239,7 @@ It refuses to run in production.
    | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Where outputs go                                                                                                 |
    | `R2_PUBLIC_BASE_URL`                                                     | Public URL of the bucket, returned to the server                                                                 |
    | `ALLOWED_IMAGE_HOSTS` (trellis2)                                         | Comma-separated hosts `image_url` may point to, e.g. your R2 domain. Without it, only `image_base64` is accepted |
-   | `TRELLIS2_LOW_VRAM=0` (trellis2, optional)                               | Keep all models on the GPU; faster on 48 GB+ cards                                                               |
+   | `TRELLIS2_LOW_VRAM=0` (trellis2, optional)                               | Keep all models on the GPU; faster on 48 GB+ cards. A job that runs out of memory retries once in low-VRAM mode  |
    | `FLUX_CPU_OFFLOAD=1` (flux-schnell, optional)                            | Run on 24 GB cards, several times slower                                                                         |
 
 4. Give the server `RUNPOD_API_KEY`, `RUNPOD_TRELLIS2_ENDPOINT_ID` and
