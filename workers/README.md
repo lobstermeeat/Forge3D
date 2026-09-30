@@ -1,14 +1,16 @@
 # AI workers
 
-FORGE 3D generates 3D models with its own models on RunPod serverless GPUs. There are no
-third-party AI APIs involved.
+FORGE 3D generates 3D models with its own models on serverless GPUs, billed only while they
+work. There are no third-party AI APIs involved.
 
-| Worker                          | Model                         | Job                      | GPU                                                          |
-| ------------------------------- | ----------------------------- | ------------------------ | ------------------------------------------------------------ |
-| [`trellis2/`](trellis2)         | TRELLIS.2-4B (MIT)            | image to textured GLB    | 24 GB+ Ampere/Ada/Hopper (RTX 4090, L40S, A6000, A100, H100) |
-| [`flux-schnell/`](flux-schnell) | FLUX.1 [schnell] (Apache-2.0) | text to reference images | 48 GB (L40S, A6000, A40)                                     |
+| Worker                          | Model                         | Job                      | GPU                                              |
+| ------------------------------- | ----------------------------- | ------------------------ | ------------------------------------------------ |
+| [`trellis2/`](trellis2)         | TRELLIS.2-4B (MIT)            | image to textured GLB    | 24 GB+ Ampere/Ada/Hopper (L40S, RTX 4090, A100…) |
+| [`flux-schnell/`](flux-schnell) | FLUX.1 [schnell] (Apache-2.0) | text to reference images | 48 GB (L40S, A6000, A40)                         |
 
-The server talks to both through `apps/server/src/services/ai` (`SelfHostedProvider`).
+They run on [Modal](https://modal.com) (`modal_app.py`, the simplest way to start) or on
+RunPod serverless (the Dockerfiles). Both hosts speak the same job protocol, so the server talks
+to either through `apps/server/src/services/ai` (`SelfHostedProvider`).
 
 ## The flow: spend GPU time only on results people keep
 
@@ -60,15 +62,95 @@ stale one. Output:
 Output: `{ "images": [{ "key", "url", "seed" }, …], "prompt", "seconds" }`.
 
 Invalid input (including an image where no object stands out from the background) comes back
-as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`; GPU
-faults also set `refresh_worker: true`, so RunPod restarts the worker process.
+as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`. After
+a GPU fault the worker also replaces its container (RunPod: `refresh_worker`; Modal: the
+container stops taking jobs), because CUDA may be unusable in that process.
 
-## Deploying
+Without R2 (below) files come back inline as `base64` instead of `url` (8 MB limit), and the
+server passes them around as `data:` URLs. That is fine for trying things out.
+
+## Deploying on Modal
+
+Modal bills GPUs by the second and includes $30 of free compute a month on its Starter plan.
+`modal_app.py` defines both workers, a volume for the weights and a small job API
+(`job_api.py`) with the same routes as a RunPod endpoint (`/run`, `/runsync`, `/status/{id}`,
+`/cancel/{id}`), under `/trellis2` and `/reference`.
 
 1. On Hugging Face, request access to
    [DINOv3](https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m) (Meta approves it
-   manually) and accept the [FLUX.1 [schnell]](https://huggingface.co/black-forest-labs/FLUX.1-schnell)
-   terms. Create a read token.
+   manually, so do this first) and accept the
+   [FLUX.1 [schnell]](https://huggingface.co/black-forest-labs/FLUX.1-schnell) terms. Create a
+   read token.
+2. Install the CLI and log in (from the repository root; the same commands work in PowerShell):
+
+   ```sh
+   pip install modal
+   modal setup
+   ```
+
+3. Store two secrets. The worker token is a password you make up for the job API; the server
+   sends it with every request:
+
+   ```sh
+   modal secret create huggingface HF_TOKEN=hf_…
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   modal secret create orainge-worker-token ORAINGE_WORKER_TOKEN=<the printed value>
+   ```
+
+   (You can also create them in the Modal dashboard under Secrets.)
+
+4. Download the weights into the `orainge-models` volume. This runs on a CPU and fetches about
+   50 GB. The first `modal run` also builds the images, which takes 20–40 minutes once (the
+   TRELLIS.2 image compiles CUDA extensions); later runs reuse them.
+
+   ```sh
+   modal run workers/modal_app.py::download_models
+   ```
+
+   `--which reference` fetches only FLUX (while Meta reviews your DINOv3 request, say) and
+   `--which trellis2` only TRELLIS.2. Running it again skips weights that are already there.
+
+5. Try it. `try_prompt` saves images in the current folder, `try_image` saves the GLB next to
+   its image, and a preview prints the command that makes its final:
+
+   ```sh
+   modal run workers/modal_app.py::try_prompt --prompt "a brass pocket watch"
+   modal run workers/modal_app.py::try_image --image reference-123.png
+   modal run workers/modal_app.py::try_image --image reference-123.png --mode final --seed 42
+   ```
+
+   The GLBs are meshopt/KTX2-compressed, so open them in the FORGE 3D editor (File › Import
+   model) or another viewer that supports those extensions.
+
+6. Deploy the job API:
+
+   ```sh
+   modal deploy workers/modal_app.py
+   ```
+
+   Give the server the URL it prints (`https://<workspace>--orainge-ai-api.modal.run`) as
+   `AI_WORKERS_URL` and the same token as `AI_WORKERS_TOKEN` (see `.env.example`).
+
+**Settings** (in `modal_app.py`): both workers run on an L40S (48 GB), scale to zero, stay warm
+for 60 s after their last job (idle time is billed; a cold start takes about a minute) and are
+capped at 2 TRELLIS.2 containers and 1 FLUX container to bound spending. `TRELLIS2_GPU = "A10"`
+costs about half as much per second but is slower and has only 24 GB; set
+`TRELLIS2_LOW_VRAM = "1"` with it.
+
+**R2 storage** (for production): put the storage variables from the RunPod table below in a
+Modal secret, then deploy with its name in `ORAINGE_R2_SECRET`:
+
+```sh
+modal secret create orainge-r2 R2_ACCOUNT_ID=… R2_ACCESS_KEY_ID=… R2_SECRET_ACCESS_KEY=… R2_BUCKET=… R2_PUBLIC_BASE_URL=https://assets.example.com ALLOWED_IMAGE_HOSTS=assets.example.com
+ORAINGE_R2_SECRET=orainge-r2 modal deploy workers/modal_app.py
+```
+
+In PowerShell the second line is `$env:ORAINGE_R2_SECRET = "orainge-r2"; modal deploy workers/modal_app.py`.
+`modal deploy` prints which storage the workers use, so a deploy without R2 doesn't go unnoticed.
+
+## Deploying on RunPod
+
+1. Hugging Face access as in Modal step 1.
 2. Build and push the images. The token is a build secret, so it never lands in a layer:
 
    ```sh
@@ -91,11 +173,8 @@ faults also set `refresh_worker: true`, so RunPod restarts the worker process.
    | `TRELLIS2_LOW_VRAM=0` (trellis2, optional)                               | Keep all models on the GPU; faster on 48 GB+ cards                                                               |
    | `FLUX_CPU_OFFLOAD=1` (flux-schnell, optional)                            | Run on 24 GB cards, several times slower                                                                         |
 
-   Without R2 the workers return files inline (base64, 8 MB limit), which is fine for local tests only.
-
 4. Give the server `RUNPOD_API_KEY`, `RUNPOD_TRELLIS2_ENDPOINT_ID` and
-   `RUNPOD_REFERENCE_ENDPOINT_ID` (see `.env.example`). `createAIOrchestrator()` registers the
-   provider when they are set.
+   `RUNPOD_REFERENCE_ENDPOINT_ID` (see `.env.example`). `AI_WORKERS_URL` wins if both are set.
 
 Keep endpoints at **0 minimum workers** (scale to zero). An always-on RTX 4090 pod ($0.74/h)
 only beats serverless ($1.10/h, billed while busy) once the GPU would be busy about two-thirds
@@ -103,22 +182,31 @@ of the time.
 
 ### RTX 5090 and other Blackwell cards
 
-The image targets CUDA 12.4 (compute capability 8.0, 8.6, 8.9 and 9.0). Blackwell (sm_120) needs
+The images target CUDA 12.4 (compute capability 8.0, 8.6, 8.9 and 9.0). Blackwell (sm_120) needs
 CUDA 12.8+: switch the base image to `nvidia/cuda:12.8.x-cudnn-devel-ubuntu22.04`, install a
 cu128 build of PyTorch, add `12.0` to `TORCH_CUDA_ARCH_LIST`, and use a flash-attn build for
 that torch version. CuMesh, FlexGEMM and o-voxel must be compiled against that exact PyTorch,
-which is what the Dockerfile does; a mismatch shows up as an ABI error at import.
+which is what the Dockerfile and `modal_app.py` do; a mismatch shows up as an ABI error at import.
 
 ## Cost (estimates to check against real `timings`)
 
-RunPod list prices on 29 Sep 2026: RTX 4090 $1.10/h serverless ($0.74/h always-on), RTX 5090
-$1.58/h ($0.99/h), L40S $1.75/h, RTX A6000/A40 $1.22/h.
+Modal on 29 Sep 2026: L40S $0.000542/s ($1.95/h), plus $0.047 per CPU core-hour and $0.008 per
+GiB-hour of memory, so about $2.30/h per worker container as configured.
 
-| Step                     | GPU time (estimate) | Cost         |
-| ------------------------ | ------------------- | ------------ |
-| 4 reference images, L40S | 10–20 s             | ~$0.01       |
-| Preview, RTX 4090        | 15–30 s             | ~$0.005–0.01 |
-| Final, RTX 4090          | 1–2 min             | ~$0.02–0.04  |
+| Step (Modal, L40S)                                | Time (estimate) | Cost        |
+| ------------------------------------------------- | --------------- | ----------- |
+| 4 reference images                                | 10–20 s         | ~$0.01      |
+| Preview                                           | 20–40 s         | ~$0.01–0.03 |
+| Final                                             | 1–2 min         | ~$0.04–0.08 |
+| Cold start and 60 s idle, per container scaled up | ~2 min          | ~$0.08      |
+
+The GPU work in a prompt-to-final run comes to about $0.06–0.12. At low traffic each run also
+pays for its cold starts: one FLUX and one TRELLIS.2 container, plus a second TRELLIS.2 start if
+the final comes more than 60 s after the preview. That makes roughly $0.22–0.36 a run, so the
+free $30 covers about 80–140 runs a month while testing, and more once steady traffic keeps
+containers warm. RunPod list prices on 29 Sep 2026: RTX 4090 $1.10/h serverless ($0.74/h
+always-on), RTX 5090 $1.58/h ($0.99/h), L40S $1.75/h, RTX A6000/A40 $1.22/h; once the free
+credits are used up, its cheaper GPUs make each job cheaper.
 
 Microsoft publishes H100 timings only (about 3 s at 512³, 17 s at 1024³ and 60 s at 1536³,
 before export). Cold starts add model-loading time on the first job after scaling from zero.
@@ -135,11 +223,16 @@ FLUX.1 [dev] (non-commercial) and Hunyuan3D 2.1 (not licensed in South Korea, th
 ## Tests
 
 ```sh
-cd workers/trellis2 && python -m pytest tests      # CPU only; set GLTFPACK_BIN to include gltfpack
-cd workers/flux-schnell && python -m pytest tests
+pip install -r workers/requirements-dev.txt
+python -m pytest workers/tests                 # the job API and modal_app.py
+python -m pytest workers/trellis2/tests        # CPU only; set GLTFPACK_BIN to include gltfpack
+python -m pytest workers/flux-schnell/tests
 ```
 
-The tests cover input validation, job handling, the checkpoint check and the nvdiffrast
-stand-in (against a brute-force rasterizer and analytic results). Before the first production
-deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine that has
-nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real hardware.
+Run the three folders separately: they share test file names.
+
+The tests cover input validation, job handling, the checkpoint check, the job API and the
+nvdiffrast stand-in (against a brute-force rasterizer and analytic results). Before the first
+production deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine
+that has nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real
+hardware.

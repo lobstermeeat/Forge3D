@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAIOrchestrator } from '../index';
-import { RunPodEndpoint, type FetchLike } from './runpod';
+import { JobEndpoint, type FetchLike } from './jobEndpoint';
 import { SelfHostedProvider, createSelfHostedProvider } from './selfHosted';
 
 interface Call {
@@ -10,8 +10,8 @@ interface Call {
   auth: string | null;
 }
 
-/** A fake RunPod API: answers each request from a queue of JSON bodies. */
-function fakeRunPod(responses: unknown[]) {
+/** A fake job API (RunPod or Modal): answers each request from a queue of JSON bodies. */
+function fakeJobApi(responses: unknown[]) {
   const calls: Call[] = [];
   const fetchImpl: FetchLike = async (url, init) => {
     const headers = new Headers(init?.headers);
@@ -42,14 +42,14 @@ const trellisOutput = {
 
 describe('SelfHostedProvider', () => {
   it('queues an image-to-3d job with the preview seed and maps the result', async () => {
-    const { calls, fetchImpl } = fakeRunPod([
+    const { calls, fetchImpl } = fakeJobApi([
       { id: 'job-1', status: 'IN_QUEUE' },
       { id: 'job-1', status: 'IN_PROGRESS' },
       { id: 'job-1', status: 'COMPLETED', output: trellisOutput },
       { id: 'job-1', status: 'COMPLETED', output: trellisOutput },
     ]);
     const provider = new SelfHostedProvider(
-      new RunPodEndpoint('trellis-ep', 'rp-key', fetchImpl),
+      JobEndpoint.runPod('trellis-ep', 'rp-key', fetchImpl),
       null,
     );
 
@@ -93,14 +93,14 @@ describe('SelfHostedProvider', () => {
   });
 
   it('defaults to the final quality', async () => {
-    const { calls, fetchImpl } = fakeRunPod([{ id: 'job-2', status: 'IN_QUEUE' }]);
-    const provider = new SelfHostedProvider(new RunPodEndpoint('ep', 'k', fetchImpl), null);
+    const { calls, fetchImpl } = fakeJobApi([{ id: 'job-2', status: 'IN_QUEUE' }]);
+    const provider = new SelfHostedProvider(JobEndpoint.runPod('ep', 'k', fetchImpl), null);
     await provider.generate({ type: 'image-to-3d', imageUrl: 'https://x/y.png', userId: 'u' });
     expect((calls[0]!.body as { input: { mode: string } }).input.mode).toBe('final');
   });
 
   it('reports worker failures', async () => {
-    const { fetchImpl } = fakeRunPod([
+    const { fetchImpl } = fakeJobApi([
       {
         id: 'job-3',
         status: 'FAILED',
@@ -108,7 +108,7 @@ describe('SelfHostedProvider', () => {
       },
       { id: 'job-3', status: 'COMPLETED', output: { error: 'invalid input: mode must be one of' } },
     ]);
-    const provider = new SelfHostedProvider(new RunPodEndpoint('ep', 'k', fetchImpl), null);
+    const provider = new SelfHostedProvider(JobEndpoint.runPod('ep', 'k', fetchImpl), null);
     expect(await provider.pollStatus('job-3')).toEqual({
       status: 'failed',
       progress: 100,
@@ -118,7 +118,7 @@ describe('SelfHostedProvider', () => {
   });
 
   it('turns a prompt into reference images, and uses the first when there is no pick', async () => {
-    const reference = fakeRunPod([
+    const reference = fakeJobApi([
       {
         id: 'ref-1',
         status: 'COMPLETED',
@@ -153,10 +153,10 @@ describe('SelfHostedProvider', () => {
         },
       },
     ]);
-    const trellis = fakeRunPod([{ id: 'job-9', status: 'IN_QUEUE' }]);
+    const trellis = fakeJobApi([{ id: 'job-9', status: 'IN_QUEUE' }]);
     const provider = new SelfHostedProvider(
-      new RunPodEndpoint('trellis-ep', 'k', trellis.fetchImpl),
-      new RunPodEndpoint('ref-ep', 'k', reference.fetchImpl),
+      JobEndpoint.runPod('trellis-ep', 'k', trellis.fetchImpl),
+      JobEndpoint.runPod('ref-ep', 'k', reference.fetchImpl),
     );
 
     const images = await provider.referenceImages('a teapot', { requestId: 'gen_9', seed: 5 });
@@ -187,8 +187,8 @@ describe('SelfHostedProvider', () => {
   });
 
   it('sends inline reference images as data instead of a URL', async () => {
-    const { calls, fetchImpl } = fakeRunPod([{ id: 'job-5', status: 'IN_QUEUE' }]);
-    const provider = new SelfHostedProvider(new RunPodEndpoint('ep', 'k', fetchImpl), null);
+    const { calls, fetchImpl } = fakeJobApi([{ id: 'job-5', status: 'IN_QUEUE' }]);
+    const provider = new SelfHostedProvider(JobEndpoint.runPod('ep', 'k', fetchImpl), null);
     await provider.generate({
       type: 'image-to-3d',
       imageUrl: 'data:image/png;base64,iVBORw0KGgo=',
@@ -199,18 +199,16 @@ describe('SelfHostedProvider', () => {
   });
 
   it('cancels a reference job that outlives the timeout', async () => {
-    const { calls, fetchImpl } = fakeRunPod([{ id: 'ref-slow', status: 'IN_PROGRESS' }, {}]);
-    const endpoint = new RunPodEndpoint('ref-ep', 'k', fetchImpl);
-    await expect(endpoint.runSync({ prompt: 'x' }, -1)).rejects.toThrow(
-      'RunPod job ref-slow timed out',
-    );
+    const { calls, fetchImpl } = fakeJobApi([{ id: 'ref-slow', status: 'IN_PROGRESS' }, {}]);
+    const endpoint = JobEndpoint.runPod('ref-ep', 'k', fetchImpl);
+    await expect(endpoint.runSync({ prompt: 'x' }, -1)).rejects.toThrow('Job ref-slow timed out');
     expect(calls[1]).toMatchObject({
       url: 'https://api.runpod.ai/v2/ref-ep/cancel/ref-slow',
       method: 'POST',
     });
   });
 
-  it('is only registered when RunPod is configured', () => {
+  it('is only registered when workers are configured', () => {
     expect(createSelfHostedProvider({})).toBeNull();
     expect(createAIOrchestrator({}).getAvailableProviders('image-to-3d')).toEqual([]);
     const imageOnly = createAIOrchestrator({
@@ -228,5 +226,66 @@ describe('SelfHostedProvider', () => {
       RUNPOD_REFERENCE_ENDPOINT_ID: 'ref',
     });
     expect(both.selectProvider('text-to-3d').name).toBe('forge3d-trellis2');
+  });
+
+  it('uses the job API on Modal when AI_WORKERS_URL is set', async () => {
+    const api = fakeJobApi([
+      {
+        id: 'fc-01K6REF',
+        status: 'COMPLETED',
+        output: {
+          request_id: 'gen_3',
+          prompt: 'x',
+          images: [{ key: 'ai/gen_3/reference-8.png', url: null, base64: 'iVBORw0KGgo=', seed: 8 }],
+          seconds: 2,
+        },
+      },
+      { id: 'fc-01K6GLB', status: 'IN_QUEUE' },
+      { id: 'fc-01K6GLB', status: 'IN_PROGRESS' },
+    ]);
+    const provider = createSelfHostedProvider(
+      {
+        // A trailing slash is fine; Modal wins over RunPod
+        AI_WORKERS_URL: 'https://orainge--orainge-ai-api.modal.run/',
+        AI_WORKERS_TOKEN: 'worker-token',
+        RUNPOD_API_KEY: 'k',
+        RUNPOD_TRELLIS2_ENDPOINT_ID: 'ep',
+      },
+      api.fetchImpl,
+    )!;
+    expect(provider.supportedTypes).toEqual(['image-to-3d', 'text-to-3d']);
+
+    const jobId = await provider.generate({
+      type: 'text-to-3d',
+      prompt: 'a teapot',
+      userId: 'u',
+      requestId: 'gen_3',
+      quality: 'preview',
+    });
+    expect(jobId).toBe('fc-01K6GLB');
+    expect(await provider.pollStatus(jobId)).toEqual({ status: 'processing', progress: 50 });
+    expect(api.calls.map((call) => [call.method, call.url, call.auth])).toEqual([
+      [
+        'POST',
+        'https://orainge--orainge-ai-api.modal.run/reference/runsync',
+        'Bearer worker-token',
+      ],
+      ['POST', 'https://orainge--orainge-ai-api.modal.run/trellis2/run', 'Bearer worker-token'],
+      [
+        'GET',
+        'https://orainge--orainge-ai-api.modal.run/trellis2/status/fc-01K6GLB',
+        'Bearer worker-token',
+      ],
+    ]);
+    // Without R2 the reference image comes back inline and goes to TRELLIS.2 as data
+    expect(api.calls[1]!.body).toEqual({
+      input: { image_base64: 'iVBORw0KGgo=', mode: 'preview', request_id: 'gen_3' },
+    });
+  });
+
+  it('refuses AI_WORKERS_URL without a token', () => {
+    expect(() =>
+      createSelfHostedProvider({ AI_WORKERS_URL: 'https://orainge--orainge-ai-api.modal.run' }),
+    ).toThrow('AI_WORKERS_URL is set but AI_WORKERS_TOKEN is not');
   });
 });

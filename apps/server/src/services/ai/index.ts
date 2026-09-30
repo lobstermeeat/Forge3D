@@ -3,7 +3,7 @@ import { createSelfHostedProvider } from './providers/selfHosted';
 
 export { AIOrchestrator } from './orchestrator';
 export { SelfHostedProvider, createSelfHostedProvider } from './providers/selfHosted';
-export { RunPodEndpoint } from './providers/runpod';
+export { JobEndpoint } from './providers/jobEndpoint';
 export type {
   AIProvider,
   GenerationRequest,

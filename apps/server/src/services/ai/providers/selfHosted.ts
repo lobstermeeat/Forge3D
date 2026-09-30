@@ -7,7 +7,7 @@ import type {
   ReferenceImage,
   ReferenceImageProvider,
 } from '../types';
-import { RunPodEndpoint, type RunPodJob } from './runpod';
+import { JobEndpoint, type FetchLike, type RemoteJob } from './jobEndpoint';
 
 /** A stored file as the workers report it (see storage.py in each worker). */
 interface StoredAsset {
@@ -38,8 +38,9 @@ interface ReferenceOutput {
 }
 
 /**
- * FORGE 3D's own models on RunPod serverless: TRELLIS.2 for image-to-3D and FLUX.1 [schnell]
- * for the reference images text prompts start from. No third-party AI APIs.
+ * FORGE 3D's own models on serverless GPUs (Modal or RunPod, see workers/): TRELLIS.2 for
+ * image-to-3D and FLUX.1 [schnell] for the reference images text prompts start from. No
+ * third-party AI APIs.
  *
  * The intended flow: `referenceImages(prompt)` -> user picks one ->
  * `generate({ type: 'image-to-3d', imageUrl, quality: 'preview' })` -> user keeps it ->
@@ -51,8 +52,8 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider {
   readonly supportedTypes: readonly GenerationType[];
 
   constructor(
-    private readonly trellis2: RunPodEndpoint,
-    private readonly reference: RunPodEndpoint | null,
+    private readonly trellis2: JobEndpoint,
+    private readonly reference: JobEndpoint | null,
   ) {
     this.supportedTypes = reference ? ['image-to-3d', 'text-to-3d'] : ['image-to-3d'];
   }
@@ -61,7 +62,8 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider {
     prompt: string,
     options: { count?: number; seed?: number; requestId?: string } = {},
   ): Promise<ReferenceImage[]> {
-    if (!this.reference) throw new Error('Reference images need RUNPOD_REFERENCE_ENDPOINT_ID');
+    if (!this.reference)
+      throw new Error('Reference images need the reference worker (see workers/README.md)');
     const job = await this.reference.runSync<ReferenceOutput>({
       prompt,
       count: options.count ?? 4,
@@ -115,7 +117,7 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider {
         return {
           status: 'failed',
           progress: 100,
-          message: job.error ?? `RunPod job ${job.status.toLowerCase()}`,
+          message: job.error ?? `Job ${job.status.toLowerCase().replace('_', ' ')}`,
         };
     }
   }
@@ -135,9 +137,9 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider {
   }
 }
 
-function outputOf<T extends { error?: string }>(job: RunPodJob<T>): T {
+function outputOf<T extends { error?: string }>(job: RemoteJob<T>): T {
   if (job.status !== 'COMPLETED' || !job.output) {
-    throw new Error(job.error ?? `RunPod job ${job.id} is ${job.status}`);
+    throw new Error(job.error ?? `Job ${job.id} is ${job.status}`);
   }
   if (job.output.error) throw new Error(job.output.error);
   return job.output;
@@ -150,16 +152,30 @@ function assetUrl(asset: StoredAsset, mimeType: string): string {
   throw new Error(`Worker stored ${asset.key} without a public URL; set R2_PUBLIC_BASE_URL on it`);
 }
 
-/** Built from RUNPOD_API_KEY, RUNPOD_TRELLIS2_ENDPOINT_ID and (optional) RUNPOD_REFERENCE_ENDPOINT_ID. */
+/**
+ * Built from the environment. Either the job API on Modal (workers/modal_app.py):
+ * AI_WORKERS_URL and AI_WORKERS_TOKEN; or RunPod: RUNPOD_API_KEY, RUNPOD_TRELLIS2_ENDPOINT_ID and
+ * (optional) RUNPOD_REFERENCE_ENDPOINT_ID. AI_WORKERS_URL wins when both are set.
+ */
 export function createSelfHostedProvider(
   env: Record<string, string | undefined> = process.env,
+  fetchImpl?: FetchLike,
 ): SelfHostedProvider | null {
+  const workersUrl = env['AI_WORKERS_URL']?.trim().replace(/\/+$/, '');
+  if (workersUrl) {
+    const token = env['AI_WORKERS_TOKEN'];
+    if (!token) throw new Error('AI_WORKERS_URL is set but AI_WORKERS_TOKEN is not');
+    return new SelfHostedProvider(
+      new JobEndpoint(`${workersUrl}/trellis2`, token, fetchImpl),
+      new JobEndpoint(`${workersUrl}/reference`, token, fetchImpl),
+    );
+  }
   const apiKey = env['RUNPOD_API_KEY'];
   const trellis2 = env['RUNPOD_TRELLIS2_ENDPOINT_ID'];
   if (!apiKey || !trellis2) return null;
   const reference = env['RUNPOD_REFERENCE_ENDPOINT_ID'];
   return new SelfHostedProvider(
-    new RunPodEndpoint(trellis2, apiKey),
-    reference ? new RunPodEndpoint(reference, apiKey) : null,
+    JobEndpoint.runPod(trellis2, apiKey, fetchImpl),
+    reference ? JobEndpoint.runPod(reference, apiKey, fetchImpl) : null,
   );
 }

@@ -20,7 +20,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HUB_OFFLINE=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3.10 python3.10-dev python3-pip git curl unzip ca-certificates \
+        python3.10 python3.10-dev python3-pip build-essential git curl unzip ca-certificates \
         libgl1 libglib2.0-0 libjpeg-dev \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3.10 /usr/bin/python

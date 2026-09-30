@@ -1,0 +1,5 @@
+# On your own machine: the Modal CLI (deploys modal_app.py) and what workers/tests needs.
+modal>=1.6,<2
+fastapi>=0.115,<1
+httpx>=0.27
+pytest>=8

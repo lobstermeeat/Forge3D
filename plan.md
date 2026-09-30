@@ -28,7 +28,7 @@
 - [x] Drizzle ORM schema (users, sessions, accounts, projects, scenes, assets, ai_generations)
 - [x] tRPC router with project CRUD + scene save/load
 - [x] Protected procedures (auth middleware)
-- [x] AI Orchestrator with the self-hosted TRELLIS.2 provider (RunPod serverless, see workers/)
+- [x] AI Orchestrator with the self-hosted TRELLIS.2 provider (Modal or RunPod serverless, see workers/)
 
 ### Client Shell
 - [x] Vite + React 19 setup with path aliases
