@@ -148,14 +148,16 @@ key matching `ops/results-public-key.pem` (`ops/seal.sh` explains how to make on
 results). `bash ops/gallery.sh "<title>"` puts a test set's gallery and final models there.
 
 **Review a test set:** a set is a text file with one prompt, or the path of a photo, per line;
-`workers/test-sets/starter.txt` covers eight kinds of game assets. `make_set` runs every line
+`workers/test-sets/starter.txt` covers eight kinds of game assets, and `renders.txt` six photos
+of CC0 sample models (no FLUX needed). `make_set` runs every line
 (previews and finals; `--no-final` for previews only) with the GPU containers kept warm between
 runs, names the runs `<set>-<nn>-<words>` and copies them to `orainge-outputs/`. Run it again
 with the same `--name` to retry what failed. Then
 `python workers/gallery/make_gallery.py orainge-outputs -o gallery/` renders every preview and
 final from six angles, with the editor's decoders and lighting, and writes a page showing each
-run's reference images, triangles, file size, GPU time and cost. It needs `pnpm install` and
-Playwright's Chromium, which `ops/gallery.sh` installs on GitHub's servers.
+run's reference images, triangles, file size, GPU time and cost, with a 3D viewer (orbit,
+zoom, wireframe) for each final. It needs `pnpm install` and Playwright's Chromium, which
+`ops/gallery.sh` installs on GitHub's servers; serve the page over http(s) to use the viewer.
 
 **Settings** (in `modal_app.py`): both workers run on an L40S (48 GB), scale to zero, stay warm
 for 60 s after their last job (idle time is billed; a cold start takes about a minute) and are
