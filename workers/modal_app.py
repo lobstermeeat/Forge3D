@@ -393,9 +393,10 @@ def run_pipeline(
     `folder`. Each finished step is recorded in progress.json, so running it again on the same
     folder skips what is done and continues where it stopped.
 
-    The first reference picture goes on to 3D unless `pick` names another (1-4), the way a
-    user picks one in the Studio. `pictures_only` stops before 3D, so the pictures can be
-    looked at first; running again with `pick` then makes the model.
+    The reference picture the worker scored best goes on to 3D (the first, if it didn't score
+    them) unless `pick` names another (1-4), the way a user picks one in the Studio.
+    `pictures_only` stops before 3D, so the pictures can be looked at first; running again with
+    `pick` then makes the model.
     """
     folder.mkdir(parents=True, exist_ok=True)
     progress_file = folder / "progress.json"
@@ -473,9 +474,16 @@ def run_pipeline(
             name = f"reference-{picture['seed']}.png"
             (folder / name).write_bytes(fetch(picture))
             files.append(name)
-        # The first picture goes on to 3D; `--image` on another one makes that one instead
-        state["input"] = files[0]
-        return {"files": files, "gpu_seconds": result.get("seconds")}
+        fields: dict = {"files": files, "gpu_seconds": result.get("seconds")}
+        scores = [picture.get("score") for picture in result["images"]]
+        if any(score is not None for score in scores):
+            fields["scores"] = scores
+            fields["issues"] = [picture.get("issues", []) for picture in result["images"]]
+        # The best-framed picture goes on to 3D: the earlier one on a tie, the first if nothing was
+        # scored. `pick` makes another one instead
+        best = max(range(len(files)), key=lambda i: -1 if scores[i] is None else scores[i])
+        state["input"] = files[best]
+        return fields
 
     def model(mode: str) -> Callable[[], dict]:
         def work() -> dict:
