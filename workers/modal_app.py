@@ -89,6 +89,16 @@ trellis2_image = (
     )
     # --no-build-isolation builds use this environment's tools, and bdist_wheel needs `wheel`
     .run_commands("python -m pip install --upgrade pip 'setuptools>=70' wheel")
+    # add_python's interpreter was built with clang, so setuptools would link with clang++, which
+    # this image doesn't have. Compile and link with the image's gcc, as PyTorch itself is built.
+    .env(
+        {
+            "CC": "gcc",
+            "CXX": "g++",
+            "LDSHARED": "gcc -pthread -shared",
+            "LDCXXSHARED": "g++ -pthread -shared",
+        }
+    )
     .run_commands(
         _git("https://github.com/JeffreyXiang/CuMesh", CUMESH_COMMIT, "/tmp/CuMesh"),
         "python -m pip install /tmp/CuMesh --no-build-isolation --no-deps && rm -rf /tmp/CuMesh",
