@@ -10,6 +10,10 @@ orainge-outputs/ folder that make and make_set fill. The output is index.html wi
 each final GLB in models/ for the page's 3D viewer (--no-3d leaves them out), ready to publish as
 one page. The viewer loads three.js from jsDelivr, so the page must be served over http(s).
 
+--verdicts adds a reviewer's judgement from a JSON file: {"<run>": {"verdict": "publish" | "edits" |
+"reject", "note": "why", "group": "Everyday"}}. Each card shows it, and the summary counts the
+runs that are publishable as they stand, overall and per group, against the go/no-go bar.
+
 Needs Playwright's Chromium (pip install playwright && playwright install chromium) and the
 repository's node_modules (pnpm install), which provide three.js and its decoders.
 """
@@ -38,6 +42,9 @@ REPO = HERE.parents[1]
 DOLLARS_PER_GPU_SECOND = 2.30 / 3600
 VIEWS = 6
 THUMB = 256
+# The go/no-go bar: the share of a test set that must be publishable without editing
+BAR = 0.8
+VERDICTS = {"publish": ("Publishable", "ok"), "edits": ("Needs edits", "warn"), "reject": ("Not usable", "fail")}
 
 
 def three_dir() -> pathlib.Path:
@@ -95,6 +102,9 @@ class Run:
     failures: list[str] = field(default_factory=list)
     gpu_seconds: float = 0.0
     photo: bool = False  # started from a photo rather than a prompt
+    verdict: Optional[str] = None  # a key of VERDICTS, from --verdicts
+    note: str = ""
+    group: str = ""
 
     @property
     def cost(self) -> float:
@@ -220,13 +230,39 @@ def _median(values: list[float]) -> Optional[float]:
     return statistics.median(values) if values else None
 
 
+def apply_verdicts(runs: list[Run], verdicts: dict) -> None:
+    """Attaches a reviewer's verdicts ({run: {"verdict", "note", "group"}}) to the runs they name."""
+    known = {run.name for run in runs}
+    unknown = sorted(set(verdicts) - known)
+    if unknown:
+        raise SystemExit(f"--verdicts names runs that aren't in the gallery: {', '.join(unknown)}")
+    for run in runs:
+        entry = verdicts.get(run.name)
+        if not entry:
+            continue
+        if entry.get("verdict") not in VERDICTS:
+            raise SystemExit(f"{run.name}: verdict must be one of {', '.join(VERDICTS)}")
+        run.verdict, run.note, run.group = entry["verdict"], entry.get("note", ""), entry.get("group", "")
+
+
+def _share(runs: list[Run]) -> str:
+    passed = sum(run.verdict == "publish" for run in runs)
+    return f"{passed} of {len(runs)} ({passed / len(runs):.0%})"
+
+
 def page(runs: list[Run], title: str, subtitle: str, three_version: Optional[str] = None) -> str:
     e = html.escape
     finals = [m for r in runs for m in r.models if m.mode == "final"]
     previews = [m for r in runs for m in r.models if m.mode == "preview"]
     failed = [r for r in runs if r.failures]
     costs = [r.cost for r in runs if r.models]
-    summary = [
+    judged = [r for r in runs if r.verdict]
+    verdicts: list[tuple[str, str]] = []
+    if judged:
+        verdicts.append((f"Publishable (bar {BAR:.0%})", _share(judged)))
+        for group in dict.fromkeys(r.group for r in judged if r.group):
+            verdicts.append((group, _share([r for r in judged if r.group == group])))
+    summary = verdicts + [
         ("Runs", str(len(runs))),
         ("Finals", str(len(finals))),
         ("Failed", str(len(failed))),
@@ -274,14 +310,21 @@ def page(runs: list[Run], title: str, subtitle: str, three_version: Optional[str
                 f"<figcaption><span><b>{e(model.mode.capitalize())}</b> {facts}</span>{view}</figcaption>"
                 "</figure>"
             )
-        status = (
-            '<span class="chip fail">Failed</span>'
-            if run.failures
-            else ('<span class="chip ok">Final ready</span>' if any(m.mode == "final" for m in run.models) else '<span class="chip">Preview only</span>')
-        )
+        if run.verdict:
+            label, tone = VERDICTS[run.verdict]
+            status = f'<span class="chip {tone}">{e(label)}</span>'
+        elif run.failures:
+            status = '<span class="chip fail">Failed</span>'
+        elif any(m.mode == "final" for m in run.models):
+            status = '<span class="chip ok">Final ready</span>'
+        else:
+            status = '<span class="chip">Preview only</span>'
+        group = f'<span class="chip">{e(run.group)}</span>' if run.group else ""
         failures = "".join(f'<p class="error">{e(f)}</p>' for f in run.failures)
+        note = f'<p class="note">{e(run.note)}</p>' if run.note else ""
         cards.append(
-            f'<article class="run" id="{e(run.name)}"><header><h2>{e(run.subject)}</h2>{status}</header>'
+            f'<article class="run" id="{e(run.name)}"><header><h2>{e(run.subject)}</h2>'
+            f'<span class="chips">{group}{status}</span></header>{note}'
             f'<div class="refs">{refs}</div>{"".join(models)}{failures}'
             f'<p class="meta"><span>{e(run.name)}</span><span>GPU ${run.cost:.3f}</span></p></article>'
         )
@@ -356,6 +399,9 @@ h1 {{ margin: 0; font: 600 clamp(28px, 4vw, 40px)/1.1 var(--display); text-wrap:
 .chip {{ font: 500 12px/1 var(--mono); padding: 6px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }}
 .chip.ok {{ color: var(--good); border-color: currentColor; }}
 .chip.fail {{ color: var(--bad); border-color: currentColor; }}
+.chip.warn {{ color: var(--accent); border-color: currentColor; }}
+.chips {{ display: flex; flex-wrap: wrap; gap: 6px; }}
+.note {{ margin: 0; max-width: 80ch; }}
 .refs {{ display: flex; flex-wrap: wrap; gap: 8px; }}
 .ref {{ width: 96px; height: 96px; object-fit: cover; border-radius: 8px; border: 2px solid transparent; opacity: .72; }}
 .ref.chosen {{ border-color: var(--accent); opacity: 1; }}
@@ -563,11 +609,14 @@ def main() -> None:
     parser.add_argument(
         "--glb-as-text", action="store_true", help="copy the GLBs as base64 .txt, for hosts that don't serve .glb"
     )
+    parser.add_argument("--verdicts", type=pathlib.Path, help="a reviewer's verdicts as JSON (see above)")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     runs = load_runs(args.runs, args.out)
     if not runs:
         raise SystemExit(f"No runs (progress.json) under {args.runs}")
+    if args.verdicts:
+        apply_verdicts([run for run, _ in runs], json.loads(args.verdicts.read_text()))
     render_models(runs, args.runs, args.out)
     three_version = None if args.no_3d else copy_models(runs, args.runs, args.out, args.glb_as_text)
     (args.out / "index.html").write_text(page([run for run, _ in runs], args.title, args.subtitle, three_version))
