@@ -163,7 +163,9 @@ zoom, wireframe) for each final. It needs `pnpm install` and Playwright's Chromi
 for 60 s after their last job (idle time is billed; a cold start takes about a minute) and are
 capped at 2 TRELLIS.2 containers and 1 FLUX container to bound spending. `TRELLIS2_GPU = "A10"`
 costs about half as much per second but is slower and has only 24 GB; set
-`TRELLIS2_LOW_VRAM = "1"` with it.
+`TRELLIS2_LOW_VRAM = "1"` with it. Compiled GPU kernels and FlexGEMM's kernel tuning are kept
+in the `orainge-cache` volume, so only the first containers spend time compiling and
+benchmarking them.
 
 **R2 storage** (for production): put the storage variables from the RunPod table below in a
 Modal secret, then deploy with its name in `ORAINGE_R2_SECRET`:

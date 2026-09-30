@@ -438,3 +438,25 @@ def test_make_set_runs_every_line_and_reports_failures(tmp_path, monkeypatch, ca
     assert "s-02-chair: failed (RuntimeError: invalid input: no object found)" in out
     assert "Done: 1 of 2 runs finished" in out
     assert "make_set --prompts" in out and "--name s" in out
+
+
+def test_tuning_results_are_merged_without_losing_any(tmp_path):
+    shared, local = tmp_path / "shared" / "tuning.json", tmp_path / "local.json"
+    local.write_text(json.dumps({"NVIDIA L40S": {"conv": {"(10, 64)": {"B": 64}}}, "NVIDIA A100": {"conv": {}}}))
+    # Nothing shared yet: the first container's results become the shared ones
+    assert modal_app.merge_tuning(shared, local)
+    assert json.loads(shared.read_text()) == json.loads(local.read_text())
+    assert not modal_app.merge_tuning(shared, local)  # nothing new, nothing written
+
+    # Another container tuned a new shape and a new kernel meanwhile
+    other = {"NVIDIA L40S": {"conv": {"(12, 64)": {"B": 128}}, "sample": {"(9,)": {"B": 32}}}}
+    shared.write_text(json.dumps(other))
+    assert modal_app.merge_tuning(shared, local)
+    assert json.loads(shared.read_text())["NVIDIA L40S"] == {
+        "conv": {"(12, 64)": {"B": 128}, "(10, 64)": {"B": 64}},
+        "sample": {"(9,)": {"B": 32}},
+    }
+    # A missing or broken source changes nothing
+    assert not modal_app.merge_tuning(shared, tmp_path / "missing.json")
+    (tmp_path / "broken.json").write_text("{")
+    assert not modal_app.merge_tuning(shared, tmp_path / "broken.json")
