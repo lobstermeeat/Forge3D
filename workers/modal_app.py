@@ -218,16 +218,15 @@ def merge_tuning(into: pathlib.Path, source: pathlib.Path) -> bool:
 
 
 def share_caches() -> None:
-    """After a job: saves new compiled kernels and tuning results for the containers to come."""
-    import modal.exception as mx
-
+    """
+    After a job: saves new compiled kernels and tuning results for the containers to come. There is
+    no reload first: Triton keeps its compiled launchers open from the volume, which Modal refuses
+    to reload under, so results another container saved meanwhile are merged in by the next one.
+    """
     try:
-        cache.commit()  # Triton writes its kernels straight into the volume
-        cache.reload()  # tuning results other containers saved since this one started
-        if merge_tuning(SHARED_TUNING, LOCAL_TUNING):
-            cache.commit()
-    except (mx.Error, OSError) as err:
-        # Only speed is at stake, so a failed save never fails the job
+        merge_tuning(SHARED_TUNING, LOCAL_TUNING)
+        cache.commit()  # also saves the kernels Triton wrote straight into the volume
+    except Exception as err:  # noqa: BLE001 - only speed is at stake, so this never fails a job
         print(f"[orainge] kernel caches not saved: {type(err).__name__}: {err}")
 
 

@@ -460,3 +460,30 @@ def test_tuning_results_are_merged_without_losing_any(tmp_path):
     assert not modal_app.merge_tuning(shared, tmp_path / "missing.json")
     (tmp_path / "broken.json").write_text("{")
     assert not modal_app.merge_tuning(shared, tmp_path / "broken.json")
+
+
+def test_saving_the_kernel_caches_never_fails_a_job(tmp_path, monkeypatch, capsys):
+    local, shared = tmp_path / "local.json", tmp_path / "cache" / "tuning.json"
+    local.write_text(json.dumps({"NVIDIA L40S": {"conv": {"(10, 64)": {"B": 64}}}}))
+    monkeypatch.setattr(modal_app, "LOCAL_TUNING", local)
+    monkeypatch.setattr(modal_app, "SHARED_TUNING", shared)
+    commits = []
+
+    class Cache:
+        def commit(self):
+            commits.append(True)
+
+        def reload(self):  # Modal refuses while Triton's launchers are open from the volume
+            raise RuntimeError("there are open files preventing the operation")
+
+    monkeypatch.setattr(modal_app, "cache", Cache())
+    modal_app.share_caches()
+    assert json.loads(shared.read_text()) == json.loads(local.read_text()) and commits == [True]
+
+    class BrokenCache:
+        def commit(self):
+            raise RuntimeError("volume unavailable")
+
+    monkeypatch.setattr(modal_app, "cache", BrokenCache())
+    modal_app.share_caches()  # reported, not raised
+    assert "kernel caches not saved: RuntimeError: volume unavailable" in capsys.readouterr().out

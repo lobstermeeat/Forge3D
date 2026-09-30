@@ -17,6 +17,7 @@ repository's node_modules (pnpm install), which provide three.js and its decoder
 from __future__ import annotations
 
 import argparse
+import base64
 import functools
 import html
 import http.server
@@ -291,18 +292,24 @@ def page(runs: list[Run], title: str, subtitle: str, three_version: Optional[str
     return body
 
 
-def copy_models(runs: list[tuple[Run, pathlib.Path]], root: pathlib.Path, out: pathlib.Path) -> Optional[str]:
+def copy_models(
+    runs: list[tuple[Run, pathlib.Path]], root: pathlib.Path, out: pathlib.Path, as_text: bool = False
+) -> Optional[str]:
     """
     Copies each final GLB next to the page, with the KTX2 transcoder the page's viewer needs,
     and returns the three.js version the viewer should load (None when there is nothing to view).
+    With as_text the copies are base64 .txt files, for hosts that serve only web file types.
     """
     finals = [(run, model) for run, _ in runs for model in run.models if model.mode == "final"]
     if not finals:
         return None
     (out / "models").mkdir(parents=True, exist_ok=True)
     for run, model in finals:
-        model.viewer = f"models/{run.name}-final.glb"
-        shutil.copyfile(root / model.file, out / model.viewer)
+        model.viewer = f"models/{run.name}-final.glb" + (".txt" if as_text else "")
+        if as_text:
+            (out / model.viewer).write_bytes(base64.b64encode((root / model.file).read_bytes()))
+        else:
+            shutil.copyfile(root / model.file, out / model.viewer)
     basis = out / "vendor" / "basis"
     basis.mkdir(parents=True, exist_ok=True)
     for name in ("basis_transcoder.js", "basis_transcoder.wasm"):
@@ -462,6 +469,16 @@ function draw() {
   renderer.render(scene, camera);
 }
 
+// Some hosts serve only web file types, so a GLB may come as base64 text (--glb-as-text)
+async function fromBase64(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${response.status} for ${url}`);
+  const binary = atob((await response.text()).trim());
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
 function clear() {
   if (!model) return;
   scene.remove(model);
@@ -487,7 +504,8 @@ async function show(button) {
   cancelAnimationFrame(frame);
   draw();
   try {
-    const gltf = await loader.loadAsync(button.dataset.model);
+    const url = button.dataset.model;
+    const gltf = url.endsWith('.txt') ? await loader.parseAsync(await fromBase64(url), '') : await loader.loadAsync(url);
     if (ticket !== loading || !dialog.open) return;
     model = gltf.scene;
     const sphere = new THREE.Box3().setFromObject(model).getBoundingSphere(new THREE.Sphere());
@@ -542,13 +560,16 @@ def main() -> None:
         "turned through six angles. Would you publish the final as it stands?",
     )
     parser.add_argument("--no-3d", action="store_true", help="leave out the final GLBs and the 3D viewer")
+    parser.add_argument(
+        "--glb-as-text", action="store_true", help="copy the GLBs as base64 .txt, for hosts that don't serve .glb"
+    )
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     runs = load_runs(args.runs, args.out)
     if not runs:
         raise SystemExit(f"No runs (progress.json) under {args.runs}")
     render_models(runs, args.runs, args.out)
-    three_version = None if args.no_3d else copy_models(runs, args.runs, args.out)
+    three_version = None if args.no_3d else copy_models(runs, args.runs, args.out, args.glb_as_text)
     (args.out / "index.html").write_text(page([run for run, _ in runs], args.title, args.subtitle, three_version))
     print(f"Wrote {args.out / 'index.html'} with {len(runs)} runs")
 
