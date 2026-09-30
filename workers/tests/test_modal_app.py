@@ -243,6 +243,38 @@ def test_a_continued_run_keeps_its_inputs(tmp_path):
         run(tmp_path / "run-6", workers)
 
 
+def test_pictures_first_then_the_picked_one_becomes_3d(tmp_path):
+    workers = FakeWorkers()
+    folder = tmp_path / "run-7"
+    state = run(folder, workers, prompt="a lamp", final=True, pictures_only=True)
+    assert [name for name, _ in workers.calls] == ["weights", "weights", "reference"]
+    assert state["input"] == "reference-5.png" and "preview" not in state["steps"]
+
+    # Like a user in the Studio: the second picture goes on to 3D, preview and final
+    workers.calls.clear()
+    run(folder, workers, prompt="a lamp", final=True, pick=2)
+    jobs = [job["input"] for name, job in workers.calls if name == "trellis"]
+    assert [(job["mode"], base64.b64decode(job["image_base64"])) for job in jobs] == [
+        ("preview", b"png-6"),
+        ("final", b"png-6"),
+    ]
+    assert [name for name, _ in workers.calls if name == "reference"] == []  # the pictures are kept
+    assert json.loads((folder / "progress.json").read_text())["input"] == "reference-6.png"
+
+    # Once there is a model, another picture needs a new run; the same pick again is fine
+    with pytest.raises(ValueError, match="start a new run to use picture 1"):
+        run(folder, workers, pick=1)
+    run(folder, workers, pick=2)
+
+
+def test_a_pick_needs_a_picture_to_pick(tmp_path):
+    workers = FakeWorkers()
+    with pytest.raises(ValueError, match="pick must be 1 to 2"):
+        run(tmp_path / "run-8", workers, prompt="a lamp", pick=4)
+    with pytest.raises(ValueError, match="no pictures to pick from"):
+        run(tmp_path / "run-9", workers, image=b"x", image_name="a.png", pick=1)
+
+
 def test_status_says_what_is_ready_and_what_is_left(monkeypatch, capsys):
     import modal.exception as mx
     from modal.types import FileEntry, FileEntryType
@@ -380,6 +412,15 @@ def test_the_starter_set_is_valid():
     assert all(modal_app.RUN_NAME.fullmatch(name) for name in names)
 
 
+def test_the_phase2_set_is_valid():
+    runs = modal_app.read_set(WORKERS / "test-sets" / "phase2.txt")
+    assert len(runs) == 20 and all("prompt" in run for run in runs)
+    names = modal_app.set_run_names("phase2", runs)
+    assert names[0] == "phase2-01-cute-low-poly-fox-sitting-down"
+    assert len(set(names)) == len(names)
+    assert all(modal_app.RUN_NAME.fullmatch(name) for name in names)
+
+
 def test_the_renders_set_lists_its_images():
     runs = modal_app.read_set(WORKERS / "test-sets" / "renders.txt")
     assert len(runs) == 6 and all(run["image"].is_file() for run in runs)
@@ -393,11 +434,28 @@ def test_set_arguments_continue_runs_already_started(tmp_path):
     names = ["s-01-lamp", "s-02-chair", "s-03-chair"]
     assert modal_app.set_arguments(names, runs, {"s-01-lamp", "s-02-chair"}, True) == [
         # The prompt goes again, so run_pipeline refuses it if the file was edited since
-        ("s-01-lamp", "a lamp", b"", "", True, -1),
+        ("s-01-lamp", "a lamp", b"", "", True, -1, 0, False),
         # A started photo run continues from the photo it saved
-        ("s-02-chair", "", b"", "", True, -1),
-        ("s-03-chair", "", b"jpeg", "chair.jpg", True, -1),
+        ("s-02-chair", "", b"", "", True, -1, 0, False),
+        ("s-03-chair", "", b"jpeg", "chair.jpg", True, -1, 0, False),
     ]
+    # Picks go to their runs by number; pictures_only goes to every run
+    assert modal_app.set_arguments(names[:1], runs[:1], set(), True, {1: 3}, True) == [
+        ("s-01-lamp", "a lamp", b"", "", True, -1, 3, True)
+    ]
+
+
+def test_picks_name_a_prompt_run_and_one_of_its_pictures(tmp_path):
+    photo = tmp_path / "chair.jpg"
+    photo.write_bytes(b"jpeg")
+    runs = [{"prompt": "a lamp"}, {"image": photo}, {"prompt": "a mug"}]
+    assert modal_app.parse_picks("", runs) == {}
+    assert modal_app.parse_picks(" 3=2, 1 = 4 ", runs) == {3: 2, 1: 4}
+    for bad in ["4=1", "1=5", "0=1", "one=2", "1:2"]:
+        with pytest.raises(SystemExit, match="should be"):
+            modal_app.parse_picks(bad, runs)
+    with pytest.raises(SystemExit, match="starts from a photo"):
+        modal_app.parse_picks("2=1", runs)
 
 
 def test_make_set_runs_every_line_and_reports_failures(tmp_path, monkeypatch, capsys):
@@ -438,6 +496,33 @@ def test_make_set_runs_every_line_and_reports_failures(tmp_path, monkeypatch, ca
     assert "s-02-chair: failed (RuntimeError: invalid input: no object found)" in out
     assert "Done: 1 of 2 runs finished" in out
     assert "make_set --prompts" in out and "--name s" in out
+
+
+def test_make_set_can_stop_at_the_pictures(tmp_path, monkeypatch, capsys):
+    listing = tmp_path / "set.txt"
+    listing.write_text("a lamp\na chair\n")
+    seen = []
+
+    class Outputs(FakeOutputs):
+        def listdir(self, path):
+            return []
+
+    class Download:
+        def remote(self, which):
+            pass
+
+    class MakeModel:
+        def starmap(self, arguments, return_exceptions):
+            seen.extend(args[-2:] for args in arguments)
+            return iter([{"steps": {}}, {"steps": {}}])
+
+    monkeypatch.setattr(modal_app, "outputs", Outputs({}))
+    monkeypatch.setattr(modal_app, "download_models", Download())
+    monkeypatch.setattr(modal_app, "make_model", MakeModel())
+    monkeypatch.chdir(tmp_path)
+    modal_app.make_set.info.raw_f(prompts=str(listing), final=True, name="s", pictures_only=True, picks="2=3")
+    assert seen == [(0, True), (3, True)]
+    assert '--name s --picks "1=2,3=4"' in capsys.readouterr().out
 
 
 def test_tuning_results_are_merged_without_losing_any(tmp_path):

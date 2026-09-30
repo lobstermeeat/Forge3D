@@ -131,6 +131,7 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
    | Continue an unfinished run           | `modal run --detach workers/modal_app.py::make --run <name>`                 |
    | Make the final of a previewed run    | the same, with `--final`                                                     |
    | Start from your own image            | `make --image photo.png` instead of `--prompt`                               |
+   | Choose which picture becomes 3D      | `make --prompt "…" --pictures-only`, then `make --run <name> --pick 3`       |
    | Make a whole test set                | `modal run --detach workers/modal_app.py::make_set --prompts <file>`         |
    | Download a run                       | `modal volume get orainge-outputs <name> .`                                  |
    | Fetch FLUX while Meta reviews DINOv3 | `modal run --detach workers/modal_app.py::download_models --which reference` |
@@ -151,11 +152,14 @@ encrypted, for the holder of the private key matching `ops/results-public-key.pe
 `bash ops/gallery.sh orainge-outputs/<set> "<title>"` puts a test set's gallery there.
 
 **Review a test set:** a set is a text file with one prompt, or the path of a photo, per line;
-`workers/test-sets/starter.txt` covers eight kinds of game assets, and `renders.txt` six photos
-of CC0 sample models (no FLUX needed). `make_set` runs every line
+`workers/test-sets/starter.txt` covers eight kinds of game assets, `phase2.txt` twenty prompts
+written the way creators type them, and `renders.txt` six photos of CC0 sample models (no FLUX
+needed). `make_set` runs every line
 (previews and finals; `--no-final` for previews only) with the GPU containers kept warm between
 runs, names the runs `<set>-<nn>-<words>` and copies them to `orainge-outputs/<set>/`. Run it
-again with the same `--name` to retry what failed. Then
+again with the same `--name` to retry what failed. To choose each prompt's picture the way a
+user does in the Studio, run the set with `--pictures-only` first, then again with
+`--picks "3=2,7=4"` (run number = picture number; runs left out use their first picture). Then
 `python workers/gallery/make_gallery.py orainge-outputs/<set> -o gallery/` renders every preview and
 final from six angles, with the editor's decoders and lighting, and writes a page showing each
 run's reference images, triangles, file size, GPU time and cost, with a 3D viewer (orbit,
