@@ -87,15 +87,19 @@ trellis2_image = (
         # Importable as `trellis2` without touching PYTHONPATH, which Modal manages
         'echo /opt/trellis2 > "$(python -c "import site; print(site.getsitepackages()[0])")/trellis2-repo.pth"',
     )
+    # --no-build-isolation builds use this environment's tools, and bdist_wheel needs `wheel`
+    .run_commands("python -m pip install --upgrade pip 'setuptools>=70' wheel")
     .run_commands(
         _git("https://github.com/JeffreyXiang/CuMesh", CUMESH_COMMIT, "/tmp/CuMesh"),
-        "python -m pip install /tmp/CuMesh --no-build-isolation && rm -rf /tmp/CuMesh",
+        "python -m pip install /tmp/CuMesh --no-build-isolation --no-deps && rm -rf /tmp/CuMesh",
     )
     .run_commands(
         _git("https://github.com/JeffreyXiang/FlexGEMM", FLEXGEMM_COMMIT, "/tmp/FlexGEMM"),
-        "python -m pip install /tmp/FlexGEMM --no-build-isolation && rm -rf /tmp/FlexGEMM",
+        "python -m pip install /tmp/FlexGEMM --no-build-isolation --no-deps && rm -rf /tmp/FlexGEMM",
     )
-    .run_commands("python -m pip install /opt/trellis2/o-voxel --no-build-isolation")
+    # --no-deps: o-voxel lists CuMesh and FlexGEMM as unpinned git dependencies, which would
+    # replace the pinned builds above
+    .run_commands("python -m pip install /opt/trellis2/o-voxel --no-build-isolation --no-deps")
     # gltfpack (meshoptimizer, MIT; embeds Basis Universal, Apache-2.0) for meshopt + KTX2
     .run_commands(
         "curl -fsSL -o /tmp/gltfpack.zip https://github.com/zeux/meshoptimizer/releases/download/"
