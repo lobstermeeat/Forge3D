@@ -261,7 +261,12 @@ def _download(name: str, force: bool) -> None:
         return
     # Modal keeps whatever a failed run wrote, so the marker must not outlive a partial download
     marker.unlink(missing_ok=True)
-    env = {**os.environ, "MODELS_ROOT": MODELS, "FLUX_MODEL_DIR": f"{MODELS}/FLUX.1-schnell"}
+    env = {
+        **os.environ,
+        "MODELS_ROOT": MODELS,
+        "FLUX_MODEL_DIR": f"{MODELS}/FLUX.1-schnell",
+        "HF_HUB_DISABLE_PROGRESS_BARS": "1",  # progress bars flood non-interactive logs
+    }
     subprocess.run([sys.executable, script], env=env, check=True)
     marker.write_text(digest)
 
