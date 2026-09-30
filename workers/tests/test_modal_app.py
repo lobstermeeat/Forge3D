@@ -34,6 +34,7 @@ def test_defines_both_workers_the_api_and_the_helpers():
     assert isinstance(modal_app.api, modal.Function)
     assert isinstance(modal_app.make_model, modal.Function)
     assert isinstance(modal_app.make, modal.app.LocalEntrypoint)
+    assert isinstance(modal_app.make_set, modal.app.LocalEntrypoint)
 
 
 def test_run_job_passes_the_call_id_as_the_job_id(monkeypatch):
@@ -286,3 +287,148 @@ def test_status_says_what_is_ready_and_what_is_left(monkeypatch, capsys):
     assert "run-1 (a teapot): weights done, reference done, preview failed" in out
     assert "preview failed: RuntimeError: boom" in out
     assert "make --run run-1" in out
+
+
+class FakeOutputs:
+    """The outputs volume's read calls, over a dict of stored files."""
+
+    def __init__(self, stored):
+        self.stored = stored
+
+    def read_file(self, path):
+        if path not in self.stored:
+            raise FileNotFoundError(path)
+        yield self.stored[path]
+
+    def read_file_into_fileobj(self, path, fileobj):
+        if path not in self.stored:
+            raise FileNotFoundError(path)
+        fileobj.write(self.stored[path])
+
+
+def test_copy_run_brings_back_the_progress_and_every_saved_file(tmp_path, monkeypatch):
+    progress = {
+        "prompt": None,
+        "input": "input-cat.jpg",
+        "steps": {
+            "weights": {"status": "done"},
+            "preview": {"status": "done", "files": ["preview-7.glb"]},
+            "final": {"status": "done", "files": ["final-7.glb"]},  # lost from the volume
+        },
+    }
+    stored = {
+        "run-1/progress.json": json.dumps(progress).encode(),
+        "run-1/input-cat.jpg": b"jpeg",
+        "run-1/preview-7.glb": b"glb",
+    }
+    monkeypatch.setattr(modal_app, "outputs", FakeOutputs(stored))
+    target = tmp_path / "copy" / "run-1"
+    assert modal_app._copy_run("run-1", target) == ["preview-7.glb", "input-cat.jpg"]
+    assert (target / "preview-7.glb").read_bytes() == b"glb"
+    assert (target / "input-cat.jpg").read_bytes() == b"jpeg"
+    assert not (target / "final-7.glb").exists()
+    # progress.json comes along, so make_gallery.py can read the copy
+    assert json.loads((target / "progress.json").read_text()) == progress
+    # A run that never saved anything leaves nothing behind
+    assert modal_app._copy_run("run-2", tmp_path / "copy" / "run-2") == []
+    assert not (tmp_path / "copy" / "run-2").exists()
+
+
+# Test sets
+
+
+def test_a_set_lists_prompts_and_photos(tmp_path):
+    (tmp_path / "photos").mkdir()
+    (tmp_path / "photos" / "Chair 1.JPG").write_bytes(b"jpeg")
+    listing = tmp_path / "set.txt"
+    listing.write_text("# notes\n\na brass pocket watch\n  photos/Chair 1.JPG  \na 3.5 inch floppy disk\n")
+    assert modal_app.read_set(listing) == [
+        {"prompt": "a brass pocket watch"},
+        {"image": tmp_path / "photos" / "Chair 1.JPG"},
+        {"prompt": "a 3.5 inch floppy disk"},
+    ]
+    # A missing photo stops the set before anything runs
+    listing.write_text("a lamp\nphotos/missing.png\n")
+    with pytest.raises(SystemExit, match="line 2"):
+        modal_app.read_set(listing)
+
+
+def test_set_runs_are_named_after_their_prompts(tmp_path):
+    runs = [
+        {"prompt": "A Brass Pocket-Watch!"},
+        {"image": tmp_path / "Chair 1.JPG"},
+        {"prompt": "a medieval longsword with a leather-wrapped grip"},
+        {"prompt": "보물 상자"},  # no Latin letters to name it by
+    ]
+    assert modal_app.set_run_names("s", runs) == [
+        "s-01-brass-pocket-watch",
+        "s-02-chair-1",
+        "s-03-medieval-longsword",
+        "s-04-run",
+    ]
+    # The longest set names and prompts still make valid run names
+    names = modal_app.set_run_names("x" * 24, [{"prompt": "y" * 80}] + [{"prompt": "word " * 40}] * 120)
+    assert all(modal_app.RUN_NAME.fullmatch(name) for name in names)
+
+
+def test_the_starter_set_is_valid():
+    runs = modal_app.read_set(WORKERS / "test-sets" / "starter.txt")
+    assert len(runs) == 8 and all("prompt" in run for run in runs)
+    names = modal_app.set_run_names("starter", runs)
+    assert names[0] == "starter-01-wooden-treasure-chest-with-iron"
+    assert len(set(names)) == len(names)
+    assert all(modal_app.RUN_NAME.fullmatch(name) for name in names)
+
+
+def test_set_arguments_continue_runs_already_started(tmp_path):
+    photo = tmp_path / "chair.jpg"
+    photo.write_bytes(b"jpeg")
+    runs = [{"prompt": "a lamp"}, {"image": photo}, {"image": photo}]
+    names = ["s-01-lamp", "s-02-chair", "s-03-chair"]
+    assert modal_app.set_arguments(names, runs, {"s-01-lamp", "s-02-chair"}, True) == [
+        # The prompt goes again, so run_pipeline refuses it if the file was edited since
+        ("s-01-lamp", "a lamp", b"", "", True, -1),
+        # A started photo run continues from the photo it saved
+        ("s-02-chair", "", b"", "", True, -1),
+        ("s-03-chair", "", b"jpeg", "chair.jpg", True, -1),
+    ]
+
+
+def test_make_set_runs_every_line_and_reports_failures(tmp_path, monkeypatch, capsys):
+    listing = tmp_path / "set.txt"
+    listing.write_text("a lamp\na chair\n")
+    progress = json.dumps({"prompt": "a lamp", "steps": {"final": {"status": "done", "files": ["final-1.glb"]}}})
+    stored = {"s-01-lamp/progress.json": progress.encode(), "s-01-lamp/final-1.glb": b"glb"}
+
+    class Outputs(FakeOutputs):
+        def listdir(self, path):
+            return []
+
+    calls = []
+
+    class Download:
+        def remote(self, which):
+            calls.append(("download", which))
+
+    class MakeModel:
+        def starmap(self, arguments, return_exceptions):
+            calls.append(("starmap", [args[:2] for args in arguments], return_exceptions))
+            return iter([{"steps": {}}, RuntimeError("invalid input: no object found\ntraceback...")])
+
+    monkeypatch.setattr(modal_app, "outputs", Outputs(stored))
+    monkeypatch.setattr(modal_app, "download_models", Download())
+    monkeypatch.setattr(modal_app, "make_model", MakeModel())
+    monkeypatch.chdir(tmp_path)
+    modal_app.make_set.info.raw_f(prompts=str(listing), final=True, name="s")
+
+    # Weights once, up front, then every run in one map
+    assert calls == [
+        ("download", "all"),
+        ("starmap", [("s-01-lamp", "a lamp"), ("s-02-chair", "a chair")], True),
+    ]
+    assert (tmp_path / "orainge-outputs" / "s-01-lamp" / "final-1.glb").read_bytes() == b"glb"
+    out = capsys.readouterr().out
+    assert "s-01-lamp: final-1.glb" in out
+    assert "s-02-chair: failed (RuntimeError: invalid input: no object found)" in out
+    assert "Done: 1 of 2 runs finished" in out
+    assert "make_set --prompts" in out and "--name s" in out

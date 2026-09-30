@@ -1,0 +1,23 @@
+# The starter set: eight kinds of game assets, each testing something different.
+#
+#   modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/starter.txt
+#
+# One run per line: a prompt, or the path of a photo relative to this file (png, jpg, webp).
+# Lines starting with # are notes.
+
+# Props: carved wood and metal, small details
+a wooden treasure chest with iron bands and gold coins spilling out
+# Nature: foliage and an organic outline
+a stylized pine tree on a mossy rock
+# Thin parts: a long blade and a narrow grip
+a medieval longsword with a leather-wrapped grip
+# Buildings: a closed shape with an opening
+a cozy cartoon mushroom house with a round wooden door
+# Hard surface: flat panels, sharp edges, glowing color
+a sci-fi supply crate with glowing blue panels
+# Characters: a face and limbs
+a friendly round robot character with big eyes
+# Vehicles: wheels, gaps and a complex outline
+a red vintage scooter
+# Metal: reflective materials
+a brass pocket watch with an open lid
