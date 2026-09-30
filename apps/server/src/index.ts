@@ -16,7 +16,8 @@ const APP_URL = process.env['APP_URL'] ?? 'http://localhost:5173';
 const UPLOAD_DIR = process.env['UPLOAD_DIR'] ?? './uploads';
 
 async function main() {
-  const server = Fastify({ logger: true });
+  // Photos for the AI panel come in as data URLs (the client scales them to 2048 px first)
+  const server = Fastify({ logger: true, bodyLimit: 16 * 1024 * 1024 });
 
   await server.register(cors, {
     origin: APP_URL,

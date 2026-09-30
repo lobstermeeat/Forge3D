@@ -288,4 +288,102 @@ describe('SelfHostedProvider', () => {
       createSelfHostedProvider({ AI_WORKERS_URL: 'https://orainge--orainge-ai-api.modal.run' }),
     ).toThrow('AI_WORKERS_URL is set but AI_WORKERS_TOKEN is not');
   });
+
+  it('runs the Studio panel as jobs to poll (StudioWorkers)', async () => {
+    const api = fakeJobApi([
+      { id: 'fc-ref', status: 'IN_QUEUE' },
+      { id: 'fc-ref', status: 'IN_PROGRESS' },
+      {
+        id: 'fc-ref',
+        status: 'COMPLETED',
+        output: {
+          request_id: 'gen-4',
+          prompt: 'a lamp',
+          seconds: 3.2,
+          images: [
+            { key: 'ai/gen-4/reference-7.png', url: null, base64: 'iVBORw0KGgo=', seed: 7 },
+            {
+              key: 'ai/gen-4/reference-8.png',
+              url: 'https://r2.test/ai/gen-4/reference-8.png',
+              seed: 8,
+            },
+          ],
+        },
+      },
+      { id: 'fc-glb', status: 'IN_QUEUE' },
+      { id: 'fc-glb', status: 'COMPLETED', output: trellisOutput },
+      {
+        id: 'fc-bad',
+        status: 'COMPLETED',
+        output: { ...trellisOutput, error: 'invalid input: no object found' },
+      },
+      { id: 'fc-gone', status: 'CANCELLED', error: undefined },
+    ]);
+    const provider = createSelfHostedProvider(
+      { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
+      api.fetchImpl,
+    )!;
+    expect(provider.prompts).toBe(true);
+
+    expect(await provider.startReferences({ prompt: 'a lamp', count: 4, requestId: 'gen-4' })).toBe(
+      'fc-ref',
+    );
+    expect(await provider.references('fc-ref')).toEqual({ status: 'running' });
+    expect(await provider.references('fc-ref')).toEqual({
+      status: 'done',
+      output: {
+        images: [
+          { file: { data: Buffer.from('iVBORw0KGgo=', 'base64') }, seed: 7 },
+          { file: { url: 'https://r2.test/ai/gen-4/reference-8.png' }, seed: 8 },
+        ],
+      },
+    });
+
+    const image = Buffer.from('picture');
+    expect(await provider.startModel({ image, mode: 'final', seed: 77, requestId: 'gen-4' })).toBe(
+      'fc-glb',
+    );
+    expect(await provider.model('fc-glb')).toEqual({
+      status: 'done',
+      output: {
+        file: { url: trellisOutput.glb.url },
+        seed: 77,
+        triangles: 100_000,
+        bytes: 2_400_000,
+        seconds: expect.closeTo(60.5, 5),
+        credits: trellisOutput.credits,
+      },
+    });
+    expect(await provider.model('fc-bad')).toEqual({
+      status: 'failed',
+      message: 'invalid input: no object found',
+    });
+    expect(await provider.model('fc-gone')).toEqual({
+      status: 'failed',
+      message: 'The job was cancelled',
+    });
+
+    expect(
+      api.calls.map((call) => `${call.method} ${call.url.replace('https://w.modal.run', '')}`),
+    ).toEqual([
+      'POST /reference/run',
+      'GET /reference/status/fc-ref',
+      'GET /reference/status/fc-ref',
+      'POST /trellis2/run',
+      'GET /trellis2/status/fc-glb',
+      'GET /trellis2/status/fc-bad',
+      'GET /trellis2/status/fc-gone',
+    ]);
+    expect(api.calls[0]!.body).toEqual({
+      input: { prompt: 'a lamp', count: 4, request_id: 'gen-4' },
+    });
+    expect(api.calls[3]!.body).toEqual({
+      input: {
+        image_base64: image.toString('base64'),
+        mode: 'final',
+        seed: 77,
+        request_id: 'gen-4',
+      },
+    });
+  });
 });

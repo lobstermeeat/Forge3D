@@ -91,22 +91,40 @@ export const assets = pgTable('assets', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** One run of the Studio's AI panel, from prompt or photo to final model (services/ai/studio.ts). */
 export const aiGenerations = pgTable('ai_generations', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  sceneId: uuid('scene_id').references(() => scenes.id, { onDelete: 'set null' }),
   provider: text('provider').notNull(), // e.g. forge3d-trellis2 (self-hosted, see workers/)
+  source: text('source').notNull().default('prompt'), // prompt | photo
   prompt: text('prompt'),
+  /** The picture that goes to 3D: the uploaded photo, or the reference picture the user picked */
   imageUrl: text('image_url'),
-  status: text('status').notNull().default('pending'), // pending, processing, completed, failed
+  // drawing -> picking -> previewing -> reviewing -> finishing -> done; or failed
+  status: text('status').notNull().default('drawing'),
+  jobId: text('job_id'),
+  /** references | preview | final: the job running now, or the one that failed */
+  jobKind: text('job_kind'),
+  referenceImages: jsonb('reference_images').$type<{ url: string; seed: number }[]>(),
+  seed: integer('seed'),
+  previewUrl: text('preview_url'),
+  previewTriangles: integer('preview_triangles'),
+  finalUrl: text('final_url'),
+  finalTriangles: integer('final_triangles'),
+  /** Attribution shown with the model, such as "Built with DINOv3" (a license requirement) */
+  credits: jsonb('credits').$type<string[]>(),
   resultAssetId: uuid('result_asset_id').references(() => assets.id),
   creditsUsed: integer('credits_used').notNull().default(0),
   durationMs: integer('duration_ms'),
   errorMessage: text('error_message'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index('ai_generations_user_created_idx').on(table.userId, table.createdAt),
+]);
 
 // ==================== Phase 2: Community & Collaboration ====================
 
