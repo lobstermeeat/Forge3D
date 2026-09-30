@@ -1,0 +1,41 @@
+== Deploy the job API that Orainge Studio's AI panel calls
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Created Function FluxSchnell.*.
+├── ✓ Created Function download_models.
+├── ✓ Created Function make_model.
+├── ✓ Created Function Trellis2.*.
+└── ✓ Created Function api
+    └── https://lobstermeeat--orainge-ai-api.modal.run (unauthenticated)
+✓ App deployed in 1.904s! 🎉
+
+View Deployment: https://modal.com/apps/lobstermeeat/main/deployed/orainge-ai
+AI_WORKERS_URL=https://lobstermeeat--orainge-ai-api.modal.run
+
+== The worker token (checked inside Modal; never printed)
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-1IUEVijl3DMDbIlxznljFi
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/check_api.py
+├── ✓ Created Function token_check.
+└── ✓ Created Function check.
+ORAINGE_WORKER_TOKEN is shorter than the 32 characters the job API needs
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-1IUEVijl3DMDbIlxznljFi
+
+== Until the token is replaced, the API should answer at once with the reason
+{"detail":"The job API is off: ORAINGE_WORKER_TOKEN in the Modal secret orainge-worker-token must be at least 32 characters"}
+HTTP 503 after 0.260885 s
+exit status: 0
