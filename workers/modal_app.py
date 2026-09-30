@@ -385,11 +385,17 @@ def run_pipeline(
     trellis: Callable[[dict], dict],
     fetch: Callable[[dict], bytes],
     save: Callable[[], Any],
+    pick: Optional[int] = None,
+    pictures_only: bool = False,
 ) -> dict:
     """
     Prompt or image -> reference images -> preview GLB -> (optionally) final GLB, written into
     `folder`. Each finished step is recorded in progress.json, so running it again on the same
     folder skips what is done and continues where it stopped.
+
+    The first reference picture goes on to 3D unless `pick` names another (1-4), the way a
+    user picks one in the Studio. `pictures_only` stops before 3D, so the pictures can be
+    looked at first; running again with `pick` then makes the model.
     """
     folder.mkdir(parents=True, exist_ok=True)
     progress_file = folder / "progress.json"
@@ -412,11 +418,27 @@ def run_pipeline(
     prompt = state.get("prompt")
     steps: dict = state["steps"]
 
-    def record(step: str, **fields: Any) -> None:
-        steps[step] = {**steps.get(step, {}), **fields}
+    def persist() -> None:
         state["updated"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
         progress_file.write_text(json.dumps(state, indent=2))
         save()
+
+    def record(step: str, **fields: Any) -> None:
+        steps[step] = {**steps.get(step, {}), **fields}
+        persist()
+
+    def use_picture(number: int) -> None:
+        pictures = steps.get("reference", {}).get("files", [])
+        if not 1 <= number <= len(pictures):
+            raise ValueError(f"{run} has {len(pictures)} pictures, so its pick must be 1 to {len(pictures)}")
+        chosen = pictures[number - 1]
+        if chosen == state.get("input"):
+            return
+        if any(steps.get(step, {}).get("status") == "done" for step in ("preview", "final")):
+            made_from = state.get("input")
+            raise ValueError(f"{run} already has a model of {made_from}; start a new run to use picture {number}")
+        state["input"] = chosen
+        persist()
 
     def done(step: str) -> bool:
         entry = steps.get(step, {})
@@ -479,9 +501,15 @@ def run_pipeline(
 
         return work
 
+    if pick and not prompt:
+        raise ValueError(f"{run} started from an image, so it has no pictures to pick from")
     attempt("weights", weights)
     if prompt:
         attempt("reference", reference_images)
+        if pick:
+            use_picture(pick)
+    if pictures_only:
+        return state
     attempt("preview", model("preview"))
     if final:
         attempt("final", model("final"))
@@ -490,7 +518,14 @@ def run_pipeline(
 
 @app.function(image=light_image, volumes={OUTPUTS: outputs}, timeout=4 * 3600)
 def make_model(
-    run: str, prompt: str = "", image: bytes = b"", image_name: str = "", final: bool = False, seed: int = -1
+    run: str,
+    prompt: str = "",
+    image: bytes = b"",
+    image_name: str = "",
+    final: bool = False,
+    seed: int = -1,
+    pick: int = 0,
+    pictures_only: bool = False,
 ) -> dict:
     """The whole flow in the cloud; see run_pipeline. Results land in orainge-outputs/<run>/."""
     if not RUN_NAME.fullmatch(run):
@@ -507,19 +542,32 @@ def make_model(
         trellis=lambda job: Trellis2().generate.remote(job),
         fetch=_asset_bytes,
         save=outputs.commit,
+        pick=pick or None,
+        pictures_only=pictures_only,
     )
 
 
 @app.local_entrypoint()
-def make(prompt: str = "", image: str = "", final: bool = False, seed: int = -1, run: str = "") -> None:
+def make(
+    prompt: str = "",
+    image: str = "",
+    final: bool = False,
+    seed: int = -1,
+    run: str = "",
+    pick: int = 0,
+    pictures_only: bool = False,
+) -> None:
     """
     Prompt or image to 3D in Modal's cloud. Start it with `modal run --detach` and it finishes
     even if this computer sleeps or goes offline; `--run NAME` continues an earlier run.
+    `--pictures-only` stops at the four pictures; `--run NAME --pick 3` makes the third into 3D.
     """
     if not (prompt or image or run):
         raise SystemExit("Give --prompt or --image, or --run NAME to continue a run")
     if prompt and image:
         raise SystemExit("Give either --prompt or --image, not both")
+    if not 0 <= pick <= 4:
+        raise SystemExit("--pick must be 1 to 4")
     run = run or time.strftime("run-%Y%m%d-%H%M%S")
     if not RUN_NAME.fullmatch(run):
         raise SystemExit("--run must be 1-64 letters, digits, '-' or '_'")
@@ -534,12 +582,16 @@ def make(prompt: str = "", image: str = "", final: bool = False, seed: int = -1,
         image_name=source.name if source else "",
         final=final,
         seed=seed,
+        pick=pick,
+        pictures_only=pictures_only,
     )
     # Still connected: copy the results here too
     target = pathlib.Path("orainge-outputs") / run
     files = _copy_run(run, target)
     print(f"Done: {', '.join(files)} in {target}")
-    if not state.get("final"):
+    if pictures_only:
+        print(f"Make one into 3D: modal run --detach workers/modal_app.py::make --run {run} --pick <1-4>")
+    elif not state.get("final"):
         print(f"Final quality, same shape: modal run --detach workers/modal_app.py::make --run {run} --final")
 
 
@@ -623,29 +675,58 @@ def set_run_names(name: str, runs: list[dict]) -> list[str]:
     ]
 
 
-def set_arguments(names: list[str], runs: list[dict], existing: set, final: bool) -> list[tuple]:
+def parse_picks(text: str, runs: list[dict]) -> dict[int, int]:
+    """
+    '3=2, 7=4' -> {3: 2, 7: 4}: the set's third run is made from its second picture and the
+    seventh from its fourth. Runs left out use their first picture.
+    """
+    picks = {}
+    for item in filter(None, (part.strip() for part in text.split(","))):
+        match = re.fullmatch(r"(\d+)\s*=\s*([1-4])", item)
+        if not match or not 1 <= int(match[1]) <= len(runs):
+            raise SystemExit(f"--picks: {item!r} should be <run 1-{len(runs)}>=<picture 1-4>, e.g. 3=2")
+        if "prompt" not in runs[int(match[1]) - 1]:
+            raise SystemExit(f"--picks: run {match[1]} starts from a photo, so it has no pictures to pick from")
+        picks[int(match[1])] = int(match[2])
+    return picks
+
+
+def set_arguments(
+    names: list[str],
+    runs: list[dict],
+    existing: set,
+    final: bool,
+    picks: Optional[dict[int, int]] = None,
+    pictures_only: bool = False,
+) -> list[tuple]:
     """
     make_model's arguments for each run of a set. A run already in the volume continues from its
     saved image; a prompt is passed again so that an edited prompt is refused, not ignored.
     """
+    picks = picks or {}
     arguments = []
-    for run, entry in zip(names, runs):
+    for number, (run, entry) in enumerate(zip(names, runs), 1):
+        choice = (picks.get(number, 0), pictures_only)
         if "prompt" in entry:
-            arguments.append((run, entry["prompt"], b"", "", final, -1))
+            arguments.append((run, entry["prompt"], b"", "", final, -1, *choice))
         elif run in existing:
-            arguments.append((run, "", b"", "", final, -1))
+            arguments.append((run, "", b"", "", final, -1, *choice))
         else:
-            arguments.append((run, "", entry["image"].read_bytes(), entry["image"].name, final, -1))
+            arguments.append((run, "", entry["image"].read_bytes(), entry["image"].name, final, -1, *choice))
     return arguments
 
 
 @app.local_entrypoint()
-def make_set(prompts: str, final: bool = True, name: str = "") -> None:
+def make_set(prompts: str, final: bool = True, name: str = "", pictures_only: bool = False, picks: str = "") -> None:
     """
     A test set in one go: one run per line of a text file (see workers/test-sets/). The runs share
     warm GPU containers, so a set costs less than the same runs one by one. With --detach it
     finishes without this computer, and the same --name continues an interrupted set. The results
     are copied to orainge-outputs/<name>/, ready for workers/gallery/make_gallery.py.
+
+    Like a user in the Studio, you can choose which picture becomes 3D: run the set with
+    --pictures-only, look at the pictures, then run it again with --picks "3=2,7=4" (run number =
+    picture number; runs left out use their first picture).
     """
     import modal.exception as mx
 
@@ -656,6 +737,7 @@ def make_set(prompts: str, final: bool = True, name: str = "") -> None:
     name = name or time.strftime("set-%Y%m%d-%H%M")
     if not SET_NAME.fullmatch(name):
         raise SystemExit("--name must be 1-24 letters, digits, '-' or '_'")
+    chosen = parse_picks(picks, runs)
     names = set_run_names(name, runs)
     try:
         existing = {entry.path.strip("/") for entry in outputs.listdir("/")}
@@ -666,7 +748,8 @@ def make_set(prompts: str, final: bool = True, name: str = "") -> None:
     # Any missing weights are fetched once here, not by every run at the same time
     download_models.remote(which="all" if any("prompt" in run for run in runs) else "trellis2")
     # All at once, so every run finishes before the copies start and the map closes cleanly
-    outcomes = list(make_model.starmap(set_arguments(names, runs, existing, final), return_exceptions=True))
+    arguments = set_arguments(names, runs, existing, final, chosen, pictures_only)
+    outcomes = list(make_model.starmap(arguments, return_exceptions=True))
     target = pathlib.Path("orainge-outputs") / name
     failed = 0
     for run, outcome in zip(names, outcomes):
@@ -678,9 +761,11 @@ def make_set(prompts: str, final: bool = True, name: str = "") -> None:
         else:
             print(f"{run}: {', '.join(files)}")
     print(f"Done: {len(runs) - failed} of {len(runs)} runs finished; files in {target}")
+    again = f"modal run --detach workers/modal_app.py::make_set --prompts {prompts} --name {name}"
     if failed:
-        retry = f"modal run --detach workers/modal_app.py::make_set --prompts {prompts} --name {name}"
-        print(f"Retry what failed: {retry}")
+        print(f"Retry what failed: {again}{' --pictures-only' if pictures_only else ''}")
+    if pictures_only:
+        print(f'Make the models, choosing pictures by run number: {again} --picks "1=2,3=4"')
 
 
 def print_status() -> None:

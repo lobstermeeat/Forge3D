@@ -1,0 +1,51 @@
+# Phase 2: twenty prompts written the way Orainge's creators (16–24, making scenes and games)
+# type them: short, casual, often with a style word. Thirteen are everyday asks; seven are
+# known weak spots (glass, liquids, thin parts, whole scenes) that users will ask for anyway,
+# so the go/no-go counts them too. None repeat the starter set.
+#
+#   modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/phase2.txt --name phase2 --pictures-only
+#   modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/phase2.txt --name phase2 --picks "1=2,5=3"
+#
+# One run per line: a prompt, or the path of a photo relative to this file (png, jpg, webp).
+# Lines starting with # are notes.
+
+# Everyday: a stylized animal
+a cute low poly fox sitting down
+# Everyday: fashion, typed without an article
+red high top sneaker
+# Everyday: furniture, colors as a list
+gaming chair black and purple
+# Everyday: a prop with a screen and decals
+a retro arcade machine
+# Everyday: a game weapon, hard surface
+sci-fi laser pistol, white and orange
+# Everyday: a painted emblem on a flat face
+a wooden shield with a lion painted on it
+# Everyday: a stylized character
+chibi knight with a big helmet
+# Everyday: a detailed product
+a vintage film camera
+# Everyday: food
+donut with pink frosting and sprinkles
+# Everyday: a curved, reflective visor
+an astronaut helmet
+# Everyday: a small group of objects
+stack of old books with a candle on top
+# Everyday: a flat board with printed art
+a skateboard with graffiti art
+# Everyday: a vehicle
+a cute cartoon car, bright blue
+# Weak spot: a clear cup, a straw and small spheres
+bubble tea with tapioca pearls
+# Weak spot: glass and liquid
+a health potion in a round glass bottle
+# Weak spot: wings, horns and a tail
+a green dragon sitting, cartoon style
+# Weak spot: thin chopsticks and a soup surface
+bowl of ramen with an egg and chopsticks
+# Weak spot: a long thin neck and strings
+electric guitar
+# Weak spot: a whole scene rather than one object
+a small cabin in a snowy forest
+# Weak spot: ropes between a balloon and a basket
+hot air balloon
