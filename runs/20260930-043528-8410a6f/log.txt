@@ -1,0 +1,286 @@
+== Build the images (20-40 minutes the first time, then cached)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] download image ready after 0 s
+[orainge] api image ready after 0 s
+[orainge] reference image ready after 0 s
+[orainge] trellis2 image ready after 1 s
+
+== Download FLUX.1 [schnell] (needs its terms accepted on Hugging Face)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-ZA63mMcNTRfGBZiYUQvvkx
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Created Function FluxSchnell.*.
+├── ✓ Created Function download_models.
+├── ✓ Created Function make_model.
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-ai-api-dev.modal.run (unauthenticated) 
+│       (label stolen)
+└── ✓ Created Function Trellis2.*.
+httpx.HTTPStatusError: Client error '403 Forbidden' for url 'https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/741f7c3ce8b383c54771c7003378a50191e9efe9/ae.safetensors'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/weights/reference.py", line 31, in <module>
+    main()
+  File "/root/weights/reference.py", line 19, in main
+    snapshot_download(
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_http.py", line 266, in _inner
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/_snapshot_download.py", line 532, in snapshot_download
+    hf_thread_map(
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/tqdm.py", line 441, in hf_thread_map
+    results[future_to_index[future]] = future.result()
+                                       ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/usr/local/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/_snapshot_download.py", line 512, in _inner_hf_hub_download
+    hf_hub_download(  # type: ignore
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_http.py", line 266, in _inner
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1026, in hf_hub_download
+    return _hf_hub_download_to_local_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1421, in _hf_hub_download_to_local_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1953, in _raise_on_head_call_error
+    raise head_call_error
+huggingface_hub.errors.GatedRepoError: 403 Client Error. (Request ID: Root=1-6abc9167-75cd3c845402bb7619a991d5;842ec73a-7f6b-4727-8c3d-c9eb0c32a373)
+
+Cannot access gated repo for url https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/741f7c3ce8b383c54771c7003378a50191e9efe9/ae.safetensors.
+Access to model black-forest-labs/FLUX.1-schnell is restricted and you are not in the authorized list. Visit https://huggingface.co/black-forest-labs/FLUX.1-schnell to ask for access.
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/container_io_manager.py", line 987, in handle_input_exception
+    yield
+  File "/pkg/modal/_container_entrypoint.py", line 189, in run_input_sync
+    values = io_context.call_function_sync()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/container_io_manager.py", line 266, in call_function_sync
+    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 262, in download_models
+    _download(name, force)
+  File "/root/modal_app.py", line 286, in _download
+    subprocess.run([sys.executable, script], env=env, check=True)
+  File "/usr/local/lib/python3.11/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/local/bin/python', '/root/weights/reference.py']' returned non-zero exit status 1.
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ Command '['/usr/local/bin/python', '/root/weights/reference.py']' returned   │
+│ non-zero exit status 1.                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+FLUX download failed (exit 1)
+
+== Download TRELLIS.2 (DINOv3 needs Meta's approval; finished files are kept either way)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-dRCnlRi5fR1j8GCXQU8f9v
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-ai-api-dev.modal.run (unauthenticated) 
+│       (label stolen)
+├── ✓ Created Function make_model.
+├── ✓ Created Function download_models.
+├── ✓ Created Function FluxSchnell.*.
+└── ✓ Created Function Trellis2.*.
+trellis2: already downloaded (--force to fetch again)
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-dRCnlRi5fR1j8GCXQU8f9v
+
+== Status
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+Weights trellis2: ready
+Weights reference: not downloaded yet
+Job API: not deployed (modal deploy workers/modal_app.py)
+Runs: none yet
+
+== The starter set: eight models, previews and finals
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+Note that running a local entrypoint in detached mode only keeps the last triggered Modal function alive after the parent process has been killed or disconnected.
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-pf6ejvreb4UOfO1YmZOJyy
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Created Function download_models.
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-ai-api-dev.modal.run (unauthenticated)
+├── ✓ Created Function make_model.
+├── ✓ Created Function FluxSchnell.*.
+└── ✓ Created Function Trellis2.*.
+[orainge] starter: 8 runs, saved in the orainge-outputs volume as starter-01-wooden-treasure-chest-with-iron to starter-08-brass-pocket-watch-with-an-open
+  Progress, any time:  python workers/modal_app.py status
+trellis2: already downloaded (--force to fetch again)
+httpx.HTTPStatusError: Client error '403 Forbidden' for url 'https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/741f7c3ce8b383c54771c7003378a50191e9efe9/.gitattributes'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/weights/reference.py", line 31, in <module>
+    main()
+  File "/root/weights/reference.py", line 19, in main
+    snapshot_download(
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_http.py", line 266, in _inner
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/_snapshot_download.py", line 532, in snapshot_download
+    hf_thread_map(
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/tqdm.py", line 441, in hf_thread_map
+    results[future_to_index[future]] = future.result()
+                                       ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/usr/local/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/_snapshot_download.py", line 512, in _inner_hf_hub_download
+    hf_hub_download(  # type: ignore
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_http.py", line 266, in _inner
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1026, in hf_hub_download
+    return _hf_hub_download_to_local_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1421, in _hf_hub_download_to_local_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1953, in _raise_on_head_call_error
+    raise head_call_error
+huggingface_hub.errors.GatedRepoError: 403 Client Error. (Request ID: Root=1-6abc9185-3fbfeb1f25efa83b2f9fd071;76c3f677-f03e-4e5d-bd98-664d4bc7faec)
+
+Cannot access gated repo for url https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/741f7c3ce8b383c54771c7003378a50191e9efe9/.gitattributes.
+Access to model black-forest-labs/FLUX.1-schnell is restricted and you are not in the authorized list. Visit https://huggingface.co/black-forest-labs/FLUX.1-schnell to ask for access.
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/container_io_manager.py", line 987, in handle_input_exception
+    yield
+  File "/pkg/modal/_container_entrypoint.py", line 189, in run_input_sync
+    values = io_context.call_function_sync()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/container_io_manager.py", line 266, in call_function_sync
+    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 262, in download_models
+    _download(name, force)
+  File "/root/modal_app.py", line 286, in _download
+    subprocess.run([sys.executable, script], env=env, check=True)
+  File "/usr/local/lib/python3.11/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/local/bin/python', '/root/weights/reference.py']' returned non-zero exit status 1.
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /home/runner/work/Forge3D/Forge3D/workers/modal_app.py:612 in make_set       │
+│                                                                              │
+│   611 │   # Any missing weights are fetched once here, not by every run at t │
+│ ❱ 612 │   download_models.remote(which="all" if any("prompt" in run for run  │
+│   613 │   outcomes = make_model.starmap(set_arguments(names, runs, existing, │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ object.py:45 in wrapped                                                      │
+│                                                                              │
+│    44 │   │   await self.hydrate()                                           │
+│ ❱  45 │   │   return await method(self, *args, **kwargs)                     │
+│    46                                                                        │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ functions.py:2067 in remote                                                  │
+│                                                                              │
+│   2066 │   │                                                                 │
+│ ❱ 2067 │   │   return await self._call_function(args, kwargs)                │
+│   2068                                                                       │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ functions.py:2004 in _call_function                                          │
+│                                                                              │
+│   2003 │   │                                                                 │
+│ ❱ 2004 │   │   return await invocation.run_function()                        │
+│   2005                                                                       │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ functions.py:515 in run_function                                             │
+│                                                                              │
+│    514 │   │   │   # No more retries left.                                   │
+│ ❱  515 │   │   │   return await _process_result(                             │
+│    516 │   │   │   │   await_response.output.result, await_response.output.d │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ utils/function_utils.py:572 in _process_result                               │
+│                                                                              │
+│   571 │   │   │                                                              │
+│ ❱ 572 │   │   │   raise exc_with_hints(exc)                                  │
+│   573                                                                        │
+│                                                                              │
+│     ...Remote call to Modal Function (ta-01M3R9GS0MV5MY8TVT9APSVC7R)...      │
+│                                                                              │
+│ /root/modal_app.py:262 in download_models                                    │
+│                                                                              │
+│ ❱ 262 _download(name, force)                                                 │
+│                                                                              │
+│                                                                              │
+│ /root/modal_app.py:286 in _download                                          │
+│                                                                              │
+│ ❱ 286 subprocess.run([sys.executable, script], env=env, check=True)          │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/subprocess.py:571 in run                           │
+│                                                                              │
+│ ❱ 571 raise CalledProcessError(retcode, process.args,                        │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+CalledProcessError: Command '['/usr/local/bin/python', 
+'/root/weights/reference.py']' returned non-zero exit status 1.
+exit status: 1
