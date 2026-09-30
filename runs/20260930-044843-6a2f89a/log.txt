@@ -1,0 +1,687 @@
+== Image to 3D on six sample renders (FLUX isn't needed for photos)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+Note that running a local entrypoint in detached mode only keeps the last triggered Modal function alive after the parent process has been killed or disconnected.
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-vqFisY0RSucdSmfHyh0Tfd
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Created Function download_models.
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-ai-api-dev.modal.run (unauthenticated)
+├── ✓ Created Function make_model.
+├── ✓ Created Function FluxSchnell.*.
+└── ✓ Created Function Trellis2.*.
+[orainge] renders: 6 runs, saved in the orainge-outputs volume as renders-01-lantern to renders-06-avocado
+  Progress, any time:  python workers/modal_app.py status
+trellis2: already downloaded (--force to fetch again)
+trellis2: already downloaded (--force to fetch again)
+trellis2: already downloaded (--force to fetch again)
+trellis2: already downloaded (--force to fetch again)
+trellis2: already downloaded (--force to fetch again)
+trellis2: already downloaded (--force to fetch again)
+trellis2: already downloaded (--force to fetch again)
+[SPARSE] Conv backend: flex_gemm; Attention backend: flash_attn
+[SPARSE] Conv backend: flex_gemm; Attention backend: flash_attn
+[ATTENTION] Using backend: flash_attn
+[ATTENTION] Using backend: flash_attn
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:03,  3.54it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:02,  4.20it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:02,  4.47it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.61it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  4.68it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.73it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.75it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.77it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.78it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.79it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.68it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.48it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.09it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:03,  3.19it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:02,  3.49it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:02,  3.58it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:01<00:02,  3.63it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:01<00:01,  3.66it/s]
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  3.68it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:02,  4.24it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:02,  4.63it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:01,  3.68it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  4.77it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:02<00:01,  3.69it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.84it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:02<00:00,  3.69it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  4.87it/s]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:02<00:00,  4.38it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:02<00:00,  5.01it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.89it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  5.55it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  4.17it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:00<00:01,  7.31it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.90it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:01,  7.36it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.91it/s]
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:00<00:01,  7.39it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:00<00:01,  7.40it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.92it/s]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:00<00:00,  7.41it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.92it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:00<00:00,  7.40it/s]
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:00<00:00,  7.41it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.45it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.31it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:01<00:00,  7.41it/s]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:01<00:00,  7.41it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:02,  4.66it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:01<00:00,  7.41it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  5.21it/s]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:01<00:00,  7.41it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  5.42it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  5.53it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:01<00:00,  7.42it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:01<00:00,  7.40it/s]
+
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:01,  5.59it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  5.62it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:00,  5.64it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  5.66it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  5.67it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00,  7.45it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  6.37it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:00, 11.42it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:00<00:00, 11.43it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:00<00:00, 11.43it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:00<00:00, 11.42it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:00<00:00, 11.42it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:01<00:00, 11.43it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:01<00:00, 11.42it/s]
+/usr/local/lib/python3.10/site-packages/cumesh/remeshing.py:220: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:62.)
+  normals0 = torch.cross(mesh_vertices[atempt_triangles_0[:, 1]] - mesh_vertices[atempt_triangles_0[:, 0]], mesh_vertices[atempt_triangles_0[:, 2]] - mesh_vertices[atempt_triangles_0[:, 0]])
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.37it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.29it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  5.02it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.89it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  4.82it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.77it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.75it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.73it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.72it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.71it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.58it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.36it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.26it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  7.01it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  7.07it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  7.12it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  7.14it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:00,  7.15it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:00<00:00,  7.16it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:00<00:00,  7.15it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  7.17it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  7.15it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00,  9.39it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  8.17it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:00, 14.51it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:00<00:00, 14.48it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:00<00:00, 14.46it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:00<00:00, 14.42it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:00<00:00, 14.45it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 14.47it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 14.46it/s]
+/usr/local/lib/python3.10/site-packages/cumesh/remeshing.py:220: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:62.)
+  normals0 = torch.cross(mesh_vertices[atempt_triangles_0[:, 1]] - mesh_vertices[atempt_triangles_0[:, 0]], mesh_vertices[atempt_triangles_0[:, 2]] - mesh_vertices[atempt_triangles_0[:, 0]])
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.52it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.44it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  5.17it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  5.05it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:00<00:01,  4.98it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.94it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.92it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.90it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.89it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.88it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.78it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.60it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.44it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  8.85it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  8.98it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:00,  9.06it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:00,  8.99it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:00,  9.00it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:00<00:00,  9.01it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:00<00:00,  9.02it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:00<00:00,  8.99it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  8.96it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00, 11.80it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00, 10.29it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:00, 18.01it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:00<00:00, 17.93it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:00<00:00, 18.02it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:00<00:00, 18.12it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:00<00:00, 18.18it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 18.06it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 18.05it/s]
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.34it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.27it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  4.98it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.86it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  4.78it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.74it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.72it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.72it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.73it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.72it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.60it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.39it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.25it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  8.54it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  8.66it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  8.66it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:00,  8.69it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:00,  8.68it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:00<00:00,  8.67it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:00<00:00,  8.70it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:00<00:00,  8.68it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  8.66it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00, 11.34it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  9.91it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:00, 17.44it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:00<00:00, 17.61it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:00<00:00, 17.65it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:00<00:00, 17.45it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:00<00:00, 17.39it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 17.45it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 17.47it/s]
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.45it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.39it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  5.12it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  5.00it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:00<00:01,  4.93it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.89it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.86it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.85it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.84it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.83it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.72it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.53it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.39it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  7.74it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  7.82it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  7.83it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  7.89it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:00,  7.92it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:00<00:00,  7.93it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:00<00:00,  7.95it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  7.93it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  7.94it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00, 10.40it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  9.05it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:00, 16.02it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:00<00:00, 16.06it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:00<00:00, 15.95it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:00<00:00, 15.99it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:00<00:00, 15.99it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 16.01it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 16.00it/s]
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.23it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.24it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  4.98it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.82it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  4.76it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.73it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.71it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.70it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.68it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.67it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.53it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.31it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.21it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:03,  3.61it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:02,  3.63it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:02,  3.64it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:01<00:02,  3.64it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:01<00:01,  3.64it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  3.63it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:01,  3.62it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:02<00:01,  3.62it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:02<00:00,  3.62it/s]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:02<00:00,  4.29it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:02<00:00,  4.89it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  5.42it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  4.14it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:02<00:22,  2.00s/it]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:04<00:20,  2.01s/it]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:06<00:18,  2.01s/it]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:08<00:16,  2.01s/it]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:10<00:14,  2.01s/it]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:12<00:12,  2.01s/it]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:14<00:10,  2.01s/it]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:16<00:08,  2.02s/it]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:18<00:06,  2.02s/it]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:19<00:03,  1.70s/it]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:20<00:01,  1.49s/it]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:21<00:00,  1.35s/it]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:21<00:00,  1.76s/it]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:01<00:11,  1.01s/it]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:02<00:10,  1.01s/it]
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:03<00:09,  1.02s/it]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:04<00:08,  1.02s/it]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:05<00:07,  1.02s/it]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:06<00:06,  1.02s/it]
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:07<00:05,  1.02s/it]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:08<00:04,  1.02s/it]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:09<00:03,  1.02s/it]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:10<00:02,  1.02s/it]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:11<00:01,  1.02s/it]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:12<00:00,  1.02s/it]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:12<00:00,  1.02s/it]
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.35it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.36it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  5.10it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.98it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:00<00:01,  4.91it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.87it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.85it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.83it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.83it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.82it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.71it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.51it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.37it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:02,  5.43it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  5.47it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  5.48it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  5.48it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:01,  5.49it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  5.49it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:00,  5.49it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  5.49it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  5.49it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00,  7.20it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  6.27it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:01<00:13,  1.26s/it]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:02<00:12,  1.26s/it]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:03<00:11,  1.26s/it]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:05<00:10,  1.26s/it]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:06<00:08,  1.27s/it]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:07<00:07,  1.27s/it]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:08<00:06,  1.27s/it]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:10<00:05,  1.27s/it]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:11<00:03,  1.27s/it]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:12<00:02,  1.07s/it]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:12<00:00,  1.07it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:13<00:00,  1.19it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:13<00:00,  1.11s/it]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:00<00:06,  1.60it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:01<00:06,  1.59it/s]
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:01<00:05,  1.58it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:02<00:05,  1.58it/s]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:03<00:04,  1.58it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:03<00:03,  1.58it/s]
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:04<00:03,  1.58it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:05<00:02,  1.58it/s]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:05<00:01,  1.58it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:06<00:01,  1.58it/s]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:06<00:00,  1.58it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:07<00:00,  1.58it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:07<00:00,  1.58it/s]
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.18it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.21it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  4.95it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.83it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  4.77it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.74it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.71it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.70it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.69it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.68it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.55it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.32it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.21it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  7.01it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  7.08it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  7.12it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  7.14it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:00,  7.14it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:00<00:00,  7.13it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:00<00:00,  7.15it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  7.14it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  7.17it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00,  9.40it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  8.17it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:06,  1.63it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:01<00:06,  1.63it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:01<00:05,  1.63it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:02<00:04,  1.62it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:03<00:04,  1.62it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:03<00:03,  1.62it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:04<00:03,  1.62it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:04<00:02,  1.62it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:05<00:01,  1.62it/s]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:05<00:01,  1.92it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:06<00:00,  2.19it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:06<00:00,  2.42it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:06<00:00,  1.85it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:00<00:03,  3.23it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:03,  3.20it/s]
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:00<00:02,  3.19it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:01<00:02,  3.18it/s]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:01<00:02,  3.18it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:01<00:01,  3.18it/s]
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:02<00:01,  3.18it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:02<00:01,  3.18it/s]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:02<00:00,  3.18it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:03<00:00,  3.18it/s]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:03<00:00,  3.19it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:03<00:00,  3.19it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:03<00:00,  3.19it/s]
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.37it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.37it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  5.11it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.99it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:00<00:01,  4.92it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.89it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.87it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.85it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.84it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.84it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.73it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.54it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.38it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  8.89it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  8.86it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  8.82it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:00,  8.86it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:00,  8.90it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:00<00:00,  8.87it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:00<00:00,  8.92it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:00<00:00,  8.89it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  8.92it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00, 11.71it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00, 10.17it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  5.81it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  5.77it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  5.76it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  5.76it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:01,  5.75it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  5.75it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:00,  5.75it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  5.75it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  5.76it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00,  7.53it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  6.58it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:00, 11.52it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:00<00:00, 11.49it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:00<00:00, 11.48it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:00<00:00, 11.47it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:00<00:00, 11.46it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:01<00:00, 11.46it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:01<00:00, 11.46it/s]
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.21it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.24it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  4.99it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.86it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  4.80it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.76it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.74it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.73it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.72it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.71it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.58it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.36it/s]Sampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.25it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  8.51it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  8.67it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  8.69it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:00,  8.67it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:00,  8.68it/s]
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:00<00:00,  8.59it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:00<00:00,  8.59it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.38it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:00<00:00,  8.56it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.39it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  8.57it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  5.14it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00, 11.26it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  9.85it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  6.46it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  5.02it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  6.39it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:00<00:01,  4.96it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  6.37it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  4.92it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  6.36it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:01,  6.36it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:01,  4.90it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:00<00:00,  6.36it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  4.89it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:00,  6.36it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  6.35it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  4.88it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  6.35it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  4.87it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00,  8.30it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.76it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.57it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.42it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  7.26it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  7.68it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:00, 12.62it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:00<00:00, 12.59it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  7.80it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  7.77it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:00<00:00, 12.59it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:00<00:00, 12.59it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  7.78it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:00<00:00, 12.59it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:00,  7.80it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:00<00:00,  7.81it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 12.58it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:00<00:00, 12.58it/s]
+
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:00<00:00,  7.81it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  7.81it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  7.82it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00, 10.28it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  8.94it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:06,  1.74it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:01<00:05,  1.74it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:01<00:05,  1.74it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:02<00:04,  1.73it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:02<00:04,  1.73it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:03<00:03,  1.73it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:04<00:02,  1.73it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:04<00:02,  1.73it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:05<00:01,  1.73it/s]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:05<00:00,  2.05it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:05<00:00,  2.34it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:06<00:00,  2.60it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:06<00:00,  1.98it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:00<00:03,  3.51it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:02,  3.47it/s]
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:00<00:02,  3.47it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:01<00:02,  3.46it/s]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:01<00:02,  3.46it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:01<00:01,  3.46it/s]
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:02<00:01,  3.46it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:02<00:01,  3.46it/s]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:02<00:00,  3.46it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:02<00:00,  3.46it/s]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:03<00:00,  3.46it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:03<00:00,  3.46it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:03<00:00,  3.46it/s]
+renders-01-lantern: preview-520051442.glb, final-520051442.glb, input-lantern.jpg
+renders-02-boombox: preview-1451574716.glb, final-1451574716.glb, input-boombox.jpg
+renders-03-toycar: preview-1659235160.glb, final-1659235160.glb, input-toycar.jpg
+renders-04-sheenchair: preview-2086988420.glb, final-2086988420.glb, input-sheenchair.jpg
+renders-05-barramundifish: preview-1132999614.glb, final-1132999614.glb, input-barramundifish.jpg
+renders-06-avocado: preview-212105499.glb, final-212105499.glb, input-avocado.jpg
+an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7f362c232cd0>
+asyncgen: <async_generator object async_merge at 0x7f362c232cd0>
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_utils/async_utils.py", line 856, in __iter__
+    yield from run_async_gen(runner, self._async_iterable)
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7f362c48b940>
+asyncgen: <async_generator object Synchronizer._run_generator_async at 0x7f362c48b940>
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_utils/async_utils.py", line 856, in __iter__
+    yield from run_async_gen(runner, self._async_iterable)
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+RuntimeError: aclose(): asynchronous generator is already running
+Task was destroyed but it is pending!
+task: <Task pending name='Task-3615' coro=<<async_generator_athrow without __name__>()> wait_for=<Future finished result=None>>
+Done: 6 of 6 runs finished; files in orainge-outputs
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-vqFisY0RSucdSmfHyh0Tfd
+== Gallery: installing three.js and Chromium
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+ systemctl restart packagekit.service php8.3-fpm.service polkit.service udisks2.service
+
+Service restarts being deferred:
+ systemctl restart ModemManager.service
+ systemctl restart networkd-dispatcher.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+== Gallery: rendering
+renders-01-lantern preview: rendered in 3.2 s
+renders-01-lantern final: rendered in 1.6 s
+renders-02-boombox preview: rendered in 1.2 s
+renders-02-boombox final: rendered in 2.1 s
+renders-03-toycar preview: rendered in 0.9 s
+renders-03-toycar final: rendered in 2.2 s
+renders-04-sheenchair preview: rendered in 1.5 s
+renders-04-sheenchair final: rendered in 3.2 s
+renders-05-barramundifish preview: rendered in 1.1 s
+renders-05-barramundifish final: rendered in 1.9 s
+renders-06-avocado preview: rendered in 1.1 s
+renders-06-avocado final: rendered in 1.9 s
+Wrote ops-out/private/gallery/index.html with 6 runs
+Gallery and 6 final models in ops-out/private/
+
+== Status
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+Weights trellis2: ready
+Weights reference: not downloaded yet
+Job API: not deployed (modal deploy workers/modal_app.py)
+renders-02-boombox (input-boombox.jpg): weights done, preview done, final done; updated 2026-09-30 04:45:11 UTC
+  Download: modal volume get orainge-outputs renders-02-boombox .
+renders-04-sheenchair (input-sheenchair.jpg): weights done, preview done, final done; updated 2026-09-30 04:45:40 UTC
+  Download: modal volume get orainge-outputs renders-04-sheenchair .
+renders-03-toycar (input-toycar.jpg): weights done, preview done, final done; updated 2026-09-30 04:46:18 UTC
+  Download: modal volume get orainge-outputs renders-03-toycar .
+renders-05-barramundifish (input-barramundifish.jpg): weights done, preview done, final done; updated 2026-09-30 04:46:21 UTC
+  Download: modal volume get orainge-outputs renders-05-barramundifish .
+renders-01-lantern (input-lantern.jpg): weights done, preview done, final done; updated 2026-09-30 04:46:39 UTC
+  Download: modal volume get orainge-outputs renders-01-lantern .
+renders-06-avocado (input-avocado.jpg): weights done, preview done, final done; updated 2026-09-30 04:47:28 UTC
+  Download: modal volume get orainge-outputs renders-06-avocado .
+exit status: 0
