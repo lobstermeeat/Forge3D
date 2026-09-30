@@ -4,7 +4,7 @@ import type { Database } from '../../db';
 import { schema } from '../../db';
 import type { StorageProvider } from '../storage';
 import type { FetchLike } from './providers/jobEndpoint';
-import type { StudioWorkers, WorkerFile } from './types';
+import type { StudioWorkers, WorkerFile, WorkerKind } from './types';
 
 /**
  * The Studio's AI panel, one generation at a time:
@@ -23,6 +23,9 @@ import type { StudioWorkers, WorkerFile } from './types';
  *
  * The FLUX worker rates each picture as a start for 3D (the object's size in the frame, not cut
  * off, just one), and `recommended` points out the best one. The user still picks.
+ *
+ * A GPU that has been idle takes a while to start (about 45 s for FLUX, 100 s for TRELLIS.2), so
+ * `warm` starts one before its job: FLUX when the panel opens, TRELLIS.2 while FLUX draws.
  */
 
 export type GenerationStatus =
@@ -95,6 +98,8 @@ export const MAX_PROMPT_LENGTH = 500;
 const MAX_PHOTO_SIDE = 2048;
 /** Bigger photos are refused before decoding (about 8000 x 6000) */
 const MAX_PHOTO_PIXELS = 50_000_000;
+/** How often a user may start each GPU early: about a cold start plus the minute it stays up */
+export const WARM_INTERVAL_MS = 2 * 60 * 1000;
 
 export interface StudioDeps {
   workers: StudioWorkers | null;
@@ -105,6 +110,9 @@ export interface StudioDeps {
 }
 
 export class AIStudio {
+  /** When each user last started each GPU early (key `userId:kind`), oldest first */
+  private readonly warmedAt = new Map<string, number>();
+
   constructor(private readonly deps: StudioDeps) {}
 
   capabilities() {
@@ -214,6 +222,33 @@ export class AIStudio {
     return (await this.deps.store.recent(userId, limit)).map(view);
   }
 
+  /**
+   * Starts a GPU before the user's job needs it, so the job skips the cold start. Returns at once
+   * and never throws (only speed is at stake), and asks at most once per GPU per user every
+   * WARM_INTERVAL_MS. Does nothing when the workers can't be started early.
+   */
+  warm(userId: string, kind: WorkerKind): void {
+    const { workers } = this.deps;
+    if (!workers?.warm) return;
+    const now = Date.now();
+    // Keys are added as time goes on, so the expired ones are at the front
+    for (const [key, at] of this.warmedAt) {
+      if (now - at < WARM_INTERVAL_MS) break;
+      this.warmedAt.delete(key);
+    }
+    const key = `${userId}:${kind}`;
+    if (this.warmedAt.has(key)) return;
+    this.warmedAt.set(key, now);
+    void (async () => {
+      try {
+        await workers.warm?.(kind);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[AI] Couldn't start the ${kind} GPU early:`, message);
+      }
+    })();
+  }
+
   // ─── Jobs ─────────────────────────────────────────────────────
 
   /** Starts a job for the generation and records it; a job that can't start fails the step. */
@@ -242,13 +277,17 @@ export class AIStudio {
           requestId: record.id,
         });
       }
-      return await this.deps.store.update(record.id, {
+      const started = await this.deps.store.update(record.id, {
         status,
         jobId,
         jobKind: kind,
         errorMessage: null,
         updatedAt: new Date(),
       });
+      // The pictures take about a minute from cold, so TRELLIS.2 starts meanwhile and is ready
+      // (or nearly) by the time the user picks one
+      if (kind === 'references') this.warm(record.userId, 'model');
+      return started;
     } catch (err) {
       return this.fail(record, kind, err);
     }

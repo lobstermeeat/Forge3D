@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { randomUUID } from 'node:crypto';
 import type { StorageProvider } from '../storage';
@@ -6,10 +6,17 @@ import {
   AIStudio,
   LIMITS,
   StudioError,
+  WARM_INTERVAL_MS,
   type GenerationRecord,
   type GenerationStore,
 } from './studio';
-import type { ModelOutput, ReferencesOutput, StudioWorkers, WorkerJobState } from './types';
+import type {
+  ModelOutput,
+  ReferencesOutput,
+  StudioWorkers,
+  WorkerJobState,
+  WorkerKind,
+} from './types';
 
 /** Generations in memory, shaped like the ai_generations table's rows. */
 function memoryStore(): GenerationStore & { rows: Map<string, GenerationRecord> } {
@@ -92,11 +99,16 @@ function scriptedWorkers(prompts = true) {
   const references = new Map<string, WorkerJobState<ReferencesOutput> | Error>();
   const models = new Map<string, WorkerJobState<ModelOutput> | Error>();
   const started: { kind: string; input: Record<string, unknown> }[] = [];
+  /** The GPUs asked to start early, in order */
+  const warmed: WorkerKind[] = [];
+  /** What the test makes happen: pictures that can't start, and what starting a GPU early does */
+  const control: { startError?: Error; warm?: () => Promise<void> } = {};
   let next = 1;
   const workers: StudioWorkers = {
     name: 'test-workers',
     prompts,
     async startReferences(input) {
+      if (control.startError) throw control.startError;
       const id = `ref-${next++}`;
       started.push({ kind: 'references', input });
       references.set(id, { status: 'running' });
@@ -118,8 +130,12 @@ function scriptedWorkers(prompts = true) {
       if (state instanceof Error) throw state;
       return state;
     },
+    async warm(kind) {
+      warmed.push(kind);
+      await control.warm?.();
+    },
   };
-  return { workers, references, models, started };
+  return { workers, references, models, started, warmed, control };
 }
 
 const png = (colour: string) =>
@@ -467,5 +483,92 @@ describe('AIStudio', () => {
     expect((await studio.pick('u1', old.id, 1)).image).toBe(
       'https://files.test/ai/old/reference-2.png',
     );
+  });
+
+  it('starts each GPU early at most once every 2 minutes per user', () => {
+    expect(WARM_INTERVAL_MS).toBe(2 * 60 * 1000);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const start = Date.parse('2026-09-30T12:00:00Z');
+      vi.setSystemTime(start);
+      const { studio, warmed } = setup();
+      studio.warm('u1', 'references');
+      studio.warm('u1', 'references');
+      studio.warm('u1', 'model');
+      studio.warm('u2', 'references');
+      expect(warmed).toEqual(['references', 'model', 'references']);
+
+      vi.setSystemTime(start + WARM_INTERVAL_MS - 1);
+      studio.warm('u1', 'references');
+      expect(warmed).toHaveLength(3);
+      vi.setSystemTime(start + WARM_INTERVAL_MS);
+      studio.warm('u1', 'references');
+      studio.warm('u1', 'references');
+      studio.warm('u2', 'model');
+      expect(warmed).toEqual(['references', 'model', 'references', 'references', 'model']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never fails the caller when a GPU can't be started early", async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { studio, workers, warmed, control } = setup();
+      control.warm = async () => {
+        throw new Error('AI worker warm failed: 503 {"detail":"Modal can\'t be reached"}');
+      };
+      expect(() => studio.warm('u1', 'references')).not.toThrow();
+      expect(warmed).toEqual(['references']);
+      await vi.waitFor(() =>
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('references'),
+          expect.stringContaining('503'),
+        ),
+      );
+      // And isn't asked again at once
+      studio.warm('u1', 'references');
+      expect(warmed).toHaveLength(1);
+
+      // Nor when the workers throw before they even ask
+      workers.warm = () => {
+        throw new Error('not set up');
+      };
+      expect(() => studio.warm('u2', 'model')).not.toThrow();
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(2));
+
+      // Workers that can't start a GPU early, and servers without workers, do nothing
+      delete workers.warm;
+      expect(() => studio.warm('u3', 'model')).not.toThrow();
+      const none = new AIStudio({ workers: null, store: memoryStore(), storage: memoryStorage() });
+      expect(() => none.warm('u1', 'model')).not.toThrow();
+      expect(warmed).toHaveLength(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('starts TRELLIS.2 while the pictures are drawn', async () => {
+    const { studio, started, warmed, control } = setup();
+    // The prompt doesn't wait for it
+    control.warm = () => new Promise(() => {});
+    expect(await studio.startFromPrompt('u1', 'a lamp')).toMatchObject({ status: 'drawing' });
+    expect(started.map((s) => s.kind)).toEqual(['references']);
+    expect(warmed).toEqual(['model']);
+    // At most once every 2 minutes per user
+    await studio.startFromPrompt('u1', 'a chair');
+    expect(warmed).toEqual(['model']);
+
+    // Not when the pictures couldn't be started, nor for a photo, which starts TRELLIS.2 itself
+    control.startError = new Error('fetch failed');
+    const failed = await studio.startFromPrompt('u2', 'a mug');
+    expect(failed).toMatchObject({ status: 'failed' });
+    await studio.startFromPhoto('u3', await png('#fff'));
+    expect(warmed).toEqual(['model']);
+
+    // Drawing them again does
+    delete control.startError;
+    expect(await studio.retry('u2', failed.id)).toMatchObject({ status: 'drawing' });
+    expect(warmed).toEqual(['model', 'model']);
   });
 });

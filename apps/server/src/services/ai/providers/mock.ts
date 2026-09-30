@@ -102,6 +102,9 @@ export class MockWorkers implements StudioWorkers {
     };
   }
 
+  /** Nothing to start: the mock has no cold start. */
+  async warm(): Promise<void> {}
+
   private add(job: Job): string {
     const id = `mock-${this.next++}`;
     this.jobs.set(id, job);

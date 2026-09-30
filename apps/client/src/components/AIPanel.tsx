@@ -120,6 +120,16 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
   const retry = trpc.ai.retry.useMutation({ onSuccess: show, onError });
   const busy = start.isPending || pick.isPending || keep.isPending || retry.isPending;
 
+  // Start FLUX while the user types: after a quiet spell it takes about 45 s before it can draw
+  const { mutate: warm } = trpc.ai.warm.useMutation();
+  const warmed = useRef(false);
+  const prompts = capabilities.data?.prompts ?? false;
+  useEffect(() => {
+    if (warmed.current || !signedIn || !prompts) return;
+    warmed.current = true;
+    warm({ worker: 'references' });
+  }, [signedIn, prompts, warm]);
+
   // After a reload, carry on with this scene's unfinished generation (once per page load)
   useEffect(() => {
     if (restored || !recent.data) return;

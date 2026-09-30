@@ -387,6 +387,44 @@ describe('SelfHostedProvider', () => {
     });
   });
 
+  it('starts a GPU early through the job API on Modal, and not on RunPod', async () => {
+    const modal = fakeJobApi([{ status: 'WARMING' }, { status: 'WARMING' }]);
+    const provider = createSelfHostedProvider(
+      { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
+      modal.fetchImpl,
+    )!;
+    await provider.warm('references');
+    await provider.warm('model');
+    expect(modal.calls).toEqual([
+      {
+        url: 'https://w.modal.run/reference/warm',
+        method: 'POST',
+        body: undefined,
+        auth: 'Bearer worker-token',
+      },
+      {
+        url: 'https://w.modal.run/trellis2/warm',
+        method: 'POST',
+        body: undefined,
+        auth: 'Bearer worker-token',
+      },
+    ]);
+
+    // RunPod endpoints have no such route, so nothing is sent
+    const runPod = fakeJobApi([]);
+    const onRunPod = createSelfHostedProvider(
+      {
+        RUNPOD_API_KEY: 'k',
+        RUNPOD_TRELLIS2_ENDPOINT_ID: 'ep',
+        RUNPOD_REFERENCE_ENDPOINT_ID: 'ref',
+      },
+      runPod.fetchImpl,
+    )!;
+    await onRunPod.warm('references');
+    await onRunPod.warm('model');
+    expect(runPod.calls).toEqual([]);
+  });
+
   it('passes on how the worker rated each picture, when it did', async () => {
     const picture = (seed: number) => ({
       key: `ai/gen-5/reference-${seed}.png`,

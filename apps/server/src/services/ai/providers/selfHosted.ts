@@ -12,6 +12,7 @@ import type {
   StudioWorkers,
   WorkerFile,
   WorkerJobState,
+  WorkerKind,
 } from '../types';
 import { JobEndpoint, type FetchLike, type RemoteJob } from './jobEndpoint';
 
@@ -62,6 +63,8 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
   constructor(
     private readonly trellis2: JobEndpoint,
     private readonly reference: JobEndpoint | null,
+    /** canWarm: the host can start a GPU ahead of a job (Orainge's job API on Modal; not RunPod) */
+    private readonly options: { canWarm?: boolean } = {},
   ) {
     this.supportedTypes = reference ? ['image-to-3d', 'text-to-3d'] : ['image-to-3d'];
     this.prompts = reference !== null;
@@ -112,6 +115,12 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
       seconds: Object.values(output.timings).reduce((sum, t) => sum + t, 0),
       credits: output.credits,
     }));
+  }
+
+  /** On Modal, starts the worker's GPU ahead of its job. RunPod has no route for it: no-op. */
+  async warm(kind: WorkerKind): Promise<void> {
+    if (!this.options.canWarm) return;
+    await (kind === 'model' ? this.trellis2 : this.reference)?.warm();
   }
 
   async referenceImages(
@@ -274,6 +283,7 @@ export function createSelfHostedProvider(
     return new SelfHostedProvider(
       new JobEndpoint(`${workersUrl}/trellis2`, token, fetchImpl),
       new JobEndpoint(`${workersUrl}/reference`, token, fetchImpl),
+      { canWarm: true },
     );
   }
   const apiKey = env['RUNPOD_API_KEY'];
