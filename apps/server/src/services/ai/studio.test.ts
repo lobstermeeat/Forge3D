@@ -54,6 +54,10 @@ function memoryStore(): GenerationStore & { rows: Map<string, GenerationRecord> 
       rows.set(id, row);
       return { ...row };
     },
+    async finishJob(id, jobId, patch) {
+      if (rows.get(id)?.jobId !== jobId) return null;
+      return this.update(id, patch);
+    },
     async recent(userId, limit) {
       return [...rows.values()]
         .filter((r) => r.userId === userId)
@@ -339,5 +343,36 @@ describe('AIStudio', () => {
     await expect(studio.startFromPrompt('u2', 'a chair')).resolves.toMatchObject({
       status: 'drawing',
     });
+  });
+
+  it("doesn't let a slow poll undo Keep", async () => {
+    const store = memoryStore();
+    const storage = memoryStorage();
+    const jobs = scriptedWorkers(false);
+    let release: () => void = () => {};
+    let downloads = 0;
+    const studio = new AIStudio({
+      workers: jobs.workers,
+      store,
+      storage,
+      // The first download (a slow poll) waits until the test lets it go
+      fetchImpl: async () => {
+        if (downloads++ === 0) await new Promise<void>((resolve) => (release = resolve));
+        return new Response('glb-preview');
+      },
+    });
+    const gen = await studio.startFromPhoto('u1', await png('#fff'));
+    jobs.models.set('model-1', {
+      status: 'done',
+      output: { ...modelOutput(5, 'preview'), file: { url: 'https://r2.test/preview.glb' } },
+    });
+    const slow = studio.get('u1', gen.id);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect((await studio.get('u1', gen.id)).status).toBe('reviewing');
+    expect((await studio.keep('u1', gen.id)).status).toBe('finishing');
+
+    release();
+    expect((await slow).status).toBe('finishing');
+    expect((await studio.get('u1', gen.id)).status).toBe('finishing');
   });
 });

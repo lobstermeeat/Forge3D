@@ -40,6 +40,15 @@ export interface GenerationStore {
   create(values: NewGeneration): Promise<GenerationRecord>;
   find(id: string, userId: string): Promise<GenerationRecord | null>;
   update(id: string, patch: Partial<NewGeneration>): Promise<GenerationRecord>;
+  /**
+   * Updates the generation only if `jobId` is still its job, so a slow poll can't undo a step the
+   * user took meanwhile (such as Keep starting the final). Returns null when the job changed.
+   */
+  finishJob(
+    id: string,
+    jobId: string,
+    patch: Partial<NewGeneration>,
+  ): Promise<GenerationRecord | null>;
   recent(userId: string, limit: number): Promise<GenerationRecord[]>;
 }
 
@@ -77,6 +86,8 @@ export const LIMITS = { running: 3, perHour: 30 };
 export const MAX_PROMPT_LENGTH = 500;
 /** Photos are scaled down to this before they are stored and sent to TRELLIS.2 */
 const MAX_PHOTO_SIDE = 2048;
+/** Bigger photos are refused before decoding (about 8000 x 6000) */
+const MAX_PHOTO_PIXELS = 50_000_000;
 
 export interface StudioDeps {
   workers: StudioWorkers | null;
@@ -244,7 +255,7 @@ export class AIStudio {
       if (kind === 'references') {
         const state = await workers.references(jobId);
         if (state.status === 'running') return record;
-        if (state.status === 'failed') return this.fail(record, kind, state.message);
+        if (state.status === 'failed') return this.settle(record, failure(kind, state.message));
         const references = [];
         for (const image of state.output.images) {
           const data = await this.download(image.file);
@@ -254,7 +265,7 @@ export class AIStudio {
             seed: image.seed,
           });
         }
-        return await this.deps.store.update(record.id, {
+        return await this.settle(record, {
           status: 'picking',
           referenceImages: references,
           jobId: null,
@@ -264,7 +275,7 @@ export class AIStudio {
 
       const state = await workers.model(jobId);
       if (state.status === 'running') return record;
-      if (state.status === 'failed') return this.fail(record, kind, state.message);
+      if (state.status === 'failed') return this.settle(record, failure(kind, state.message));
       const { output } = state;
       const data = await this.download(output.file);
       const url = await this.deps.storage.write(
@@ -278,8 +289,8 @@ export class AIStudio {
         durationMs: (record.durationMs ?? 0) + Math.round(output.seconds * 1000),
         updatedAt: new Date(),
       };
-      return await this.deps.store.update(
-        record.id,
+      return await this.settle(
+        record,
         kind === 'preview'
           ? {
               ...common,
@@ -293,8 +304,17 @@ export class AIStudio {
     } catch (err) {
       // Couldn't reach the workers: try again on the next poll
       if (isTransient(err)) return record;
-      return this.fail(record, kind, err);
+      return this.settle(record, failure(kind, err));
     }
+  }
+
+  /** Records the end of the generation's current job, unless another job replaced it meanwhile. */
+  private async settle(
+    record: GenerationRecord,
+    patch: Partial<NewGeneration>,
+  ): Promise<GenerationRecord> {
+    const updated = await this.deps.store.finishJob(record.id, record.jobId!, patch);
+    return updated ?? (await this.find(record.userId, record.id));
   }
 
   private async fail(
@@ -302,14 +322,7 @@ export class AIStudio {
     kind: JobKind,
     reason: unknown,
   ): Promise<GenerationRecord> {
-    const message = reason instanceof Error ? reason.message : String(reason);
-    return this.deps.store.update(record.id, {
-      status: 'failed',
-      jobId: null,
-      jobKind: kind,
-      errorMessage: message.slice(0, 500),
-      updatedAt: new Date(),
-    });
+    return this.deps.store.update(record.id, failure(kind, reason));
   }
 
   // ─── Files ────────────────────────────────────────────────────
@@ -364,6 +377,17 @@ export class AIStudio {
   }
 }
 
+function failure(kind: JobKind, reason: unknown): Partial<NewGeneration> {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  return {
+    status: 'failed',
+    jobId: null,
+    jobKind: kind,
+    errorMessage: message.slice(0, 500),
+    updatedAt: new Date(),
+  };
+}
+
 function view(record: GenerationRecord): GenerationView {
   return {
     id: record.id,
@@ -398,7 +422,7 @@ export async function normalisePhoto(
 ): Promise<{ data: Buffer; type: string; extension: string }> {
   let meta: sharp.Metadata;
   try {
-    meta = await sharp(data).metadata();
+    meta = await sharp(data, { limitInputPixels: MAX_PHOTO_PIXELS }).metadata();
   } catch {
     throw new StudioError(
       'BAD_REQUEST',
@@ -411,7 +435,7 @@ export async function normalisePhoto(
       "That file isn't a picture we can read (use PNG, JPEG or WebP)",
     );
   }
-  const image = sharp(data)
+  const image = sharp(data, { limitInputPixels: MAX_PHOTO_PIXELS })
     .rotate()
     .resize(MAX_PHOTO_SIDE, MAX_PHOTO_SIDE, { fit: 'inside', withoutEnlargement: true });
   if (meta.hasAlpha) {
@@ -443,6 +467,14 @@ export function drizzleGenerationStore(db: Database): GenerationStore {
       const [row] = await db.update(table).set(patch).where(eq(table.id, id)).returning();
       if (!row) throw new StudioError('NOT_FOUND', 'This generation was not found');
       return row;
+    },
+    async finishJob(id, jobId, patch) {
+      const [row] = await db
+        .update(table)
+        .set(patch)
+        .where(and(eq(table.id, id), eq(table.jobId, jobId)))
+        .returning();
+      return row ?? null;
     },
     async recent(userId, limit) {
       return db
