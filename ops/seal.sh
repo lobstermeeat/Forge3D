@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Keeps results private on the ai-results branch, which is public in a public repository.
+# Keeps results private in refs/ops/results, which is public in a public repository.
 #
 #   bash ops/seal.sh seal ops-out                # the workflow: ops-out/private/ -> encrypted files
 #   bash ops/seal.sh open runs/<id> key.pem      # you: -> runs/<id>/private/
