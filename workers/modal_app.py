@@ -376,7 +376,7 @@ def run_pipeline(
             files.append(name)
         # The first picture goes on to 3D; `--image` on another one makes that one instead
         state["input"] = files[0]
-        return {"files": files}
+        return {"files": files, "gpu_seconds": result.get("seconds")}
 
     def model(mode: str) -> Callable[[], dict]:
         def work() -> dict:
@@ -392,7 +392,13 @@ def run_pipeline(
             state["seed"] = result["seed"]
             name = f"{mode}-{result['seed']}.glb"
             (folder / name).write_bytes(fetch(result["glb"]))
-            return {"files": [name], "triangles": result["triangles"], "timings": result["timings"]}
+            return {
+                "files": [name],
+                "triangles": result["triangles"],
+                "bytes": result.get("bytes"),
+                "timings": result["timings"],
+                "gpu_seconds": round(sum(result["timings"].values()), 1),
+            }
 
         return work
 

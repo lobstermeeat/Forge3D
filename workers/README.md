@@ -142,6 +142,11 @@ Settings > API Tokens), put the commands in `ops/run.sh` and push it to the `ai-
 The log and anything the script writes to `ops-out/` land on the `ai-results` branch under
 `runs/<id>/`, with the tokens scrubbed. In a public repository that branch is public.
 
+**Review a test set:** `python workers/gallery/make_gallery.py <runs folder> -o gallery/`
+renders every preview and final from six angles, with the editor's decoders and lighting, and
+writes a page showing each run's reference images, triangles, file size, GPU time and cost. It
+needs `pnpm install` and Playwright's Chromium.
+
 **Settings** (in `modal_app.py`): both workers run on an L40S (48 GB), scale to zero, stay warm
 for 60 s after their last job (idle time is billed; a cold start takes about a minute) and are
 capped at 2 TRELLIS.2 containers and 1 FLUX container to bound spending. `TRELLIS2_GPU = "A10"`
