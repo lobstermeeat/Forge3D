@@ -24,6 +24,18 @@ image = modal.Image.debian_slim(python_version="3.11")
 
 POLL_S = 2.0  # the Studio's panel polls this often too
 LIMIT_S = 20 * 60
+MIN_TOKEN_LENGTH = 32  # as in workers/job_api.py
+SECRET = modal.Secret.from_name("orainge-worker-token", required_keys=["ORAINGE_WORKER_TOKEN"])
+
+
+def token_problems(token: str) -> list[str]:
+    """What would stop the job API from accepting this token (never the token itself)."""
+    problems = []
+    if len(token.strip()) < MIN_TOKEN_LENGTH:
+        problems.append(f"is shorter than the {MIN_TOKEN_LENGTH} characters the job API needs")
+    if token != token.strip():
+        problems.append("has spaces or a line break around it")
+    return problems
 
 
 def request(url: str, token: Optional[str], method: str, path: str, body: Any = None) -> tuple[int, Any]:
@@ -106,13 +118,19 @@ def check_flow(url: str, token: str, prompt: str, log: Callable[[str], None] = p
     }
 
 
-@app.function(
-    image=image,
-    secrets=[modal.Secret.from_name("orainge-worker-token", required_keys=["ORAINGE_WORKER_TOKEN"])],
-    timeout=45 * 60,
-)
+@app.function(image=image, secrets=[SECRET])
+def token_check() -> None:
+    problems = token_problems(os.environ["ORAINGE_WORKER_TOKEN"])
+    print("ORAINGE_WORKER_TOKEN " + (" and ".join(problems) if problems else "is fine: long enough, nothing around it"))
+
+
+@app.function(image=image, secrets=[SECRET], timeout=45 * 60)
 def check(url: str, prompt: str) -> dict:
-    return check_flow(url, os.environ["ORAINGE_WORKER_TOKEN"], prompt)
+    token = os.environ["ORAINGE_WORKER_TOKEN"]
+    problems = token_problems(token)
+    if problems:
+        raise RuntimeError("ORAINGE_WORKER_TOKEN in the Modal secret orainge-worker-token " + " and ".join(problems))
+    return check_flow(url, token, prompt)
 
 
 @app.local_entrypoint()
