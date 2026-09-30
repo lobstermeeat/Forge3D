@@ -1,0 +1,116 @@
+<!doctype html>
+<!--
+  Turntable renderer for make_gallery.py: loads a meshopt/KTX2 GLB with the same decoders and
+  studio lighting the Orainge editor uses, and returns a few views as PNG data URLs.
+-->
+<meta charset="utf-8" />
+<script type="importmap">
+  {
+    "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/examples/jsm/" }
+  }
+</script>
+<canvas id="view" width="512" height="512"></canvas>
+<script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+  import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+  const renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById('view'),
+    antialias: true,
+    preserveDrawingBuffer: true,
+  });
+  renderer.setPixelRatio(1);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NeutralToneMapping;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x24252c);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const ktx2 = new KTX2Loader()
+    .setTranscoderPath('/three/examples/jsm/libs/basis/')
+    .detectSupport(renderer);
+  const loader = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder);
+
+  function dispose(root) {
+    root.traverse((object) => {
+      if (!object.isMesh) return;
+      object.geometry.dispose();
+      for (const material of [object.material].flat()) {
+        for (const value of Object.values(material)) if (value && value.isTexture) value.dispose();
+        material.dispose();
+      }
+    });
+  }
+
+  // Views start at a three-quarter angle, slightly above, and go once around the model
+  window.renderTurntable = async (url, views = 6, size = 512) => {
+    renderer.setSize(size, size, false);
+    const gltf = await loader.loadAsync(url);
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    model.position.sub(sphere.center);
+    scene.add(model);
+
+    const fov = 30;
+    const elevation = THREE.MathUtils.degToRad(20);
+    const directions = Array.from({ length: views }, (_, i) => {
+      const azimuth = Math.PI / 4 + (i / views) * Math.PI * 2;
+      return new THREE.Vector3(
+        Math.sin(azimuth) * Math.cos(elevation),
+        Math.sin(elevation),
+        Math.cos(azimuth) * Math.cos(elevation),
+      );
+    });
+    // One distance for every view (so the model keeps its size as it turns): the closest at
+    // which all eight box corners stay inside 92% of the frame from every angle
+    const reach = Math.tan(THREE.MathUtils.degToRad(fov / 2)) * 0.92;
+    const worldUp = new THREE.Vector3(0, 1, 0);
+    const corners = [];
+    for (const x of [box.min.x, box.max.x])
+      for (const y of [box.min.y, box.max.y])
+        for (const z of [box.min.z, box.max.z])
+          corners.push(new THREE.Vector3(x, y, z).sub(sphere.center));
+    let distance = 0;
+    for (const toCamera of directions) {
+      const right = new THREE.Vector3().crossVectors(worldUp, toCamera).normalize();
+      const up = new THREE.Vector3().crossVectors(toCamera, right).normalize();
+      for (const corner of corners) {
+        const depth = corner.dot(toCamera);
+        distance = Math.max(
+          distance,
+          depth + Math.abs(corner.dot(right)) / reach,
+          depth + Math.abs(corner.dot(up)) / reach,
+        );
+      }
+    }
+    const camera = new THREE.PerspectiveCamera(fov, 1, distance / 100, distance * 10);
+    const shots = [];
+    for (const toCamera of directions) {
+      camera.position.copy(toCamera).multiplyScalar(distance);
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+      shots.push(renderer.domElement.toDataURL('image/png'));
+    }
+
+    let triangles = 0;
+    model.traverse((object) => {
+      if (!object.isMesh) return;
+      const geometry = object.geometry;
+      triangles += (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3;
+    });
+    scene.remove(model);
+    dispose(model);
+    return {
+      shots,
+      triangles: Math.round(triangles),
+      size: box.getSize(new THREE.Vector3()).toArray(),
+    };
+  };
+  window.rendererReady = true;
+</script>
