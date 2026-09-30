@@ -3,6 +3,10 @@
  * Render <IconSprite /> once per page, then use <Icon name="move" />.
  */
 const PATHS: Record<string, string> = {
+  sparkle:
+    '<path d="M10.5 3.5l1.8 4.9 4.9 1.8-4.9 1.8-1.8 4.9-1.8-4.9-4.9-1.8 4.9-1.8z"/><path d="M18 14.5l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z"/>',
+  image:
+    '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 16l-5-5-8.5 8.5"/>',
   select: '<path d="M6 3.5l12 6.8-5.4 1.4-2.4 5.3L6 3.5z"/>',
   move: '<path d="M12 3.5v17M3.5 12h17M12 3.5L9.8 5.7M12 3.5l2.2 2.2M12 20.5l-2.2-2.2M12 20.5l2.2-2.2M3.5 12l2.2-2.2M3.5 12l2.2 2.2M20.5 12l-2.2-2.2M20.5 12l-2.2 2.2"/>',
   rotate: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4.2v3.6h-3.6"/>',

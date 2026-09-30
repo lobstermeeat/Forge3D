@@ -57,6 +57,9 @@ export class Entity {
     if (this.hasComponent('light')) {
       data.components.light = this.getComponent('light');
     }
+    if (this.hasComponent('model')) {
+      data.components.model = this.getComponent('model');
+    }
 
     return data;
   }
@@ -76,6 +79,9 @@ export class Entity {
     }
     if (data.components.light) {
       entity.setComponent('light', data.components.light);
+    }
+    if (data.components.model) {
+      entity.setComponent('model', data.components.model);
     }
 
     return entity;

@@ -576,6 +576,13 @@ export function Ribbon({ actions, play, stop, paint, selection, onRequestImport 
               onClick={onRequestImport}
               title="Import a .glb or .gltf model"
             />
+            <Big
+              icon="sparkle"
+              label="AI model"
+              disabled={playing}
+              onClick={s.openAIPanel}
+              title="Make a 3D model from a description or a photo"
+            />
           </Group>
           <Group
             label="Edit"

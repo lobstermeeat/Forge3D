@@ -3,6 +3,7 @@ import type { TransformMode } from '@forge3d/engine';
 
 export type RibbonTab = 'home' | 'model' | 'test' | 'view';
 export type PanelKey = 'library' | 'explorer' | 'properties' | 'output';
+export type LibraryTab = 'parts' | 'lights' | 'imports' | 'ai';
 export type DockTab = 'output' | 'timeline';
 export type CameraView = 'perspective' | 'top' | 'front' | 'side';
 
@@ -21,6 +22,7 @@ interface EditorState {
 
   ribbonTab: RibbonTab;
   panels: Record<PanelKey, boolean>;
+  libraryTab: LibraryTab;
   dockTab: DockTab;
   snapEnabled: boolean;
   moveStep: number;
@@ -38,6 +40,9 @@ interface EditorState {
   setRibbonTab: (tab: RibbonTab) => void;
   togglePanel: (panel: PanelKey) => void;
   showPanel: (panel: PanelKey) => void;
+  setLibraryTab: (tab: LibraryTab) => void;
+  /** Shows the Library on its AI tab. */
+  openAIPanel: () => void;
   setDockTab: (tab: DockTab) => void;
   toggleSnap: () => void;
   cycleMoveStep: () => void;
@@ -57,6 +62,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   ribbonTab: 'home',
   panels: { library: true, explorer: true, properties: true, output: true },
+  libraryTab: 'parts',
   dockTab: 'output',
   snapEnabled: true,
   moveStep: 1,
@@ -74,6 +80,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   setRibbonTab: (tab) => set({ ribbonTab: tab }),
   togglePanel: (panel) => set((s) => ({ panels: { ...s.panels, [panel]: !s.panels[panel] } })),
   showPanel: (panel) => set((s) => ({ panels: { ...s.panels, [panel]: true } })),
+  setLibraryTab: (tab) => set({ libraryTab: tab }),
+  openAIPanel: () => set((s) => ({ libraryTab: 'ai', panels: { ...s.panels, library: true } })),
   setDockTab: (tab) => set((s) => ({ dockTab: tab, panels: { ...s.panels, output: true } })),
   toggleSnap: () => set((s) => ({ snapEnabled: !s.snapEnabled })),
   cycleMoveStep: () =>

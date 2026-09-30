@@ -24,6 +24,14 @@ const lightDataSchema = z.object({
   intensity: z.number().min(0),
 });
 
+export const modelDataSchema = z.object({
+  url: z.string().min(1).max(2048),
+  source: z.enum(['ai', 'import']),
+  generationId: z.string().uuid().optional(),
+  quality: z.enum(['preview', 'final']).optional(),
+  credits: z.array(z.string().max(200)).max(10).optional(),
+});
+
 const entityDataSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -33,6 +41,7 @@ const entityDataSchema = z.object({
     meshRenderer: meshRendererDataSchema.optional(),
     camera: cameraDataSchema.optional(),
     light: lightDataSchema.optional(),
+    model: modelDataSchema.optional(),
   }),
 });
 

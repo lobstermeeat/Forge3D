@@ -7,6 +7,7 @@ import type {
   MaterialDescriptor,
   MeshRendererData,
   TransformData,
+  ModelData,
 } from '@forge3d/shared';
 import { Icon } from '@/editor/Icon';
 import { PropRow, Section, Select } from '@/editor/ui';
@@ -378,6 +379,7 @@ export function PropertiesPanel({
   const material = materialOf(sceneManager, entity.id);
   const mesh = entity.getComponent<MeshRendererData>('meshRenderer');
   const light = entity.getComponent<LightData>('light');
+  const model = entity.getComponent<ModelData>('model');
 
   const setPos = (axis: 0 | 1 | 2, v: number) => {
     const position = [...t.position] as TransformData['position'];
@@ -555,6 +557,25 @@ export function PropertiesPanel({
               disabled={playing}
               onChange={(opacity) => paint({ opacity, transparent: opacity < 0.999 })}
             />
+          </Section>
+        )}
+
+        {model && (
+          <Section title="Model">
+            <div className="f3-note" style={{ marginTop: 0 }}>
+              {model.source === 'ai'
+                ? model.quality === 'preview'
+                  ? 'A quick AI preview. Keep it in Library › AI to get the final.'
+                  : 'Made with AI. Uses the materials in the model file.'
+                : 'Uses the materials in the model file.'}
+            </div>
+            {model.credits && model.credits.length > 0 && (
+              <ul className="f3-model-credits" aria-label="Credits">
+                {model.credits.map((credit) => (
+                  <li key={credit}>{credit}</li>
+                ))}
+              </ul>
+            )}
           </Section>
         )}
 

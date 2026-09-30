@@ -1,5 +1,12 @@
 import * as Y from 'yjs';
-import type { TransformData, MeshRendererData, LightData, CameraData, MaterialDescriptor } from '@forge3d/shared';
+import type {
+  TransformData,
+  MeshRendererData,
+  LightData,
+  CameraData,
+  MaterialDescriptor,
+  ModelData,
+} from '@forge3d/shared';
 import { Entity } from '../ecs/Entity';
 import type { SceneManager } from '../scene/SceneManager';
 
@@ -149,6 +156,13 @@ export class YjsSceneBinding {
     } else {
       yEntity.delete('camera');
     }
+
+    const model = entity.getComponent<ModelData>('model');
+    if (model) {
+      yEntity.set('model', model);
+    } else {
+      yEntity.delete('model');
+    }
   }
 
   // ─── Yjs → Local ───────────────────────────────────────────
@@ -207,6 +221,9 @@ export class YjsSceneBinding {
 
     const camera = yEntity.get('camera') as CameraData | undefined;
     if (camera) entity.setComponent('camera', camera);
+
+    const model = yEntity.get('model') as ModelData | undefined;
+    if (model) entity.setComponent('model', model);
 
     return entity;
   }

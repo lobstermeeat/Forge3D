@@ -1,11 +1,17 @@
 import type {
   AIProvider,
+  GenerationQuality,
   GenerationType,
   GenerationProgress,
   GenerationRequest,
   GenerationResult,
+  ModelOutput,
   ReferenceImage,
   ReferenceImageProvider,
+  ReferencesOutput,
+  StudioWorkers,
+  WorkerFile,
+  WorkerJobState,
 } from '../types';
 import { JobEndpoint, type FetchLike, type RemoteJob } from './jobEndpoint';
 
@@ -46,16 +52,61 @@ interface ReferenceOutput {
  * `generate({ type: 'image-to-3d', imageUrl, quality: 'preview' })` -> user keeps it ->
  * `generate({ ..., quality: 'final', seed: previewSeed })`.
  */
-export class SelfHostedProvider implements AIProvider, ReferenceImageProvider {
+export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, StudioWorkers {
   readonly name = 'forge3d-trellis2';
   /** Text prompts need the reference-image endpoint. */
   readonly supportedTypes: readonly GenerationType[];
+  readonly prompts: boolean;
 
   constructor(
     private readonly trellis2: JobEndpoint,
     private readonly reference: JobEndpoint | null,
   ) {
     this.supportedTypes = reference ? ['image-to-3d', 'text-to-3d'] : ['image-to-3d'];
+    this.prompts = reference !== null;
+  }
+
+  // The Studio's panel (StudioWorkers): start a job, then poll it
+
+  startReferences(input: { prompt: string; count: number; requestId: string }): Promise<string> {
+    if (!this.reference) throw new Error('Text prompts need the reference-image worker');
+    return this.reference.run({
+      prompt: input.prompt,
+      count: input.count,
+      request_id: input.requestId,
+    });
+  }
+
+  async references(jobId: string): Promise<WorkerJobState<ReferencesOutput>> {
+    if (!this.reference) throw new Error('Text prompts need the reference-image worker');
+    return jobState(await this.reference.status<ReferenceOutput>(jobId), (output) => ({
+      images: output.images.map((image) => ({ file: workerFile(image), seed: image.seed })),
+    }));
+  }
+
+  startModel(input: {
+    image: Buffer;
+    mode: GenerationQuality;
+    seed?: number;
+    requestId: string;
+  }): Promise<string> {
+    return this.trellis2.run({
+      image_base64: input.image.toString('base64'),
+      mode: input.mode,
+      seed: input.seed,
+      request_id: input.requestId,
+    });
+  }
+
+  async model(jobId: string): Promise<WorkerJobState<ModelOutput>> {
+    return jobState(await this.trellis2.status<Trellis2Output>(jobId), (output) => ({
+      file: workerFile(output.glb),
+      seed: output.seed,
+      triangles: output.triangles,
+      bytes: output.bytes,
+      seconds: Object.values(output.timings).reduce((sum, t) => sum + t, 0),
+      credits: output.credits,
+    }));
   }
 
   async referenceImages(
@@ -137,6 +188,33 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider {
   }
 }
 
+function jobState<T extends { error?: string }, R>(
+  job: RemoteJob<T>,
+  map: (output: T) => R,
+): WorkerJobState<R> {
+  switch (job.status) {
+    case 'IN_QUEUE':
+    case 'IN_PROGRESS':
+      return { status: 'running' };
+    case 'COMPLETED':
+      if (!job.output)
+        return { status: 'failed', message: `Job ${job.id} finished without output` };
+      if (job.output.error) return { status: 'failed', message: job.output.error };
+      return { status: 'done', output: map(job.output) };
+    default:
+      return {
+        status: 'failed',
+        message: job.error ?? `The job was ${job.status.toLowerCase().replace('_', ' ')}`,
+      };
+  }
+}
+
+function workerFile(asset: StoredAsset): WorkerFile {
+  if (asset.url) return { url: asset.url };
+  if (asset.base64) return { data: Buffer.from(asset.base64, 'base64') };
+  throw new Error(`Worker stored ${asset.key} without a public URL; set R2_PUBLIC_BASE_URL on it`);
+}
+
 function outputOf<T extends { error?: string }>(job: RemoteJob<T>): T {
   if (job.status !== 'COMPLETED' || !job.output) {
     throw new Error(job.error ?? `Job ${job.id} is ${job.status}`);
@@ -163,7 +241,8 @@ export function createSelfHostedProvider(
 ): SelfHostedProvider | null {
   const workersUrl = env['AI_WORKERS_URL']?.trim().replace(/\/+$/, '');
   if (workersUrl) {
-    const token = env['AI_WORKERS_TOKEN'];
+    // Trimmed like the job API trims its copy: a pasted token often ends in a line break
+    const token = env['AI_WORKERS_TOKEN']?.trim();
     if (!token) throw new Error('AI_WORKERS_URL is set but AI_WORKERS_TOKEN is not');
     return new SelfHostedProvider(
       new JobEndpoint(`${workersUrl}/trellis2`, token, fetchImpl),

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { prepareModel } from '@forge3d/engine';
 import type {
   ExperienceData,
   EntityData,
@@ -14,7 +15,15 @@ import type {
 export class SceneBuilder {
   private materialCache = new Map<string, THREE.Material>();
 
-  build(data: ExperienceData, scene: THREE.Scene): void {
+  /**
+   * `loadModel` loads the files of model entities (generated models); they appear when loaded.
+   * Without it those entities stay empty.
+   */
+  build(
+    data: ExperienceData,
+    scene: THREE.Scene,
+    loadModel?: (url: string) => Promise<THREE.Object3D>,
+  ): void {
     // Set background color
     const bg = data.environment.backgroundColor;
     scene.background = new THREE.Color(bg[0], bg[1], bg[2]);
@@ -29,6 +38,13 @@ export class SceneBuilder {
     for (const entity of data.scene.entities) {
       const obj = this.buildEntity(entity, data.scene.materials);
       entityMap.set(entity.id, obj);
+      const model = entity.components.model;
+      if (model && loadModel) {
+        loadModel(model.url).then(
+          (content) => obj.add(prepareModel(content)),
+          (error: unknown) => console.warn(`[orainge] couldn't load ${entity.name}:`, error),
+        );
+      }
     }
 
     // Establish hierarchy
