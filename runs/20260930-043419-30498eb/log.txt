@@ -1,0 +1,306 @@
+== Build the images (20-40 minutes the first time)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] download image ready after 0 s
+[orainge] api image ready after 0 s
+[orainge] reference image ready after 0 s
+Building image im-pmDjyKvDArRGEqHONMOG0v
+
+=> Step 0: FROM base
+
+=> Step 1: ENV CC=gcc
+
+=> Step 2: ENV CXX=g++
+
+=> Step 3: ENV LDSHARED='gcc -pthread -shared'
+
+=> Step 4: ENV LDCXXSHARED='g++ -pthread -shared'
+Saving image...
+Image saved, took 643.06ms
+
+Built image im-pmDjyKvDArRGEqHONMOG0v in 1.91s
+
+
+Building image im-9E2MylW8hbRn6yYZcvuBpl
+
+=> Step 0: FROM base
+
+=> Step 1: RUN git clone https://github.com/JeffreyXiang/CuMesh /tmp/CuMesh && git -C /tmp/CuMesh checkout 12289e1062f0603f2f0d0771b02e1395d247f26f && git -C /tmp/CuMesh submodule update --init --recursive
+Cloning into '/tmp/CuMesh'...
+Note: switching to '12289e1062f0603f2f0d0771b02e1395d247f26f'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at 12289e1 Merge pull request #29 from cuzelac/fix/blackwell-stream-sync-upstream
+Submodule 'third_party/cubvh' (https://github.com/JeffreyXiang/cubvh.git) registered for path 'third_party/cubvh'
+Cloning into '/tmp/CuMesh/third_party/cubvh'...
+Submodule path 'third_party/cubvh': checked out 'ce92267a24ef6ad7d2c8ccbc2ae2c021a6597e70'
+Submodule 'third_party/eigen' (https://gitlab.com/libeigen/eigen) registered for path 'third_party/cubvh/third_party/eigen'
+Cloning into '/tmp/CuMesh/third_party/cubvh/third_party/eigen'...
+warning: redirecting to https://gitlab.com/libeigen/eigen.git/
+Submodule path 'third_party/cubvh/third_party/eigen': checked out 'e63d9f6ccb7f6f29f31241b87c542f3f0ab3112b'
+
+=> Step 2: RUN python -m pip install /tmp/CuMesh --no-build-isolation --no-deps && rm -rf /tmp/CuMesh
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Processing ./tmp/CuMesh
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: cumesh
+  Building wheel for cumesh (pyproject.toml): started
+  Building wheel for cumesh (pyproject.toml): still running...
+  Building wheel for cumesh (pyproject.toml): still running...
+  Building wheel for cumesh (pyproject.toml): still running...
+  Building wheel for cumesh (pyproject.toml): still running...
+  Building wheel for cumesh (pyproject.toml): finished with status 'done'
+  Created wheel for cumesh: filename=cumesh-0.0.1-cp310-cp310-linux_x86_64.whl size=5393154 sha256=5370b13717b4d84e37c7c4c496718060ad21a6100f5cb070c2a3cfbe6dc2df24
+  Stored in directory: /tmp/pip-ephem-wheel-cache-ewds1hx9/wheels/1e/2a/94/782d5cb6935e9012aaf01e5ed7bc60b91c8b34e9c830dd0fd0
+Successfully built cumesh
+Installing collected packages: cumesh
+Successfully installed cumesh-0.0.1
+Saving image...
+Image saved, took 1.17s
+
+Built image im-9E2MylW8hbRn6yYZcvuBpl in 370.46s
+
+
+Building image im-H1LCIl4gmT8f0jJ6Ie8J2l
+
+=> Step 0: FROM base
+
+=> Step 1: RUN git clone https://github.com/JeffreyXiang/FlexGEMM /tmp/FlexGEMM && git -C /tmp/FlexGEMM checkout 6dd94a859c26ee8246888502eada3dd8ad85532e && git -C /tmp/FlexGEMM submodule update --init --recursive
+Cloning into '/tmp/FlexGEMM'...
+Note: switching to '6dd94a859c26ee8246888502eada3dd8ad85532e'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at 6dd94a8 Merge autotune cache on install instead of overwriting
+
+=> Step 2: RUN python -m pip install /tmp/FlexGEMM --no-build-isolation --no-deps && rm -rf /tmp/FlexGEMM
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Processing ./tmp/FlexGEMM
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: flex_gemm
+  Building wheel for flex_gemm (pyproject.toml): started
+  Building wheel for flex_gemm (pyproject.toml): still running...
+  Building wheel for flex_gemm (pyproject.toml): still running...
+  Building wheel for flex_gemm (pyproject.toml): finished with status 'done'
+  Created wheel for flex_gemm: filename=flex_gemm-1.0.0-cp310-cp310-linux_x86_64.whl size=499176 sha256=cfe43c587adddd869821e41a1c32e82ac4da44eef489d0f98bbbd2ba885b8566
+  Stored in directory: /tmp/pip-ephem-wheel-cache-hhaued4g/wheels/5a/62/a3/00bf13a0738d0c91ceea170fabf82e38ec9d86b0b87c436c0e
+Successfully built flex_gemm
+Installing collected packages: flex_gemm
+Successfully installed flex_gemm-1.0.0
+Saving image...
+Image saved, took 1.17s
+
+Built image im-H1LCIl4gmT8f0jJ6Ie8J2l in 317.73s
+
+
+Building image im-CUB2S9ASDCIIE5BMD7QV7y
+
+=> Step 0: FROM base
+
+=> Step 1: RUN python -m pip install /opt/trellis2/o-voxel --no-build-isolation --no-deps
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Processing ./opt/trellis2/o-voxel
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: o_voxel
+  Building wheel for o_voxel (pyproject.toml): started
+  Building wheel for o_voxel (pyproject.toml): still running...
+  Building wheel for o_voxel (pyproject.toml): finished with status 'done'
+  Created wheel for o_voxel: filename=o_voxel-0.0.1-cp310-cp310-linux_x86_64.whl size=305036 sha256=714ab028af623ff282e42ed09d6c097bf42601c031f3122ae0c26b5e249756a2
+  Stored in directory: /tmp/pip-ephem-wheel-cache-5lsgo31i/wheels/71/85/c4/fc5bf800fd6c6b2a792634e3c8d722e453f2bddc54a3260fc5
+Successfully built o_voxel
+Installing collected packages: o_voxel
+Successfully installed o_voxel-0.0.1
+Saving image...
+Image saved, took 1.72s
+
+Built image im-CUB2S9ASDCIIE5BMD7QV7y in 109.77s
+
+
+Building image im-GrOAjuDxuoV56KRlOvhC3C
+
+=> Step 0: FROM base
+
+=> Step 1: RUN curl -fsSL -o /tmp/gltfpack.zip https://github.com/zeux/meshoptimizer/releases/download/v1.3/gltfpack-ubuntu.zip && unzip /tmp/gltfpack.zip -d /usr/local/bin && chmod +x /usr/local/bin/gltfpack && rm /tmp/gltfpack.zip
+Archive:  /tmp/gltfpack.zip
+  inflating: /usr/local/bin/gltfpack  
+Saving image...
+Image saved, took 1.00s
+
+Built image im-GrOAjuDxuoV56KRlOvhC3C in 2.86s
+
+
+Building image im-mNCbwJFAqiBmYRj1QA9DrQ
+
+=> Step 0: FROM base
+
+=> Step 1: ENV ATTN_BACKEND=flash_attn
+
+=> Step 2: ENV HF_HUB_OFFLINE=1
+
+=> Step 3: ENV TRELLIS2_MODEL_DIR=/models/TRELLIS.2-4B
+
+=> Step 4: ENV TRELLIS2_LOW_VRAM=0
+Saving image...
+Image saved, took 1.58s
+
+Built image im-mNCbwJFAqiBmYRj1QA9DrQ in 3.13s
+
+
+[orainge] trellis2 image ready after 812 s
+
+== Download FLUX.1 [schnell] (needs its terms accepted on Hugging Face)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-LXI4CLYXTLYH6yLPITA2V6
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Created Function FluxSchnell.*.
+├── ✓ Created Function download_models.
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-ai-api-dev.modal.run (unauthenticated)
+├── ✓ Created Function make_model.
+└── ✓ Created Function Trellis2.*.
+httpx.HTTPStatusError: Client error '403 Forbidden' for url 'https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/741f7c3ce8b383c54771c7003378a50191e9efe9/.gitattributes'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/weights/reference.py", line 31, in <module>
+    main()
+  File "/root/weights/reference.py", line 19, in main
+    snapshot_download(
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_http.py", line 266, in _inner
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/_snapshot_download.py", line 532, in snapshot_download
+    hf_thread_map(
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/tqdm.py", line 441, in hf_thread_map
+    results[future_to_index[future]] = future.result()
+                                       ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/usr/local/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/_snapshot_download.py", line 512, in _inner_hf_hub_download
+    hf_hub_download(  # type: ignore
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/utils/_http.py", line 266, in _inner
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1026, in hf_hub_download
+    return _hf_hub_download_to_local_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1421, in _hf_hub_download_to_local_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "/usr/local/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1953, in _raise_on_head_call_error
+    raise head_call_error
+huggingface_hub.errors.GatedRepoError: 403 Client Error. (Request ID: Root=1-6abc90cb-3cb2f55a266364635aa58dfa;a63f1339-1cc0-434f-8db0-7fdbc99ae0c7)
+
+Cannot access gated repo for url https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/741f7c3ce8b383c54771c7003378a50191e9efe9/.gitattributes.
+Access to model black-forest-labs/FLUX.1-schnell is restricted and you are not in the authorized list. Visit https://huggingface.co/black-forest-labs/FLUX.1-schnell to ask for access.
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/container_io_manager.py", line 987, in handle_input_exception
+    yield
+  File "/pkg/modal/_container_entrypoint.py", line 189, in run_input_sync
+    values = io_context.call_function_sync()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/container_io_manager.py", line 266, in call_function_sync
+    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 260, in download_models
+    _download(name, force)
+  File "/root/modal_app.py", line 284, in _download
+    subprocess.run([sys.executable, script], env=env, check=True)
+  File "/usr/local/lib/python3.11/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/local/bin/python', '/root/weights/reference.py']' returned non-zero exit status 1.
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+│ Command '['/usr/local/bin/python', '/root/weights/reference.py']' returned   │
+│ non-zero exit status 1.                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+FLUX download failed (exit 1)
+
+== Download TRELLIS.2 (DINOv3 needs Meta's approval; finished files are kept either way)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-o91pa5RZc8iZzlH5rUzU4P
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Created Function FluxSchnell.*.
+├── ✓ Created Function make_model.
+├── ✓ Created Function download_models.
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-ai-api-dev.modal.run (unauthenticated) 
+│       (label stolen)
+└── ✓ Created Function Trellis2.*.
+Models ready in /models
+[modal-client] 2026-09-30T04:34:18+0000 Timed out waiting for final app logs.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-o91pa5RZc8iZzlH5rUzU4P
+
+== Status
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+Weights trellis2: ready
+Weights reference: not downloaded yet
+Job API: not deployed (modal deploy workers/modal_app.py)
+Runs: none yet
+exit status: 0
