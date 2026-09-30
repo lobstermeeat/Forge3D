@@ -233,7 +233,8 @@ WEIGHT_SCRIPTS = {"trellis2": "/root/weights/trellis2.py", "reference": "/root/w
 @app.function(
     image=download_image,
     volumes={MODELS: models},
-    secrets=[modal.Secret.from_name("huggingface", required_keys=["HF_TOKEN"])],
+    # The name Modal's Hugging Face secret template suggests
+    secrets=[modal.Secret.from_name("huggingface-secret", required_keys=["HF_TOKEN"])],
     cpu=2.0,
     timeout=3 * 3600,  # generous for slow Hugging Face transfers; an interrupted run resumes
 )

@@ -92,12 +92,13 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
    sends it with every request:
 
    ```sh
-   modal secret create huggingface HF_TOKEN=hf_…
+   modal secret create huggingface-secret HF_TOKEN=hf_…
    python -c "import secrets; print(secrets.token_urlsafe(32))"
    modal secret create orainge-worker-token ORAINGE_WORKER_TOKEN=<the printed value>
    ```
 
-   (You can also create them in the Modal dashboard under Secrets.)
+   (You can also create them in the Modal dashboard under Secrets; its Hugging Face template
+   makes `huggingface-secret` with the key `HF_TOKEN`.)
 
 4. Build and deploy. This is the only step that needs this computer online: it takes 20–40
    minutes the first time (the TRELLIS.2 image compiles CUDA extensions). If the connection
