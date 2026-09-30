@@ -380,6 +380,12 @@ def test_the_starter_set_is_valid():
     assert all(modal_app.RUN_NAME.fullmatch(name) for name in names)
 
 
+def test_the_renders_set_lists_its_images():
+    runs = modal_app.read_set(WORKERS / "test-sets" / "renders.txt")
+    assert len(runs) == 6 and all(run["image"].is_file() for run in runs)
+    assert modal_app.set_run_names("renders", runs)[0] == "renders-01-lantern"
+
+
 def test_set_arguments_continue_runs_already_started(tmp_path):
     photo = tmp_path / "chair.jpg"
     photo.write_bytes(b"jpeg")
