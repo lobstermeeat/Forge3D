@@ -4,7 +4,8 @@
 #
 # Needs the repository secrets MODAL_TOKEN_ID and MODAL_TOKEN_SECRET (Modal > Settings >
 # API Tokens). Only people who can push to this repository can start it. In a public
-# repository the ai-results branch is public too; tokens are scrubbed from what it saves.
+# repository the ai-results branch is public too: tokens are scrubbed from what it saves, and
+# ops-out/private/ is saved only encrypted (see ops/seal.sh).
 name: AI ops (Modal)
 
 on:
@@ -64,6 +65,8 @@ jobs:
                       text = text.replace(secret, "***")
                   path.write_text(text)
           PY
+          # Never save private results in the clear, even if encrypting them fails
+          bash ops/seal.sh seal ops-out || { echo "Not saved: ops-out/private/"; rm -rf ops-out/private ops-out/private.*; }
           run_dir="runs/$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
