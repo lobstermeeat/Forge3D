@@ -99,30 +99,9 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
 
    (You can also create them in the Modal dashboard under Secrets.)
 
-4. Download the weights into the `orainge-models` volume. This runs on a CPU and fetches about
-   50 GB. The first `modal run` also builds the images, which takes 20–40 minutes once (the
-   TRELLIS.2 image compiles CUDA extensions); later runs reuse them.
-
-   ```sh
-   modal run workers/modal_app.py::download_models
-   ```
-
-   `--which reference` fetches only FLUX (while Meta reviews your DINOv3 request, say) and
-   `--which trellis2` only TRELLIS.2. Running it again skips weights that are already there.
-
-5. Try it. `try_prompt` saves images in the current folder, `try_image` saves the GLB next to
-   its image, and a preview prints the command that makes its final:
-
-   ```sh
-   modal run workers/modal_app.py::try_prompt --prompt "a brass pocket watch"
-   modal run workers/modal_app.py::try_image --image reference-123.png
-   modal run workers/modal_app.py::try_image --image reference-123.png --mode final --seed 42
-   ```
-
-   The GLBs are meshopt/KTX2-compressed, so open them in the Orainge editor (File › Import
-   model) or another viewer that supports those extensions.
-
-6. Deploy the job API:
+4. Build and deploy. This is the only step that needs this computer online: it takes 20–40
+   minutes the first time (the TRELLIS.2 image compiles CUDA extensions). If the connection
+   drops, run it again; finished build steps are kept.
 
    ```sh
    modal deploy workers/modal_app.py
@@ -130,6 +109,32 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
 
    Give the server the URL it prints (`https://<workspace>--orainge-ai-api.modal.run`) as
    `AI_WORKERS_URL` and the same token as `AI_WORKERS_TOKEN` (see `.env.example`).
+
+5. Make a model. This runs entirely in Modal's cloud, and with `--detach` it keeps going if
+   this computer sleeps or goes offline:
+
+   ```sh
+   modal run --detach workers/modal_app.py::make --prompt "a brass pocket watch" --final
+   ```
+
+   The first run downloads the weights (about 50 GB, 10–30 minutes) into the `orainge-models`
+   volume; later runs start within a couple of minutes. Each step is saved in the
+   `orainge-outputs` volume under the run's name: the reference images, `preview-<seed>.glb`,
+   `final-<seed>.glb` and `progress.json`. If you are still connected at the end, they are also
+   copied to `orainge-outputs/<run>/` here.
+
+   | To…                                  | Run                                                                          |
+   | ------------------------------------ | ---------------------------------------------------------------------------- |
+   | See what's ready, running or failed  | `python workers/modal_app.py status`                                         |
+   | Continue an unfinished run           | `modal run --detach workers/modal_app.py::make --run <name>`                 |
+   | Make the final of a previewed run    | the same, with `--final`                                                     |
+   | Start from your own image            | `make --image photo.png` instead of `--prompt`                               |
+   | Download a run                       | `modal volume get orainge-outputs <name> .`                                  |
+   | Fetch FLUX while Meta reviews DINOv3 | `modal run --detach workers/modal_app.py::download_models --which reference` |
+
+   A continued run skips every finished step, so finished work is never paid for twice. The GLBs are
+   meshopt/KTX2-compressed: open them in the Orainge editor (File › Import model) or another
+   viewer that supports those extensions.
 
 **Settings** (in `modal_app.py`): both workers run on an L40S (48 GB), scale to zero, stay warm
 for 60 s after their last job (idle time is billed; a cold start takes about a minute) and are
