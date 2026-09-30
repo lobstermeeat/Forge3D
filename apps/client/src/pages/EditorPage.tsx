@@ -263,12 +263,14 @@ export function EditorPage() {
         play={play}
         stop={stop}
         paint={paint}
-        selection={selected ? { id: selected.id, editable: !!selectedMaterial, isModel: selectionInfo?.kind === 'model' || selectionInfo?.kind === 'mesh' } : null}
+        selection={selected ? { id: selected.id, editable: !!selectedMaterial, isModel: (selectionInfo?.kind === 'model' || selectionInfo?.kind === 'mesh') && !selected.hasComponent('model') } : null}
         onRequestImport={requestImport}
       />
 
       <div className="f3-main">
-        {panels.library && <LibraryPanel actions={editorActions} onRequestImport={requestImport} />}
+        {panels.library && (
+          <LibraryPanel sceneId={sceneId} actions={editorActions} onRequestImport={requestImport} />
+        )}
 
         <div className="f3-center">
           <div

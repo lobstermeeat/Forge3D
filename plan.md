@@ -131,14 +131,14 @@ Login page exists but bypasses auth entirely.
 ### P2 — Nice to Have
 
 #### 10. AI 3D Generation Panel
-- [ ] AI panel component in sidebar
-- [ ] Text prompt input for text-to-3D
-- [ ] Image upload for image-to-3D
-- [ ] Reference-image picker for text prompts (FLUX.1 [schnell] worker)
-- [ ] Preview (512³) → keep → final (1024³) flow, reusing the preview seed
-- [ ] Show the provider's credits ("Built with DINOv3") next to generated models
-- [ ] Progress bar during generation
-- [ ] Auto-import generated model into scene
+- [x] AI panel component in sidebar (Library › AI, and Home › Insert › AI model)
+- [x] Text prompt input for text-to-3D
+- [x] Image upload for image-to-3D
+- [x] Reference-image picker for text prompts (FLUX.1 [schnell] worker)
+- [x] Preview (512³) → keep → final (1024³) flow, reusing the preview seed
+- [x] Show the provider's credits ("Built with DINOv3") next to generated models
+- [x] Progress bar during generation
+- [x] Auto-import generated model into scene (saved by URL, so it survives reloads and publishing)
 
 #### 11. Asset Library
 - [ ] Asset panel in sidebar

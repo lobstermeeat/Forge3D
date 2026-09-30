@@ -180,6 +180,24 @@ ORAINGE_R2_SECRET=orainge-r2 modal deploy workers/modal_app.py
 In PowerShell the second line is `$env:ORAINGE_R2_SECRET = "orainge-r2"; modal deploy workers/modal_app.py`.
 `modal deploy` prints which storage the workers use, so a deploy without R2 doesn't go unnoticed.
 
+## The Studio's AI panel
+
+Library › AI (or Home › Insert › AI model) in Orainge Studio runs the flow above: describe an
+object or upload a photo, pick one of the four pictures, get a preview placed in the scene, and
+keep it to replace the preview with the final where it stands. Scenes store models by URL (the
+`model` component), so they survive saving, reloading, collaboration and publishing.
+
+The server needs `AI_WORKERS_URL` and `AI_WORKERS_TOKEN` (Modal, above) or the RunPod variables,
+and the `ai_generations` table as in `apps/server/src/db/schema.ts`
+(`pnpm --filter @forge3d/server exec drizzle-kit push` in development). Pictures and models are
+copied into the server's storage (`UPLOAD_DIR`), so they outlive the workers' outputs. Each
+user can have 3 models in progress and 30 an hour until credits exist
+(`apps/server/src/services/ai/studio.ts`).
+
+To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
+labelled pictures and return a small house model after a second or two. A prompt with the word
+"fail", or a photo under 64 px, shows the error states. It refuses to run in production.
+
 ## Deploying on RunPod
 
 1. Hugging Face access as in Modal step 1.

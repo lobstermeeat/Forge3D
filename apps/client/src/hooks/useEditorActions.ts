@@ -9,13 +9,19 @@ import {
   importGroupToScene,
 } from '@forge3d/engine';
 import type { CommandHistory, SceneBridge, SceneManager, ViewportControls } from '@forge3d/engine';
-import type { LightData, MeshRendererData, TransformData } from '@forge3d/shared';
+import type {
+  EntityData,
+  LightData,
+  MeshRendererData,
+  ModelData,
+  TransformData,
+} from '@forge3d/shared';
 import { DEFAULT_TRANSFORM, generateId } from '@forge3d/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import type { CameraView } from '@/stores/editorStore';
 import { logOutput } from '@/stores/outputStore';
 import { useAssetStore } from '@/stores/assetStore';
-import { AddSnapshotCommand } from '@/editor/commands';
+import { AddSnapshotCommand, SetModelCommand } from '@/editor/commands';
 import {
   freeSpot,
   groundPointAt,
@@ -42,6 +48,9 @@ const LIGHT_LABEL: Record<LightData['type'], string> = {
   ambient: 'Ambient Light',
   spot: 'Spot Light',
 };
+
+/** Generated models are about 1 unit across; this makes them about a part and a half. */
+const MODEL_SCALE: [number, number, number] = [1.5, 1.5, 1.5];
 
 function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
@@ -120,6 +129,44 @@ function createActions(d: ActionDeps) {
       history.execute(cmd);
       select(cmd.getEntityId());
       logOutput('ok', `Inserted ${LIGHT_LABEL[type]}`);
+    },
+
+    /**
+     * Places a model file (a generated model) on the ground in view, or at `at`. Model files
+     * rest on their entity's origin by their base, so the entity just stands on the ground.
+     */
+    insertModel(model: ModelData, name: string, at?: THREE.Vector3): string {
+      const p = spawnPoint(at);
+      const data: EntityData = {
+        id: generateId(),
+        name,
+        components: {
+          transform: { ...DEFAULT_TRANSFORM, position: [p.x, 0, p.z], scale: [...MODEL_SCALE] },
+          model: structuredClone(model),
+        },
+      };
+      const cmd = new AddSnapshotCommand(sceneManager, data);
+      history.execute(cmd);
+      select(cmd.getEntityId());
+      logOutput('ok', `Placed ${name}${model.quality === 'preview' ? ' (preview)' : ''}`);
+      return cmd.getEntityId();
+    },
+
+    /** Points a model entity at another file, keeping where it stands (undoable). */
+    replaceModel(entityId: string, model: ModelData) {
+      const entity = sceneManager.getEntity(entityId);
+      const before = entity?.getComponent<ModelData>('model');
+      if (!entity || !before || before.url === model.url) return;
+      history.execute(new SetModelCommand(sceneManager, entityId, before, model));
+      logOutput('ok', `${entity.name} now uses its ${model.quality ?? 'new'} model`);
+    },
+
+    /** The scene's entity showing a model from this AI generation, if any. */
+    findModelEntity(generationId: string): string | null {
+      const match = sceneManager
+        .getAllEntities()
+        .find((e) => e.getComponent<ModelData>('model')?.generationId === generationId);
+      return match?.id ?? null;
     },
 
     async importModel(file: File, opts: { remember?: boolean } = {}) {
