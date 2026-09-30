@@ -96,7 +96,7 @@ export const aiGenerations = pgTable('ai_generations', {
   userId: text('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  provider: text('provider').notNull(), // tripo, meshy, rodin, hunyuan
+  provider: text('provider').notNull(), // e.g. forge3d-trellis2 (self-hosted, see workers/)
   prompt: text('prompt'),
   imageUrl: text('image_url'),
   status: text('status').notNull().default('pending'), // pending, processing, completed, failed

@@ -59,6 +59,7 @@ export function useEngine(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
   const getScene = useCallback(() => rendererRef.current?.scene ?? null, []);
   const getCamera = useCallback(() => rendererRef.current?.camera ?? null, []);
+  const getRenderer = useCallback(() => rendererRef.current?.getThreeRenderer() ?? null, []);
 
   /** Run `cb` every rendered frame, before the frame is drawn. Returns an unsubscribe. */
   const addFrameCallback = useCallback((cb: FrameCallback) => {
@@ -86,6 +87,7 @@ export function useEngine(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     ready,
     getScene,
     getCamera,
+    getRenderer,
     addFrameCallback,
     setGridVisible,
     setPlayPreview,

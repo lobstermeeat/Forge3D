@@ -1,0 +1,95 @@
+# Runs Modal commands for the AI workers on GitHub's servers, so nothing depends on a laptop
+# staying online. Push a commit to the ai-ops branch and this runs its ops/run.sh; the log and
+# anything the script writes to ops-out/ are saved under runs/<id>/ in refs/ops/results, a ref
+# that isn't a branch, so hosting integrations such as Vercel don't try to deploy it. Read it with
+#   git fetch origin refs/ops/results && git show FETCH_HEAD:runs/<id>/log.txt
+#
+# Needs the repository secrets MODAL_TOKEN_ID and MODAL_TOKEN_SECRET (Modal > Settings >
+# API Tokens). Only people who can push to this repository can start it. In a public
+# repository the results are public too: tokens are scrubbed from what is saved, and
+# ops-out/private/ is saved only encrypted (see ops/seal.sh).
+name: AI ops (Modal)
+
+on:
+  push:
+    branches: [ai-ops]
+  workflow_dispatch:
+
+concurrency:
+  group: ai-ops
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r workers/requirements-dev.txt
+
+      - name: Run ops/run.sh
+        shell: bash
+        run: |
+          mkdir -p ops-out
+          if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ]; then
+            # Not an error yet: the run still records that the relay works
+            echo "Skipped: add MODAL_TOKEN_ID and MODAL_TOKEN_SECRET under Settings > Secrets and variables > Actions" | tee ops-out/log.txt
+            exit 0
+          fi
+          set +e
+          bash ops/run.sh 2>&1 | tee ops-out/log.txt
+          status=${PIPESTATUS[0]}
+          echo "exit status: $status" | tee -a ops-out/log.txt
+          exit $status
+
+      - name: Save the log and results in refs/ops/results
+        if: always()
+        shell: bash
+        run: |
+          # GitHub masks secrets in its own log, but not in files this job commits
+          python3 - <<'PY'
+          import os, pathlib
+          secrets = [v for v in (os.environ.get("MODAL_TOKEN_ID"), os.environ.get("MODAL_TOKEN_SECRET")) if v]
+          for path in pathlib.Path("ops-out").rglob("*"):
+              if path.is_file() and path.suffix in {".txt", ".log", ".json", ".md", ".sh"}:
+                  text = path.read_text(errors="replace")
+                  for secret in secrets:
+                      text = text.replace(secret, "***")
+                  path.write_text(text)
+          PY
+          # Never save private results in the clear, even if encrypting them fails
+          bash ops/seal.sh seal ops-out || { echo "Not saved: ops-out/private/"; rm -rf ops-out/private ops-out/private.*; }
+          run_dir="runs/$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Earlier results were kept on the ai-results branch; they carry on in the new ref
+          if git fetch --depth=1 origin +refs/ops/results:refs/remotes/origin/ops-results ||
+            git fetch --depth=1 origin +refs/heads/ai-results:refs/remotes/origin/ops-results; then
+            git worktree add --detach results origin/ops-results
+          else
+            git worktree add --detach results
+            git -C results checkout --orphan ops-results
+            git -C results rm -rfq .
+          fi
+          mkdir -p "results/$run_dir"
+          cp -r ops-out/. "results/$run_dir/"
+          cp ops/run.sh "results/$run_dir/run.sh"
+          git -C results add -A
+          git -C results commit -qm "ops: $run_dir (${{ job.status }})"
+          if git -C results push origin HEAD:refs/ops/results; then
+            echo "Saved to refs/ops/results: $run_dir"
+          else
+            # Keep the results even if the ref is refused
+            git -C results push origin HEAD:refs/heads/ai-results
+            echo "Saved to the ai-results branch: $run_dir"
+          fi

@@ -11,3 +11,14 @@ Thumbs.db
 drizzle/meta/
 uploads/
 *.tsbuildinfo
+
+# Python (AI workers)
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# AI results: what make/make_set copy here, galleries, and what ops scripts write
+/orainge-outputs/
+/gallery/
+/ops-out/

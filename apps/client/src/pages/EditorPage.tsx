@@ -11,6 +11,7 @@ import { OutputPanel } from '@/components/OutputPanel';
 import { StatusBar } from '@/components/StatusBar';
 import { ViewportOverlay } from '@/components/ViewportOverlay';
 import { PublishDialog } from '@/components/PublishDialog';
+import { AboutDialog } from '@/components/AboutDialog';
 import { CursorOverlay } from '@/components/CursorOverlay';
 import { IconSprite } from '@/editor/Icon';
 import { describeEntity } from '@/editor/entityInfo';
@@ -37,6 +38,8 @@ export function EditorPage() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const sceneLoadedRef = useRef(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const closeAbout = useCallback(() => setAboutOpen(false), []);
   const [dropActive, setDropActive] = useState(false);
 
   const engine = useEngine(canvasRef);
@@ -48,6 +51,7 @@ export function EditorPage() {
     ready,
     getScene,
     getCamera,
+    getRenderer,
     addFrameCallback,
     setGridVisible,
     setPlayPreview,
@@ -107,6 +111,7 @@ export function EditorPage() {
     bridge,
     controls,
     getCamera,
+    getRenderer,
     onSelectionChange: updateSelection,
   });
   actionsRef.current = editorActions;
@@ -240,6 +245,7 @@ export function EditorPage() {
         canPublish={!!sceneId}
         onPublish={() => setPublishOpen(true)}
         onRequestImport={requestImport}
+        onAbout={() => setAboutOpen(true)}
         actions={editorActions}
         collab={collab ? { connected: collab.connected, peers: collab.peers } : null}
       />
@@ -336,6 +342,8 @@ export function EditorPage() {
           if (file) void editorActions.importModel(file);
         }}
       />
+
+      <AboutDialog open={aboutOpen} onClose={closeAbout} />
 
       {sceneId && (
         <PublishDialog
