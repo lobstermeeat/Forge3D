@@ -5,9 +5,10 @@ glance.
 
     python workers/gallery/make_gallery.py <folder with runs> -o <output folder> --title "..."
 
-The input is any folder holding run folders (each with its progress.json), such as a
-`modal volume get orainge-outputs` download or a checkout of the ai-results branch. The output
-is index.html plus img/, ready to publish as one page.
+The input is any folder holding run folders (each with its progress.json), such as the
+orainge-outputs/ folder that make and make_set fill. The output is index.html with img/, plus
+each final GLB in models/ for the page's 3D viewer (--no-3d leaves them out), ready to publish as
+one page. The viewer loads three.js from jsDelivr, so the page must be served over http(s).
 
 Needs Playwright's Chromium (pip install playwright && playwright install chromium) and the
 repository's node_modules (pnpm install), which provide three.js and its decoders.
@@ -22,6 +23,7 @@ import http.server
 import io
 import json
 import pathlib
+import shutil
 import statistics
 import threading
 import time
@@ -78,6 +80,8 @@ class Model:
     megabytes: Optional[float] = None
     gpu_seconds: Optional[float] = None
     seconds: Optional[float] = None
+    viewer: Optional[str] = None  # the copy the page's 3D viewer opens
+    timings: dict = field(default_factory=dict)  # the worker's seconds per stage
 
 
 @dataclass
@@ -159,6 +163,7 @@ def load_runs(root: pathlib.Path, out: pathlib.Path) -> list[tuple[Run, pathlib.
                             megabytes=round((folder / name).stat().st_size / 1e6, 2),
                             gpu_seconds=info.get("gpu_seconds"),
                             seconds=info.get("seconds"),
+                            timings=info.get("timings") or {},
                         )
                     )
         runs.append((run, folder))
@@ -206,7 +211,7 @@ def _median(values: list[float]) -> Optional[float]:
     return statistics.median(values) if values else None
 
 
-def page(runs: list[Run], title: str, subtitle: str) -> str:
+def page(runs: list[Run], title: str, subtitle: str, three_version: Optional[str] = None) -> str:
     e = html.escape
     finals = [m for r in runs for m in r.models if m.mode == "final"]
     previews = [m for r in runs for m in r.models if m.mode == "preview"]
@@ -229,12 +234,16 @@ def page(runs: list[Run], title: str, subtitle: str) -> str:
         )
         models = []
         for model in sorted(run.models, key=lambda m: m.mode != "final"):
+            # Hovering the GPU time shows where it went (generate, export, compress, upload)
+            stages = ", ".join(f"{k.removesuffix('_s')} {v:.0f} s" for k, v in model.timings.items())
             facts = " · ".join(
                 x
                 for x in (
-                    f"{model.triangles:,}\u00a0triangles" if model.triangles else "",
-                    f"{model.megabytes}\u00a0MB" if model.megabytes else "",
-                    f"{_seconds(model.gpu_seconds)}\u00a0GPU" if model.gpu_seconds else "",
+                    e(f"{model.triangles:,}\u00a0triangles") if model.triangles else "",
+                    e(f"{model.megabytes}\u00a0MB") if model.megabytes else "",
+                    f'<span title="{e(stages)}">{e(_seconds(model.gpu_seconds))}\u00a0GPU</span>'
+                    if model.gpu_seconds
+                    else "",
                 )
                 if x
             )
@@ -244,9 +253,16 @@ def page(runs: list[Run], title: str, subtitle: str) -> str:
                 if model.strip
                 else '<p class="missing">Not rendered</p>'
             )
+            view = (
+                f'<button type="button" class="view3d" data-model="{e(model.viewer)}" '
+                f'data-title="{e(run.subject)}">View in 3D</button>'
+                if model.viewer
+                else ""
+            )
             models.append(
                 f'<figure class="model {e(model.mode)}"><div class="strip">{strip}</div>'
-                f"<figcaption><b>{e(model.mode.capitalize())}</b> {e(facts)}</figcaption></figure>"
+                f"<figcaption><span><b>{e(model.mode.capitalize())}</b> {facts}</span>{view}</figcaption>"
+                "</figure>"
             )
         status = (
             '<span class="chip fail">Failed</span>'
@@ -260,10 +276,34 @@ def page(runs: list[Run], title: str, subtitle: str) -> str:
             f'<p class="meta"><span>{e(run.name)}</span><span>GPU ${run.cost:.3f}</span></p></article>'
         )
     stats = "".join(f"<div><dt>{e(k)}</dt><dd>{e(v)}</dd></div>" for k, v in summary)
-    return TEMPLATE.format(title=e(title), subtitle=e(subtitle), stats=stats, cards="".join(cards))
+    body = TEMPLATE.format(title=e(title), subtitle=e(subtitle), stats=stats, cards="".join(cards))
+    if three_version and any(m.viewer for r in runs for m in r.models):
+        body += VIEWER.replace("__THREE__", three_version)
+    return body
 
 
-TEMPLATE = """<title>{title}</title>
+def copy_models(runs: list[tuple[Run, pathlib.Path]], root: pathlib.Path, out: pathlib.Path) -> Optional[str]:
+    """
+    Copies each final GLB next to the page, with the KTX2 transcoder the page's viewer needs,
+    and returns the three.js version the viewer should load (None when there is nothing to view).
+    """
+    finals = [(run, model) for run, _ in runs for model in run.models if model.mode == "final"]
+    if not finals:
+        return None
+    (out / "models").mkdir(parents=True, exist_ok=True)
+    for run, model in finals:
+        model.viewer = f"models/{run.name}-final.glb"
+        shutil.copyfile(root / model.file, out / model.viewer)
+    basis = out / "vendor" / "basis"
+    basis.mkdir(parents=True, exist_ok=True)
+    for name in ("basis_transcoder.js", "basis_transcoder.wasm"):
+        shutil.copyfile(three_dir() / "examples" / "jsm" / "libs" / "basis" / name, basis / name)
+    return json.loads((three_dir() / "package.json").read_text())["version"]
+
+
+TEMPLATE = """<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Barlow:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -307,7 +347,8 @@ h1 {{ margin: 0; font: 600 clamp(28px, 4vw, 40px)/1.1 var(--display); text-wrap:
 .strip {{ overflow-x: auto; border-radius: 8px; background: var(--stage); }}
 .strip img {{ display: block; width: 100%; min-width: 720px; height: auto; }}
 .model.preview .strip img {{ min-width: 540px; }}
-figcaption {{ font: 400 13px/1.4 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }}
+figcaption {{ display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px;
+  font: 400 13px/1.4 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }}
 figcaption b {{ color: var(--ink); font-weight: 500; margin-right: 6px; }}
 .error {{ margin: 0; font: 400 13px/1.4 var(--mono); color: var(--bad); overflow-wrap: anywhere; }}
 .missing {{ margin: 0; padding: 24px; color: var(--muted); }}
@@ -327,6 +368,160 @@ footer {{ font-size: 13px; color: var(--muted); }}
 """
 
 
+# A viewer for the finals, appended when they are copied next to the page. three.js comes from
+# jsDelivr (the same version the renderer used); the KTX2 transcoder is served with the page.
+# The buttons stay hidden unless the viewer loads, so the page never offers a dead control.
+VIEWER = """
+<dialog id="viewer" aria-labelledby="viewer-title">
+  <header>
+    <h2 id="viewer-title">Model</h2>
+    <div class="tools">
+      <button type="button" id="viewer-spin" aria-pressed="true">Turning</button>
+      <button type="button" id="viewer-wire" aria-pressed="false">Wireframe</button>
+      <button type="button" id="viewer-close">Close</button>
+    </div>
+  </header>
+  <canvas id="viewer-stage"></canvas>
+  <p id="viewer-status" role="status"></p>
+</dialog>
+<style>
+.view3d { display: none; font: 500 12px/1 var(--mono); color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 999px; padding: 7px 11px; cursor: pointer; }
+:root[data-viewer="ready"] .view3d { display: inline-block; }
+.view3d:hover, .view3d:focus-visible, #viewer button:hover, #viewer button:focus-visible { border-color: var(--accent); color: var(--accent); }
+:is(.view3d, #viewer button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#viewer { width: min(960px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--panel); color: var(--ink); overflow: hidden; }
+#viewer::backdrop { background: rgb(10 10 12 / .6); }
+#viewer header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 14px; }
+#viewer h2 { margin: 0; font: 600 18px/1.2 var(--display); min-width: 0; }
+#viewer .tools { display: flex; flex-wrap: wrap; gap: 6px; }
+#viewer button { font: 500 12px/1 var(--mono); color: var(--ink); background: transparent; border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 11px; cursor: pointer; }
+#viewer button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+#viewer-stage { display: block; width: 100%; aspect-ratio: 4 / 3; max-height: calc(100dvh - 150px); background: var(--stage); touch-action: none; }
+#viewer-status { margin: 0; padding: 10px 14px 14px; font: 400 13px/1.4 var(--mono); color: var(--muted); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@__THREE__/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@__THREE__/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const dialog = document.getElementById('viewer');
+const canvas = document.getElementById('viewer-stage');
+const heading = document.getElementById('viewer-title');
+const status = document.getElementById('viewer-status');
+const spin = document.getElementById('viewer-spin');
+const wire = document.getElementById('viewer-wire');
+let renderer, scene, camera, controls, loader, model, frame, loading = 0;
+
+function setup() {
+  // The same lighting and tone mapping as the editor and the turntables
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x24252c);
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  camera = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.autoRotate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  spin.setAttribute('aria-pressed', String(controls.autoRotate));
+  const ktx2 = new KTX2Loader().setTranscoderPath('vendor/basis/').detectSupport(renderer);
+  loader = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder);
+}
+
+function draw() {
+  frame = requestAnimationFrame(draw);
+  const width = canvas.clientWidth, height = canvas.clientHeight;
+  if (canvas.width !== Math.round(width * renderer.getPixelRatio()) || canvas.height !== Math.round(height * renderer.getPixelRatio())) {
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  }
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function clear() {
+  if (!model) return;
+  scene.remove(model);
+  model.traverse((object) => {
+    if (!object.isMesh) return;
+    object.geometry.dispose();
+    for (const material of [object.material].flat()) {
+      for (const value of Object.values(material)) if (value && value.isTexture) value.dispose();
+      material.dispose();
+    }
+  });
+  model = null;
+}
+
+async function show(button) {
+  if (!renderer) setup();
+  const ticket = ++loading;
+  heading.textContent = button.dataset.title;
+  status.textContent = 'Loading the model…';
+  wire.setAttribute('aria-pressed', 'false');
+  clear();
+  dialog.showModal();
+  cancelAnimationFrame(frame);
+  draw();
+  try {
+    const gltf = await loader.loadAsync(button.dataset.model);
+    if (ticket !== loading || !dialog.open) return;
+    model = gltf.scene;
+    const sphere = new THREE.Box3().setFromObject(model).getBoundingSphere(new THREE.Sphere());
+    model.position.sub(sphere.center);
+    scene.add(model);
+    const distance = (sphere.radius / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.1;
+    camera.near = distance / 100;
+    camera.far = distance * 10;
+    camera.position.set(Math.SQRT1_2, 0.4, Math.SQRT1_2).normalize().multiplyScalar(distance);
+    controls.target.set(0, 0, 0);
+    controls.minDistance = distance * 0.15;
+    controls.maxDistance = distance * 4;
+    controls.update();
+    let triangles = 0;
+    model.traverse((object) => {
+      if (object.isMesh) triangles += (object.geometry.index ? object.geometry.index.count : object.geometry.attributes.position.count) / 3;
+    });
+    status.textContent = `${Math.round(triangles).toLocaleString()} triangles. Drag to turn, scroll or pinch to zoom.`;
+  } catch (error) {
+    if (ticket === loading) status.textContent = `This model couldn't be shown here (${error.message || error}). Its turntable on the page shows the same model.`;
+  }
+}
+
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('button.view3d');
+  if (button) show(button);
+});
+dialog.addEventListener('close', () => { loading++; cancelAnimationFrame(frame); clear(); });
+document.getElementById('viewer-close').addEventListener('click', () => dialog.close());
+spin.addEventListener('click', () => {
+  controls.autoRotate = !controls.autoRotate;
+  spin.setAttribute('aria-pressed', String(controls.autoRotate));
+});
+wire.addEventListener('click', () => {
+  const on = wire.getAttribute('aria-pressed') !== 'true';
+  wire.setAttribute('aria-pressed', String(on));
+  model?.traverse((object) => { if (object.isMesh) for (const material of [object.material].flat()) material.wireframe = on; });
+});
+document.documentElement.dataset.viewer = 'ready';
+</script>
+"""
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("runs", type=pathlib.Path, help="folder holding run folders with progress.json")
@@ -337,13 +532,15 @@ def main() -> None:
         default="Each prompt's reference images (the one used for 3D is outlined), then its final and preview "
         "turned through six angles. Would you publish the final as it stands?",
     )
+    parser.add_argument("--no-3d", action="store_true", help="leave out the final GLBs and the 3D viewer")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     runs = load_runs(args.runs, args.out)
     if not runs:
         raise SystemExit(f"No runs (progress.json) under {args.runs}")
     render_models(runs, args.runs, args.out)
-    (args.out / "index.html").write_text(page([run for run, _ in runs], args.title, args.subtitle))
+    three_version = None if args.no_3d else copy_models(runs, args.runs, args.out)
+    (args.out / "index.html").write_text(page([run for run, _ in runs], args.title, args.subtitle, three_version))
     print(f"Wrote {args.out / 'index.html'} with {len(runs)} runs")
 
 
