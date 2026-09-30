@@ -18,5 +18,6 @@ fi
 
 echo "== Gallery: $title"
 out="ops-out/private/$(basename "$runs")"
-python workers/gallery/make_gallery.py "$runs" -o "$out" --title "$title" "${subtitle[@]}"
+# GLBs as base64 text: the galleries are published as Claude artifacts, which serve only web types
+python workers/gallery/make_gallery.py "$runs" -o "$out" --title "$title" "${subtitle[@]}" --glb-as-text
 du -sh "$out"
