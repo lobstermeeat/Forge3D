@@ -1,10 +1,12 @@
 """The RunPod-compatible job API in front of the Modal workers, with fake Modal calls."""
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
+import job_api
 from job_api import (
     JobCancelled,
     JobFailed,
@@ -27,6 +29,8 @@ class FakeCalls:
         self.outcomes = {}  # job id -> output, or an exception to raise; missing means still running
         self.waits = []
         self.cancelled = []
+        self.warmed = []
+        self.down = False  # Modal can't be reached
 
     def spawn(self, worker, job):
         if job["input"].get("prompt") == "modal is down":
@@ -46,6 +50,11 @@ class FakeCalls:
             raise JobNotFound(job_id)
         self.cancelled.append(job_id)
 
+    def warm(self, worker):
+        if self.down:
+            raise WorkersUnavailable("ServiceError: unavailable")
+        self.warmed.append(worker)
+
 
 @pytest.fixture
 def calls():
@@ -64,7 +73,8 @@ def test_every_route_needs_the_token(client, calls):
     assert client.post("/trellis2/run", json={"input": {}}).status_code == 401
     assert client.get("/trellis2/status/fc-1").status_code == 401
     assert client.post("/trellis2/cancel/fc-1").status_code == 401
-    assert calls.spawned == [] and calls.cancelled == []
+    assert client.post("/trellis2/warm").status_code == 401
+    assert calls.spawned == [] and calls.cancelled == [] and calls.warmed == []
     assert client.get("/", headers=AUTH).json() == {"workers": ["trellis2", "reference"]}
 
 
@@ -224,6 +234,21 @@ def test_cancel(client, calls):
     assert client.post("/reference/cancel/fc-gone", headers=AUTH).status_code == 404
 
 
+def test_warm_starts_a_container_without_waiting_for_it(client, calls):
+    response = client.post("/trellis2/warm", headers=AUTH)
+    assert response.status_code == 200
+    assert response.json() == {"status": "WARMING"}
+    assert client.post("/reference/warm", headers=AUTH).json() == {"status": "WARMING"}
+    assert calls.warmed == ["trellis2", "reference"]
+    # No job is queued and nothing is waited for
+    assert calls.spawned == [] and calls.waits == []
+
+    assert client.post("/hunyuan/warm", headers=AUTH).status_code == 404
+    calls.down = True
+    assert client.post("/reference/warm", headers=AUTH).status_code == 503
+    assert calls.warmed == ["trellis2", "reference"]
+
+
 # ModalCalls: the translation from Modal's function calls and errors
 
 
@@ -353,3 +378,56 @@ def test_modal_calls_cancel(modal_calls):
     registry["fc-missing"] = Missing(None)
     with pytest.raises(JobNotFound):
         calls.cancel("fc-missing")
+
+
+class FakeMethod:
+    """A worker's class method: spawn() queues a call and returns without waiting for it."""
+
+    def __init__(self, name, spawned, error=None):
+        self.name, self.spawned, self.error = name, spawned, error
+
+    def spawn(self, *args):
+        if self.error:
+            raise self.error
+        self.spawned.append((self.name, *args))
+        return SimpleNamespace(object_id="fc-01K6ABC")
+
+
+def test_modal_calls_warm_spawns_the_workers_warm_method():
+    pytest.importorskip("modal")
+    from modal.exception import ServiceError
+
+    spawned = []
+    calls = ModalCalls({"trellis2": FakeFunction()}, warm={"trellis2": FakeMethod("warm", spawned)})
+    calls.warm("trellis2")
+    assert spawned == [("warm",)]  # with no arguments, and not waited for
+
+    down = ModalCalls({}, warm={"trellis2": FakeMethod("warm", spawned, ServiceError("unavailable"))})
+    with pytest.raises(WorkersUnavailable):
+        down.warm("trellis2")
+
+
+def test_the_deployed_api_warms_each_worker_with_its_own_class(monkeypatch):
+    pytest.importorskip("modal")
+    import modal_app
+
+    # Building it fails if either class has no warm method (Modal raises AttributeError)
+    monkeypatch.setattr(job_api, "app_for_token", lambda token, calls: calls)
+    assert modal_app.api.local().workers == ("trellis2", "reference")
+
+    spawned = []
+    for cls in ("Trellis2", "FluxSchnell"):
+        methods = SimpleNamespace(
+            generate=FakeMethod(f"{cls}.generate", spawned), warm=FakeMethod(f"{cls}.warm", spawned)
+        )
+        monkeypatch.setattr(modal_app, cls, lambda methods=methods: methods)
+    calls = modal_app.api.local()
+    for worker in calls.workers:
+        calls.warm(worker)
+        calls.spawn(worker, {"input": {}})
+    assert spawned == [
+        ("Trellis2.warm",),
+        ("Trellis2.generate", {"input": {}}),
+        ("FluxSchnell.warm",),
+        ("FluxSchnell.generate", {"input": {}}),
+    ]

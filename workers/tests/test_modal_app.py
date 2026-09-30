@@ -173,7 +173,7 @@ def test_prompt_run_saves_every_step(tmp_path):
         {"input": {"prompt": "a brass pocket watch", "count": 4, "request_id": "run-1"}},
     )
     preview, final = workers.calls[3][1]["input"], workers.calls[4][1]["input"]
-    # The first reference picture goes to 3D, and the final reuses the preview's seed
+    # Unscored pictures: the first goes to 3D, and the final reuses the preview's seed
     assert base64.b64decode(preview["image_base64"]) == b"png-5"
     assert (preview["mode"], preview["request_id"], "seed" in preview) == ("preview", "run-1", False)
     assert (final["mode"], final["seed"]) == ("final", 42)
@@ -183,6 +183,7 @@ def test_prompt_run_saves_every_step(tmp_path):
     assert (folder / "final-42.glb").read_bytes() == b"glb-final"
     saved = json.loads((folder / "progress.json").read_text())
     assert saved == state
+    assert "scores" not in saved["steps"]["reference"]
     assert {step: info["status"] for step, info in saved["steps"].items()} == {
         "weights": "done",
         "reference": "done",
@@ -273,6 +274,59 @@ def test_a_pick_needs_a_picture_to_pick(tmp_path):
         run(tmp_path / "run-8", workers, prompt="a lamp", pick=4)
     with pytest.raises(ValueError, match="no pictures to pick from"):
         run(tmp_path / "run-9", workers, image=b"x", image_name="a.png", pick=1)
+
+
+class ScoringWorkers(FakeWorkers):
+    """Like the FLUX worker: each picture comes with its framing score and issues (None: not scored)."""
+
+    def __init__(self, scores):
+        super().__init__()
+        self.scores = scores
+
+    def reference(self, job):
+        self.calls.append(("reference", job))
+        images = []
+        for i, score in enumerate(self.scores):
+            data = base64.b64encode(f"png-{5 + i}".encode()).decode()
+            picture = {"key": f"ai/x/reference-{5 + i}.png", "url": None, "base64": data, "seed": 5 + i}
+            if score is not None:
+                picture.update(score=score, issues=[] if score >= 0.5 else ["small in the frame"])
+            images.append(picture)
+        return {"images": images}
+
+
+def test_the_best_scored_picture_becomes_3d(tmp_path):
+    workers = ScoringWorkers([0.41, 0.93, 0.93, 0.7])
+    folder = tmp_path / "run-10"
+    state = run(folder, workers, prompt="a lamp")
+
+    # The second and third tie, and the earlier one wins
+    assert state["input"] == "reference-6.png"
+    preview = next(job["input"] for name, job in workers.calls if name == "trellis")
+    assert base64.b64decode(preview["image_base64"]) == b"png-6"
+    # The scores are kept next to the pictures they belong to
+    step = json.loads((folder / "progress.json").read_text())["steps"]["reference"]
+    assert step["files"] == ["reference-5.png", "reference-6.png", "reference-7.png", "reference-8.png"]
+    assert step["scores"] == [0.41, 0.93, 0.93, 0.7]
+    assert step["issues"] == [["small in the frame"], [], [], []]
+
+
+def test_a_pick_still_beats_the_scores(tmp_path):
+    workers = ScoringWorkers([0.2, 0.9])
+    folder = tmp_path / "run-11"
+    assert run(folder, workers, prompt="a lamp", pictures_only=True)["input"] == "reference-6.png"
+
+    run(folder, workers, prompt="a lamp", pick=1)
+    jobs = [job["input"] for name, job in workers.calls if name == "trellis"]
+    assert [base64.b64decode(job["image_base64"]) for job in jobs] == [b"png-5"]
+
+
+def test_pictures_the_worker_couldnt_score_are_passed_over(tmp_path):
+    workers = ScoringWorkers([None, 0.3, 0.8])
+    state = run(tmp_path / "run-12", workers, prompt="a lamp", pictures_only=True)
+    assert state["input"] == "reference-7.png"
+    assert state["steps"]["reference"]["scores"] == [None, 0.3, 0.8]
+    assert state["steps"]["reference"]["issues"] == [[], ["small in the frame"], []]
 
 
 def test_status_says_what_is_ready_and_what_is_left(monkeypatch, capsys):

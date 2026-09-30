@@ -6,6 +6,10 @@
 #   modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/phase2.txt --name phase2 --pictures-only
 #   modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/phase2.txt --name phase2 --picks "1=2,5=3"
 #
+# The first round (30 Sep 2026) used the picks "1=4,2=3,3=2,4=4,5=4,6=3,7=2,8=4,9=2,10=3,11=2,12=4,
+# 13=2,14=4,15=4,16=2,17=3,18=4,19=2,20=1"; phase2.verdicts.json holds the reviewers' verdicts
+# (make_gallery.py --verdicts). 10 of 20 were publishable as they stood, against a bar of 16.
+#
 # One run per line: a prompt, or the path of a photo relative to this file (png, jpg, webp).
 # Lines starting with # are notes.
 

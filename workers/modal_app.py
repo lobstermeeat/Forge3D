@@ -266,6 +266,11 @@ class Trellis2:
         finally:
             share_caches()
 
+    @modal.method()
+    def warm(self) -> bool:
+        """Does nothing: calling it starts a container (load() runs first) before a job needs one."""
+        return True
+
 
 @app.cls(
     image=flux_image,
@@ -295,6 +300,11 @@ class FluxSchnell:
     @modal.method()
     def generate(self, job: dict) -> dict:
         return run_job(self.handle, job)
+
+    @modal.method()
+    def warm(self) -> bool:
+        """Does nothing: calling it starts a container (load() runs first) before a job needs one."""
+        return True
 
 
 WEIGHT_SCRIPTS = {"trellis2": "/root/weights/trellis2.py", "reference": "/root/weights/reference.py"}
@@ -353,7 +363,11 @@ def api():
     """https://<workspace>--orainge-ai-api.modal.run: set it as the server's AI_WORKERS_URL."""
     from job_api import ModalCalls, app_for_token
 
-    calls = ModalCalls({"trellis2": Trellis2().generate, "reference": FluxSchnell().generate})
+    trellis2, flux = Trellis2(), FluxSchnell()
+    calls = ModalCalls(
+        {"trellis2": trellis2.generate, "reference": flux.generate},
+        warm={"trellis2": trellis2.warm, "reference": flux.warm},
+    )
     return app_for_token(os.environ.get("ORAINGE_WORKER_TOKEN"), calls)
 
 
@@ -393,9 +407,10 @@ def run_pipeline(
     `folder`. Each finished step is recorded in progress.json, so running it again on the same
     folder skips what is done and continues where it stopped.
 
-    The first reference picture goes on to 3D unless `pick` names another (1-4), the way a
-    user picks one in the Studio. `pictures_only` stops before 3D, so the pictures can be
-    looked at first; running again with `pick` then makes the model.
+    The reference picture the worker scored best goes on to 3D (the first, if it didn't score
+    them) unless `pick` names another (1-4), the way a user picks one in the Studio.
+    `pictures_only` stops before 3D, so the pictures can be looked at first; running again with
+    `pick` then makes the model.
     """
     folder.mkdir(parents=True, exist_ok=True)
     progress_file = folder / "progress.json"
@@ -473,9 +488,16 @@ def run_pipeline(
             name = f"reference-{picture['seed']}.png"
             (folder / name).write_bytes(fetch(picture))
             files.append(name)
-        # The first picture goes on to 3D; `--image` on another one makes that one instead
-        state["input"] = files[0]
-        return {"files": files, "gpu_seconds": result.get("seconds")}
+        fields: dict = {"files": files, "gpu_seconds": result.get("seconds")}
+        scores = [picture.get("score") for picture in result["images"]]
+        if any(score is not None for score in scores):
+            fields["scores"] = scores
+            fields["issues"] = [picture.get("issues", []) for picture in result["images"]]
+        # The best-framed picture goes on to 3D: the earlier one on a tie, the first if nothing was
+        # scored. `pick` makes another one instead
+        best = max(range(len(files)), key=lambda i: -1 if scores[i] is None else scores[i])
+        state["input"] = files[best]
+        return fields
 
     def model(mode: str) -> Callable[[], dict]:
         def work() -> dict:
@@ -678,7 +700,7 @@ def set_run_names(name: str, runs: list[dict]) -> list[str]:
 def parse_picks(text: str, runs: list[dict]) -> dict[int, int]:
     """
     '3=2, 7=4' -> {3: 2, 7: 4}: the set's third run is made from its second picture and the
-    seventh from its fourth. Runs left out use their first picture.
+    seventh from its fourth. Runs left out use their best-scored picture.
     """
     picks = {}
     for item in filter(None, (part.strip() for part in text.split(","))):
@@ -726,7 +748,7 @@ def make_set(prompts: str, final: bool = True, name: str = "", pictures_only: bo
 
     Like a user in the Studio, you can choose which picture becomes 3D: run the set with
     --pictures-only, look at the pictures, then run it again with --picks "3=2,7=4" (run number =
-    picture number; runs left out use their first picture).
+    picture number; runs left out use their best-scored picture).
     """
     import modal.exception as mx
 
