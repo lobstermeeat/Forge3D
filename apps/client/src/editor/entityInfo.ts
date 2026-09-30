@@ -1,5 +1,5 @@
 import type { Entity } from '@forge3d/engine';
-import type { LightData, MeshRendererData } from '@forge3d/shared';
+import type { LightData, MeshRendererData, ModelData } from '@forge3d/shared';
 
 export interface EntityInfo {
   icon: string;
@@ -29,6 +29,12 @@ export function describeEntity(entity: Entity): EntityInfo {
   if (light) {
     const info = LIGHT_INFO[light.type] ?? LIGHT_INFO.point;
     return { ...info, color: '#f5b84b', kind: 'light' };
+  }
+  const model = entity.getComponent<ModelData>('model');
+  if (model) {
+    const quality = model.quality === 'preview' ? ' · preview' : '';
+    const type = model.source === 'ai' ? `AI model${quality}` : 'Model';
+    return { icon: 'model', type, color: '#8fb3ff', kind: 'model' };
   }
   const mesh = entity.getComponent<MeshRendererData>('meshRenderer');
   if (mesh?.geometryType === 'imported') {

@@ -60,3 +60,45 @@ export interface ReferenceImageProvider {
     options?: { count?: number; seed?: number; requestId?: string },
   ): Promise<ReferenceImage[]>;
 }
+
+/** A file a worker produced: at a public URL (workers with R2), or inline. */
+export type WorkerFile = { url: string } | { data: Buffer };
+
+export interface ReferencesOutput {
+  images: { file: WorkerFile; seed: number }[];
+}
+
+export interface ModelOutput {
+  file: WorkerFile;
+  seed: number;
+  triangles: number;
+  bytes: number;
+  /** GPU seconds the job took (the worker's timings added up). */
+  seconds: number;
+  /** Attribution to show with the model, e.g. "Built with DINOv3" (a license requirement). */
+  credits: string[];
+}
+
+export type WorkerJobState<T> =
+  | { status: 'running' }
+  | { status: 'done'; output: T }
+  | { status: 'failed'; message: string };
+
+/**
+ * What the Studio's AI panel needs from the GPU workers. Every step is a job that is started
+ * and then polled, so no request waits on a GPU (a cold start takes a minute or more).
+ */
+export interface StudioWorkers {
+  readonly name: string;
+  /** Text prompts need the reference-image worker; photos only need TRELLIS.2. */
+  readonly prompts: boolean;
+  startReferences(input: { prompt: string; count: number; requestId: string }): Promise<string>;
+  references(jobId: string): Promise<WorkerJobState<ReferencesOutput>>;
+  startModel(input: {
+    image: Buffer;
+    mode: GenerationQuality;
+    seed?: number;
+    requestId: string;
+  }): Promise<string>;
+  model(jobId: string): Promise<WorkerJobState<ModelOutput>>;
+}

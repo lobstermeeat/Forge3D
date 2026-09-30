@@ -5,7 +5,15 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
-from job_api import JobCancelled, JobFailed, JobNotFound, ModalCalls, WorkersUnavailable, create_app
+from job_api import (
+    JobCancelled,
+    JobFailed,
+    JobNotFound,
+    ModalCalls,
+    WorkersUnavailable,
+    app_for_token,
+    create_app,
+)
 
 TOKEN = "k" * 43
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
@@ -102,6 +110,27 @@ def test_refuses_to_start_with_a_weak_token(calls):
         create_app("hunter2", calls)
     with pytest.raises(ValueError):
         create_app("", calls)
+
+
+@pytest.mark.parametrize("token", [None, "", "hunter2", " " * 40])
+def test_a_short_token_switches_the_api_off_instead_of_crashing(calls, token):
+    # Modal restarts a web container that fails to start, so every request would just hang
+    client = TestClient(app_for_token(token, calls))
+    responses = [
+        client.get("/"),
+        client.post("/trellis2/run", json={"input": {}}, headers={"Authorization": f"Bearer {token}"}),
+        client.get("/reference/status/fc-1", headers=AUTH),
+    ]
+    for response in responses:
+        assert response.status_code == 503
+        assert "orainge-worker-token must be at least 32 characters" in response.json()["detail"]
+    assert calls.spawned == []
+
+
+def test_the_token_from_the_environment_is_trimmed(calls):
+    client = TestClient(app_for_token(f"  {TOKEN}\n", calls))
+    assert client.get("/", headers=AUTH).status_code == 200
+    assert client.get("/").status_code == 401
 
 
 def test_run_queues_only_the_input(client, calls):

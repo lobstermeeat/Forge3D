@@ -7,6 +7,7 @@ import { PRIMITIVES, restingTransform, type Primitive } from '@/editor/placement
 import { useAssetStore } from '@/stores/assetStore';
 import { useEditorStore } from '@/stores/editorStore';
 import type { EditorActions } from '@/hooks/useEditorActions';
+import { AIPanel } from '@/components/AIPanel';
 
 /** MIME type used when dragging library items into the viewport. */
 export const LIBRARY_DRAG_TYPE = 'application/x-forge3d-library';
@@ -15,8 +16,6 @@ export type LibraryDragPayload =
   | { kind: 'part'; type: Primitive }
   | { kind: 'light'; type: LightData['type'] }
   | { kind: 'import'; id: string };
-
-type LibraryTab = 'parts' | 'lights' | 'imports';
 
 const LIGHTS: { type: LightData['type']; name: string; meta: string; icon: string }[] = [
   { type: 'directional', name: 'Sun light', meta: 'Parallel rays, casts shadows', icon: 'sun' },
@@ -102,11 +101,15 @@ interface Tile {
 export function LibraryPanel({
   actions,
   onRequestImport,
+  sceneId,
 }: {
   actions: EditorActions;
   onRequestImport: () => void;
+  /** The saved scene the AI panel's models are recorded against */
+  sceneId?: string;
 }) {
-  const [tab, setTab] = useState<LibraryTab>('parts');
+  const tab = useEditorStore((s) => s.libraryTab);
+  const setTab = useEditorStore((s) => s.setLibraryTab);
   const [query, setQuery] = useState('');
   const [thumbs, setThumbs] = useState<Partial<Record<Primitive, string>>>(
     () => thumbnailCache ?? {},
@@ -142,7 +145,7 @@ export function LibraryPanel({
       payload: { kind: 'light', type: l.type },
       onInsert: () => actions.addLight(l.type),
     }));
-  } else {
+  } else if (tab === 'imports') {
     tiles = imports.map((a) => ({
       key: a.id,
       name: a.name,
@@ -164,6 +167,7 @@ export function LibraryPanel({
             ['parts', 'Parts'],
             ['lights', 'Lights'],
             ['imports', 'Imports'],
+            ['ai', 'AI'],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -174,6 +178,7 @@ export function LibraryPanel({
             aria-selected={tab === key}
             onClick={() => setTab(key)}
           >
+            {key === 'ai' && <Icon name="sparkle" size={12} />}
             {label}
             {key === 'imports' && imports.length > 0 && (
               <span className="f3-cnt">{imports.length}</span>
@@ -182,68 +187,76 @@ export function LibraryPanel({
         ))}
       </div>
 
-      <div style={{ padding: '10px 10px 8px', flexShrink: 0 }}>
-        <label className="f3-fld">
-          <Icon name="search" size={14} />
-          <input
-            aria-label="Search the library"
-            placeholder={tab === 'imports' ? 'Search your imports' : `Search ${tab}`}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-      </div>
-
-      <div style={{ flexGrow: 1, overflowY: 'auto', padding: '2px 10px 10px', minHeight: 0 }}>
-        {shown.length === 0 ? (
-          <div className="f3-empty" style={{ margin: '8px 0 0' }}>
-            <Icon name={tab === 'imports' ? 'import' : 'search'} size={22} />
-            <span>
-              {tab === 'imports' && !q
-                ? 'Models you import show up here, so you can place them again.'
-                : `Nothing matches “${query}”.`}
-            </span>
+      {tab === 'ai' ? (
+        <div style={{ flexGrow: 1, overflowY: 'auto', minHeight: 0 }}>
+          <AIPanel actions={actions} sceneId={sceneId} />
+        </div>
+      ) : (
+        <>
+          <div style={{ padding: '10px 10px 8px', flexShrink: 0 }}>
+            <label className="f3-fld">
+              <Icon name="search" size={14} />
+              <input
+                aria-label="Search the library"
+                placeholder={tab === 'imports' ? 'Search your imports' : `Search ${tab}`}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
           </div>
-        ) : (
-          <div className="f3-tiles">
-            {shown.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                className="f3-tile"
-                draggable={!playing}
-                disabled={playing}
-                onDragStart={(e) => setDrag(e, t.payload)}
-                onClick={t.onInsert}
-                title={`Click to insert ${t.name}, or drag it into the scene`}
-              >
-                <span className="f3-thumb">
-                  {t.image ? (
-                    <img src={t.image} alt="" draggable={false} />
-                  ) : (
-                    <Icon name={t.icon} size={30} style={{ strokeWidth: 1.3 }} />
-                  )}
+
+          <div style={{ flexGrow: 1, overflowY: 'auto', padding: '2px 10px 10px', minHeight: 0 }}>
+            {shown.length === 0 ? (
+              <div className="f3-empty" style={{ margin: '8px 0 0' }}>
+                <Icon name={tab === 'imports' ? 'import' : 'search'} size={22} />
+                <span>
+                  {tab === 'imports' && !q
+                    ? 'Models you import show up here, so you can place them again.'
+                    : `Nothing matches “${query}”.`}
                 </span>
-                <span className="f3-tile-name">{t.name}</span>
-                <span className="f3-tile-meta">{t.meta}</span>
-              </button>
-            ))}
+              </div>
+            ) : (
+              <div className="f3-tiles">
+                {shown.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    className="f3-tile"
+                    draggable={!playing}
+                    disabled={playing}
+                    onDragStart={(e) => setDrag(e, t.payload)}
+                    onClick={t.onInsert}
+                    title={`Click to insert ${t.name}, or drag it into the scene`}
+                  >
+                    <span className="f3-thumb">
+                      {t.image ? (
+                        <img src={t.image} alt="" draggable={false} />
+                      ) : (
+                        <Icon name={t.icon} size={30} style={{ strokeWidth: 1.3 }} />
+                      )}
+                    </span>
+                    <span className="f3-tile-name">{t.name}</span>
+                    <span className="f3-tile-meta">{t.meta}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      <div style={{ padding: 10, borderTop: '1px solid var(--line)', flexShrink: 0 }}>
-        <button
-          type="button"
-          className="f3-btn ghost"
-          style={{ width: '100%' }}
-          disabled={playing}
-          onClick={onRequestImport}
-        >
-          <Icon name="import" size={14} />
-          Import model
-        </button>
-      </div>
+          <div style={{ padding: 10, borderTop: '1px solid var(--line)', flexShrink: 0 }}>
+            <button
+              type="button"
+              className="f3-btn ghost"
+              style={{ width: '100%' }}
+              disabled={playing}
+              onClick={onRequestImport}
+            >
+              <Icon name="import" size={14} />
+              Import model
+            </button>
+          </div>
+        </>
+      )}
     </aside>
   );
 }

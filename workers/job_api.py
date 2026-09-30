@@ -199,6 +199,29 @@ class RequireToken:
         await self.app(scope, receive, send)
 
 
+def app_for_token(token: str | None, calls: Calls) -> FastAPI:
+    """
+    The API for the token in the environment. With a missing or short token it still starts, but
+    answers every request with the reason: Modal keeps restarting a web container that fails to
+    start, so callers would only see their requests hang.
+    """
+    token = (token or "").strip()  # a pasted secret often ends in a line break
+    if len(token) >= MIN_TOKEN_LENGTH:
+        return create_app(token, calls)
+    reason = (
+        "The job API is off: ORAINGE_WORKER_TOKEN in the Modal secret orainge-worker-token must be "
+        f"at least {MIN_TOKEN_LENGTH} characters"
+    )
+    print(f"[orainge] {reason}", file=sys.stderr)
+    app = FastAPI(title="Orainge AI workers", docs_url=None, redoc_url=None, openapi_url=None)
+
+    @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+    def switched_off(path: str) -> JSONResponse:
+        return JSONResponse({"detail": reason}, status_code=503)
+
+    return app
+
+
 def create_app(token: str, calls: Calls, runsync_wait: float = RUNSYNC_WAIT_S) -> FastAPI:
     if len(token) < MIN_TOKEN_LENGTH:
         raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")

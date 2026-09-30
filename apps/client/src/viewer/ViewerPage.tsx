@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import * as THREE from 'three';
 import {
+  AssetLoader,
   createStudioEnvironment,
   STUDIO_ENVIRONMENT_INTENSITY,
   VIEWER_TONE_MAPPING,
@@ -144,7 +145,10 @@ export function ViewerPage() {
 
         // Scene
         const scene = new THREE.Scene();
-        sceneBuilder.build(experienceData, scene);
+        // Generated models load after the scene appears; KTX2 textures need the renderer
+        const modelLoader = new AssetLoader({ renderer });
+        const loadModel = async (url: string) => (await modelLoader.loadGLTF(url)).scene;
+        sceneBuilder.build(experienceData, scene, loadModel);
         // Same studio lighting as the editor, so PBR and metal surfaces don't render black
         scene.environment = createStudioEnvironment(renderer);
         scene.environmentIntensity = STUDIO_ENVIRONMENT_INTENSITY;
