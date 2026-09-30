@@ -62,7 +62,7 @@ export function DashboardPage() {
           marginBottom: 32,
         }}
       >
-        <h1 style={{ fontSize: 24 }}>Forge3D</h1>
+        <h1 style={{ fontSize: 24 }}>Orainge</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <span style={{ fontSize: 14, color: '#888' }}>{user?.name ?? user?.email ?? 'User'}</span>
           <button onClick={handleSignOut} style={headerBtn}>

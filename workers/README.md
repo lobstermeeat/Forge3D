@@ -1,6 +1,6 @@
 # AI workers
 
-FORGE 3D generates 3D models with its own models on serverless GPUs, billed only while they
+Orainge generates 3D models with its own models on serverless GPUs, billed only while they
 work. There are no third-party AI APIs involved.
 
 | Worker                          | Model                         | Job                      | GPU                                              |

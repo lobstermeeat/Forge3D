@@ -2,7 +2,7 @@
 
 **Built with DINOv3.**
 
-FORGE 3D's AI generation runs the components below. Anything that shows AI-generated
+Orainge's AI generation runs the components below. Anything that shows AI-generated
 assets to users (for example the editor's AI panel) must display "Built with DINOv3",
 which the DINOv3 License requires.
 

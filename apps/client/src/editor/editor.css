@@ -1,5 +1,5 @@
 /*
- * FORGE 3D Studio — editor chrome.
+ * Orainge Studio — editor chrome.
  * Everything is scoped under .f3 so the feed, dashboard and viewer keep their own styles.
  * Colours live in the tokens below; change --acc to re-theme the editor.
  */
@@ -124,7 +124,7 @@
 .f3-brand b {
   font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
 }
 .f3-brand span {
   font-size: 11.5px;

@@ -311,8 +311,8 @@ function createActions(d: ActionDeps) {
 
     saveToFile() {
       const json = JSON.stringify(sceneManager.serialize(), null, 2);
-      download(new Blob([json], { type: 'application/json' }), 'scene.forge3d.json');
-      logOutput('ok', 'Downloaded scene.forge3d.json');
+      download(new Blob([json], { type: 'application/json' }), 'scene.orainge.json');
+      logOutput('ok', 'Downloaded scene.orainge.json');
     },
 
     openFile(file: File) {

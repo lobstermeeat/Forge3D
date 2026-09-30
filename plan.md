@@ -1,4 +1,4 @@
-# Forge3D — Internal Alpha Release Plan
+# Orainge — Internal Alpha Release Plan
 
 **Exit Criteria:** 3D viewport, basic modeling, file I/O, and user accounts functional across Chrome, Firefox, and Edge.
 

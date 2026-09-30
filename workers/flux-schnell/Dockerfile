@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# FORGE 3D reference-image worker: FLUX.1 [schnell] (Apache-2.0) on RunPod serverless.
+# Orainge reference-image worker: FLUX.1 [schnell] (Apache-2.0) on RunPod serverless.
 #
 #   docker build --secret id=hf_token,env=HF_TOKEN -t forge3d/flux-schnell-worker workers/flux-schnell
 #

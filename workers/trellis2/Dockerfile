@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# FORGE 3D image-to-3D worker: stock TRELLIS.2-4B on RunPod serverless.
+# Orainge image-to-3D worker: stock TRELLIS.2-4B on RunPod serverless.
 #
 #   docker build --secret id=hf_token,env=HF_TOKEN -t forge3d/trellis2-worker workers/trellis2
 #

@@ -65,9 +65,9 @@ export class Renderer {
           (gpuRenderer as { backend?: { isWebGPUBackend?: boolean } }).backend?.isWebGPUBackend,
         );
         this.backendLabel = onWebGPU ? 'WebGPU' : 'WebGL 2 (WebGPU fallback)';
-        console.log(`[Forge3D] Renderer: ${this.backendLabel}`);
+        console.log(`[Orainge] Renderer: ${this.backendLabel}`);
       } catch {
-        console.warn('[Forge3D] WebGPU init failed, falling back to WebGL');
+        console.warn('[Orainge] WebGPU init failed, falling back to WebGL');
         this.initWebGL();
       }
     } else {
@@ -93,7 +93,7 @@ export class Renderer {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.rendererType = 'webgl';
     this.backendLabel = 'WebGL 2';
-    console.log('[Forge3D] Renderer: WebGL');
+    console.log('[Orainge] Renderer: WebGL');
   }
 
   /**
@@ -133,7 +133,7 @@ export class Renderer {
       this.scene.environment = createStudioEnvironment(this.renderer, this.pmremGenerator);
       this.scene.environmentIntensity = STUDIO_ENVIRONMENT_INTENSITY;
     } catch (err) {
-      console.warn('[Forge3D] Environment lighting unavailable', err);
+      console.warn('[Orainge] Environment lighting unavailable', err);
     }
   }
 
