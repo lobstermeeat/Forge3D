@@ -1,0 +1,268 @@
+== One request to the job API without the token (it should answer 401 at once)
+curl: (28) Operation timed out after 150002 milliseconds with 0 bytes received
+HTTP 000 after 150.002088 s
+No answer
+
+
+== The job API's logs from the last 2 hours
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/task_lifecycle_manager.py", line 84, in handle_task_lifecycle_exception
+    yield
+  File "/pkg/modal/_runtime/user_code_imports.py", line 227, in function_execution_context
+    finalized_functions = self.get_finalized_functions(self.function_def, container_io_manager)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 324, in get_finalized_functions
+    web_callable, lifespan_manager = construct_webhook_callable(
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/user_code_imports.py", line 250, in construct_webhook_callable
+    return asgi.asgi_app_wrapper(user_defined_callable(), container_io_manager)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/modal_app.py", line 357, in api
+    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/job_api.py", line 204, in create_app
+    raise ValueError(f"ORAINGE_WORKER_TOKEN must be at least {MIN_TOKEN_LENGTH} characters")
+ValueError: ORAINGE_WORKER_TOKEN must be at least 32 characters
+Function modal_app.api is crash-looping: containers are repeatedly failing to start.
+Runner failed with exception: ValueError('ORAINGE_WORKER_TOKEN must be at least 32 characters')
+
+== The worker token (checked inside Modal; never printed)
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-4r3fLFHUrRDXaNjg7hDAg2
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/check_api.py
+├── ✓ Created Function check.
+└── ✓ Created Function token_check.
+Stopping app - local entrypoint completed.
+ORAINGE_WORKER_TOKEN is shorter than the 32 characters the job API needs
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-4r3fLFHUrRDXaNjg7hDAg2
+exit status: 0
