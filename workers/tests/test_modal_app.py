@@ -432,7 +432,7 @@ def test_make_set_runs_every_line_and_reports_failures(tmp_path, monkeypatch, ca
         ("download", "all"),
         ("starmap", [("s-01-lamp", "a lamp"), ("s-02-chair", "a chair")], True),
     ]
-    assert (tmp_path / "orainge-outputs" / "s-01-lamp" / "final-1.glb").read_bytes() == b"glb"
+    assert (tmp_path / "orainge-outputs" / "s" / "s-01-lamp" / "final-1.glb").read_bytes() == b"glb"
     out = capsys.readouterr().out
     assert "s-01-lamp: final-1.glb" in out
     assert "s-02-chair: failed (RuntimeError: invalid input: no object found)" in out

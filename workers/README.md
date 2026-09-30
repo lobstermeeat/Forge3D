@@ -151,9 +151,9 @@ results). `bash ops/gallery.sh "<title>"` puts a test set's gallery and final mo
 `workers/test-sets/starter.txt` covers eight kinds of game assets, and `renders.txt` six photos
 of CC0 sample models (no FLUX needed). `make_set` runs every line
 (previews and finals; `--no-final` for previews only) with the GPU containers kept warm between
-runs, names the runs `<set>-<nn>-<words>` and copies them to `orainge-outputs/`. Run it again
-with the same `--name` to retry what failed. Then
-`python workers/gallery/make_gallery.py orainge-outputs -o gallery/` renders every preview and
+runs, names the runs `<set>-<nn>-<words>` and copies them to `orainge-outputs/<set>/`. Run it
+again with the same `--name` to retry what failed. Then
+`python workers/gallery/make_gallery.py orainge-outputs/<set> -o gallery/` renders every preview and
 final from six angles, with the editor's decoders and lighting, and writes a page showing each
 run's reference images, triangles, file size, GPU time and cost, with a 3D viewer (orbit,
 zoom, wireframe) for each final. It needs `pnpm install` and Playwright's Chromium, which
