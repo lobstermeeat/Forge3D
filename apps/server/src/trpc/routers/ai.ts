@@ -73,6 +73,13 @@ export const aiRouter = router({
     .mutation(({ ctx, input }) => studioCall(() => getStudio().retry(ctx.user.id, input.id))),
 
   recent: protectedProcedure.query(({ ctx }) => studioCall(() => getStudio().recent(ctx.user.id))),
+
+  /** Starts a GPU before its job is sent (FLUX while the user types), without waiting for it. */
+  warm: protectedProcedure
+    .input(z.object({ worker: z.enum(['references', 'model']) }))
+    .mutation(({ ctx, input }) => {
+      getStudio().warm(ctx.user.id, input.worker);
+    }),
 });
 
 async function studioCall<T>(call: () => Promise<T>): Promise<T> {

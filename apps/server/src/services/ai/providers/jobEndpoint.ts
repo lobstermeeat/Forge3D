@@ -73,6 +73,14 @@ export class JobEndpoint {
     await this.request(`cancel/${encodeURIComponent(jobId)}`, { method: 'POST' });
   }
 
+  /**
+   * Starts one of the worker's containers without waiting for it, so a job that follows soon
+   * skips the cold start. Only Orainge's job API on Modal has this route; RunPod doesn't.
+   */
+  async warm(): Promise<void> {
+    await this.request('warm', { method: 'POST' });
+  }
+
   private async request<T>(path: string, init: RequestInit): Promise<T> {
     const res = await this.fetchImpl(`${this.url}/${path}`, {
       ...init,

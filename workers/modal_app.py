@@ -266,6 +266,11 @@ class Trellis2:
         finally:
             share_caches()
 
+    @modal.method()
+    def warm(self) -> bool:
+        """Does nothing: calling it starts a container (load() runs first) before a job needs one."""
+        return True
+
 
 @app.cls(
     image=flux_image,
@@ -295,6 +300,11 @@ class FluxSchnell:
     @modal.method()
     def generate(self, job: dict) -> dict:
         return run_job(self.handle, job)
+
+    @modal.method()
+    def warm(self) -> bool:
+        """Does nothing: calling it starts a container (load() runs first) before a job needs one."""
+        return True
 
 
 WEIGHT_SCRIPTS = {"trellis2": "/root/weights/trellis2.py", "reference": "/root/weights/reference.py"}
@@ -353,7 +363,11 @@ def api():
     """https://<workspace>--orainge-ai-api.modal.run: set it as the server's AI_WORKERS_URL."""
     from job_api import ModalCalls, app_for_token
 
-    calls = ModalCalls({"trellis2": Trellis2().generate, "reference": FluxSchnell().generate})
+    trellis2, flux = Trellis2(), FluxSchnell()
+    calls = ModalCalls(
+        {"trellis2": trellis2.generate, "reference": flux.generate},
+        warm={"trellis2": trellis2.warm, "reference": flux.warm},
+    )
     return app_for_token(os.environ.get("ORAINGE_WORKER_TOKEN"), calls)
 
 

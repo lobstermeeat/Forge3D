@@ -4,7 +4,7 @@ import type { Database } from '../../db';
 import { schema } from '../../db';
 import type { StorageProvider } from '../storage';
 import type { FetchLike } from './providers/jobEndpoint';
-import type { StudioWorkers, WorkerFile } from './types';
+import type { StudioWorkers, WorkerFile, WorkerKind } from './types';
 
 /**
  * The Studio's AI panel, one generation at a time:
@@ -20,6 +20,12 @@ import type { StudioWorkers, WorkerFile } from './types';
  * Every job is started and then polled by `get`, so no request waits on a GPU. Pictures and
  * models are copied into the server's storage, so scenes keep working after the workers forget
  * their outputs.
+ *
+ * The FLUX worker rates each picture as a start for 3D (the object's size in the frame, not cut
+ * off, just one), and `recommended` points out the best one. The user still picks.
+ *
+ * A GPU that has been idle takes a while to start (about 45 s for FLUX, 100 s for TRELLIS.2), so
+ * `warm` starts one before its job: FLUX when the panel opens, TRELLIS.2 while FLUX draws.
  */
 
 export type GenerationStatus =
@@ -35,6 +41,8 @@ type JobKind = 'references' | 'preview' | 'final';
 
 export type GenerationRecord = typeof schema.aiGenerations.$inferSelect;
 export type NewGeneration = typeof schema.aiGenerations.$inferInsert;
+/** A picture drawn for a prompt, with the worker's rating of it (score, issues) if it gave one */
+export type ReferencePicture = NonNullable<GenerationRecord['referenceImages']>[number];
 
 export interface GenerationStore {
   create(values: NewGeneration): Promise<GenerationRecord>;
@@ -59,7 +67,9 @@ export interface GenerationView {
   prompt: string | null;
   status: GenerationStatus;
   /** The pictures FLUX drew for a prompt, to pick from */
-  references: { url: string; seed: number }[];
+  references: ReferencePicture[];
+  /** The index of the picture with the highest score, or null when none has a score */
+  recommended: number | null;
   /** The picture that went (or goes) to 3D */
   image: string | null;
   preview: { url: string; triangles: number | null } | null;
@@ -88,6 +98,8 @@ export const MAX_PROMPT_LENGTH = 500;
 const MAX_PHOTO_SIDE = 2048;
 /** Bigger photos are refused before decoding (about 8000 x 6000) */
 const MAX_PHOTO_PIXELS = 50_000_000;
+/** How often a user may start each GPU early: about a cold start plus the minute it stays up */
+export const WARM_INTERVAL_MS = 2 * 60 * 1000;
 
 export interface StudioDeps {
   workers: StudioWorkers | null;
@@ -98,6 +110,9 @@ export interface StudioDeps {
 }
 
 export class AIStudio {
+  /** When each user last started each GPU early (key `userId:kind`), oldest first */
+  private readonly warmedAt = new Map<string, number>();
+
   constructor(private readonly deps: StudioDeps) {}
 
   capabilities() {
@@ -207,6 +222,33 @@ export class AIStudio {
     return (await this.deps.store.recent(userId, limit)).map(view);
   }
 
+  /**
+   * Starts a GPU before the user's job needs it, so the job skips the cold start. Returns at once
+   * and never throws (only speed is at stake), and asks at most once per GPU per user every
+   * WARM_INTERVAL_MS. Does nothing when the workers can't be started early.
+   */
+  warm(userId: string, kind: WorkerKind): void {
+    const { workers } = this.deps;
+    if (!workers?.warm) return;
+    const now = Date.now();
+    // Keys are added as time goes on, so the expired ones are at the front
+    for (const [key, at] of this.warmedAt) {
+      if (now - at < WARM_INTERVAL_MS) break;
+      this.warmedAt.delete(key);
+    }
+    const key = `${userId}:${kind}`;
+    if (this.warmedAt.has(key)) return;
+    this.warmedAt.set(key, now);
+    void (async () => {
+      try {
+        await workers.warm?.(kind);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[AI] Couldn't start the ${kind} GPU early:`, message);
+      }
+    })();
+  }
+
   // ─── Jobs ─────────────────────────────────────────────────────
 
   /** Starts a job for the generation and records it; a job that can't start fails the step. */
@@ -235,13 +277,17 @@ export class AIStudio {
           requestId: record.id,
         });
       }
-      return await this.deps.store.update(record.id, {
+      const started = await this.deps.store.update(record.id, {
         status,
         jobId,
         jobKind: kind,
         errorMessage: null,
         updatedAt: new Date(),
       });
+      // The pictures take about a minute from cold, so TRELLIS.2 starts meanwhile and is ready
+      // (or nearly) by the time the user picks one
+      if (kind === 'references') this.warm(record.userId, 'model');
+      return started;
     } catch (err) {
       return this.fail(record, kind, err);
     }
@@ -256,13 +302,15 @@ export class AIStudio {
         const state = await workers.references(jobId);
         if (state.status === 'running') return record;
         if (state.status === 'failed') return this.settle(record, failure(kind, state.message));
-        const references = [];
-        for (const image of state.output.images) {
-          const data = await this.download(image.file);
-          const key = `ai/${record.id}/reference-${image.seed}.png`;
+        const references: ReferencePicture[] = [];
+        for (const { file, seed, score, issues } of state.output.images) {
+          const data = await this.download(file);
+          const key = `ai/${record.id}/reference-${seed}.png`;
           references.push({
             url: await this.deps.storage.write(key, data, 'image/png'),
-            seed: image.seed,
+            seed,
+            ...(score === undefined ? {} : { score }),
+            ...(issues?.length ? { issues } : {}),
           });
         }
         return await this.settle(record, {
@@ -389,12 +437,14 @@ function failure(kind: JobKind, reason: unknown): Partial<NewGeneration> {
 }
 
 function view(record: GenerationRecord): GenerationView {
+  const references = record.referenceImages ?? [];
   return {
     id: record.id,
     source: record.source === 'photo' ? 'photo' : 'prompt',
     prompt: record.prompt,
     status: record.status as GenerationStatus,
-    references: record.referenceImages ?? [],
+    references,
+    recommended: bestPicture(references),
     image: record.imageUrl,
     preview: record.previewUrl
       ? { url: record.previewUrl, triangles: record.previewTriangles }
@@ -405,6 +455,22 @@ function view(record: GenerationRecord): GenerationView {
     sceneId: record.sceneId,
     createdAt: record.createdAt.toISOString(),
   };
+}
+
+/**
+ * The picture with the highest score (the first of equals), or null when none has one, such as
+ * pictures drawn before the worker rated them.
+ */
+function bestPicture(references: ReferencePicture[]): number | null {
+  let best: number | null = null;
+  let bestScore = -Infinity;
+  for (const [index, { score }] of references.entries()) {
+    if (typeof score === 'number' && score > bestScore) {
+      best = index;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 /** Network trouble between us and the workers, as opposed to a job that failed. */

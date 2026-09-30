@@ -36,6 +36,21 @@ describe('mock workers', () => {
     const first = images[0]!.file;
     expect('data' in first && (await sharp(first.data).metadata()).width).toBe(512);
 
+    // Rated like the FLUX worker rates its pictures, with the second clearly the best and the
+    // others saying what's wrong with them
+    const scores = images.map((image) => image.score!);
+    expect(scores.every((score) => score >= 0 && score <= 1)).toBe(true);
+    const [best, runnerUp] = [...scores].sort((a, b) => b - a);
+    expect(scores.indexOf(best!)).toBe(1);
+    expect(best! - runnerUp!).toBeGreaterThanOrEqual(0.2);
+    expect(images.map((image) => image.issues?.length ?? 0)).toEqual([1, 0, 2, 1]);
+    const again = await workers.references(
+      await workers.startReferences({ prompt: 'a chair', count: 4 }),
+    );
+    expect(again.status === 'done' && again.output.images.map((image) => image.score)).toEqual(
+      scores,
+    );
+
     const failing = await workers.startReferences({ prompt: 'please fail', count: 4 });
     expect(await workers.references(failing)).toMatchObject({ status: 'failed' });
 

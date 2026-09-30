@@ -1538,6 +1538,18 @@
   background: rgba(15, 16, 19, 0.8);
   color: var(--tx1);
 }
+/* The picture the worker rated the best start for 3D (picked by default; the user can change it) */
+.f3-ai-pick[data-recommended]::before {
+  content: 'Best for 3D';
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  background: rgba(15, 16, 19, 0.8);
+  color: var(--acc);
+}
 .f3-ai-source {
   width: 100%;
   max-height: 150px;
@@ -1642,5 +1654,11 @@
   content: '3D';
   left: 3px;
   bottom: 3px;
+  padding: 0 4px;
+}
+.f3-ai-picks[data-compact] .f3-ai-pick[data-recommended]::before {
+  content: 'Best';
+  left: 3px;
+  top: 3px;
   padding: 0 4px;
 }

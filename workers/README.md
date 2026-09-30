@@ -74,7 +74,8 @@ server passes them around as `data:` URLs. That is fine for trying things out.
 Modal bills GPUs by the second and includes $30 of free compute a month on its Starter plan.
 `modal_app.py` defines both workers, a volume for the weights and a small job API
 (`job_api.py`) with the same routes as a RunPod endpoint (`/run`, `/runsync`, `/status/{id}`,
-`/cancel/{id}`), under `/trellis2` and `/reference`.
+`/cancel/{id}`), under `/trellis2` and `/reference`, plus `/warm`, which starts a worker's
+container ahead of a job without waiting for it.
 
 1. On Hugging Face, request access to
    [DINOv3](https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m) (Meta approves it
@@ -192,6 +193,16 @@ object or upload a photo, pick one of the four pictures, get a preview placed in
 keep it to replace the preview with the final where it stands. Scenes store models by URL (the
 `model` component), so they survive saving, reloading, collaboration and publishing.
 
+When the FLUX worker rates its pictures (`score` and `issues` on each image), the panel marks the
+highest-scoring one "Best for 3D" and chooses it to begin with, and a picture's issues show when
+the pointer rests on it. The user can still pick any of them.
+
+A container that has scaled to zero takes about 45 s (FLUX) to 100 s (TRELLIS.2) to start, so
+on Modal the server starts them early: FLUX when the panel opens, and TRELLIS.2 while the
+pictures are drawn. Each user starts each worker this way at most once every 2 minutes. A
+container started for nothing costs what a cold start does (about $0.08, see Cost). RunPod has
+no such route, so there the first job after a quiet spell still waits for its container.
+
 The server needs `AI_WORKERS_URL` and `AI_WORKERS_TOKEN` (Modal, above) or the RunPod variables,
 and the `ai_generations` table as in `apps/server/src/db/schema.ts`
 (`pnpm --filter @forge3d/server exec drizzle-kit push` in development). Pictures and models are
@@ -200,8 +211,9 @@ user can have 3 models in progress and 30 an hour until credits exist
 (`apps/server/src/services/ai/studio.ts`).
 
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
-labelled pictures and return a small house model after a second or two. A prompt with the word
-"fail", or a photo under 64 px, shows the error states. It refuses to run in production.
+labelled pictures (rated, with the second always the best) and return a small house model after
+a second or two. A prompt with the word "fail", or a photo under 64 px, shows the error states.
+It refuses to run in production.
 
 ## Deploying on RunPod
 
