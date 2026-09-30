@@ -2,6 +2,7 @@
 Orainge's AI workers on Modal (https://modal.com): serverless GPUs billed by the second.
 
     modal run --detach workers/modal_app.py::make --prompt "a brass pocket watch" --final
+    modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/starter.txt
     python workers/modal_app.py status                   # what's ready, what's running, what's left
     python workers/modal_app.py build                    # build the images ahead of time
     modal deploy workers/modal_app.py                    # the job API the server calls
@@ -9,7 +10,8 @@ Orainge's AI workers on Modal (https://modal.com): serverless GPUs billed by the
 `make` runs the whole flow in Modal's cloud (weights on first use, reference images, preview,
 final) and saves every step in the orainge-outputs volume. With --detach it keeps going when
 this computer sleeps or goes offline, and `--run NAME` continues a run from its last finished
-step.
+step. `make_set` does the same for every line of a test set, and workers/gallery/ turns the
+results into a review page.
 
 The GPU code is the same as in the RunPod images (trellis2/, flux-schnell/); only the entry
 points differ. The job API (job_api.py) speaks RunPod's protocol, so the server's client works
@@ -481,14 +483,148 @@ def make(prompt: str = "", image: str = "", final: bool = False, seed: int = -1,
     )
     # Still connected: copy the results here too
     target = pathlib.Path("orainge-outputs") / run
-    target.mkdir(parents=True, exist_ok=True)
-    files = [f for step in state["steps"].values() for f in step.get("files", [])]
-    for name in files:
-        with open(target / name, "wb") as f:
-            outputs.read_file_into_fileobj(f"{run}/{name}", f)
+    files = _copy_run(run, target)
     print(f"Done: {', '.join(files)} in {target}")
     if not state.get("final"):
         print(f"Final quality, same shape: modal run --detach workers/modal_app.py::make --run {run} --final")
+
+
+def _copy_run(run: str, target: pathlib.Path) -> list[str]:
+    """
+    Copies a run's progress.json and finished files from the outputs volume into `target`, which
+    make_gallery.py can then read. Returns the files copied besides progress.json.
+    """
+    import modal.exception as mx
+
+    try:
+        state = json.loads(b"".join(outputs.read_file(f"{run}/progress.json")))
+    except (mx.NotFoundError, FileNotFoundError):
+        return []  # the run stopped before it saved anything
+    target.mkdir(parents=True, exist_ok=True)
+    (target / "progress.json").write_text(json.dumps(state, indent=2))
+    files = [name for step in state["steps"].values() for name in step.get("files", [])]
+    if state.get("input") and state["input"] not in files:
+        files.append(state["input"])  # the photo an image run started from
+    copied = []
+    for name in files:
+        try:
+            with open(target / name, "wb") as f:
+                outputs.read_file_into_fileobj(f"{run}/{name}", f)
+        except (mx.NotFoundError, FileNotFoundError):
+            (target / name).unlink(missing_ok=True)
+            continue
+        copied.append(name)
+    return copied
+
+
+# Test sets: many runs from one file, for judging quality across kinds of assets
+
+SET_NAME = re.compile(r"[A-Za-z0-9_-]{1,24}")
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def read_set(path: pathlib.Path) -> list[dict]:
+    """
+    One run per line: a prompt, or the path of an image relative to the file. Blank lines and
+    lines starting with # are skipped.
+    """
+    runs = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if pathlib.PurePath(line).suffix.lower() in IMAGE_SUFFIXES:
+            image = path.parent / line
+            if not image.is_file():
+                raise SystemExit(f"{path}, line {number}: {image} doesn't exist")
+            runs.append({"image": image})
+        else:
+            runs.append({"prompt": line})
+    return runs
+
+
+SLUG_FILLER = {"a", "an", "the", "and", "with", "of", "on", "in", "to", "for"}
+
+
+def _slug(text: str, limit: int = 32) -> str:
+    """The first words of a prompt, whole, without a leading article or a dangling 'with'."""
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    if len(words) > 1 and words[0] in {"a", "an", "the"}:
+        words = words[1:]
+    kept: list[str] = []
+    for word in words:
+        if len("-".join(kept + [word])) > limit:
+            break
+        kept.append(word)
+    while len(kept) > 1 and kept[-1] in SLUG_FILLER:
+        kept.pop()
+    return "-".join(kept) or (words[0][:limit] if words else "")
+
+
+def set_run_names(name: str, runs: list[dict]) -> list[str]:
+    """<set>-<nn>-<words>, so runs sort like the file and read well in `status` and galleries."""
+    return [
+        f"{name}-{number:02d}-{_slug(run['image'].stem if 'image' in run else run['prompt']) or 'run'}"
+        for number, run in enumerate(runs, 1)
+    ]
+
+
+def set_arguments(names: list[str], runs: list[dict], existing: set, final: bool) -> list[tuple]:
+    """
+    make_model's arguments for each run of a set. A run already in the volume continues from its
+    saved image; a prompt is passed again so that an edited prompt is refused, not ignored.
+    """
+    arguments = []
+    for run, entry in zip(names, runs):
+        if "prompt" in entry:
+            arguments.append((run, entry["prompt"], b"", "", final, -1))
+        elif run in existing:
+            arguments.append((run, "", b"", "", final, -1))
+        else:
+            arguments.append((run, "", entry["image"].read_bytes(), entry["image"].name, final, -1))
+    return arguments
+
+
+@app.local_entrypoint()
+def make_set(prompts: str, final: bool = True, name: str = "") -> None:
+    """
+    A test set in one go: one run per line of a text file (see workers/test-sets/). The runs share
+    warm GPU containers, so a set costs less than the same runs one by one. With --detach it
+    finishes without this computer, and the same --name continues an interrupted set.
+    """
+    import modal.exception as mx
+
+    source = pathlib.Path(prompts)
+    runs = read_set(source)
+    if not runs:
+        raise SystemExit(f"{source} lists no prompts or images")
+    name = name or time.strftime("set-%Y%m%d-%H%M")
+    if not SET_NAME.fullmatch(name):
+        raise SystemExit("--name must be 1-24 letters, digits, '-' or '_'")
+    names = set_run_names(name, runs)
+    try:
+        existing = {entry.path.strip("/") for entry in outputs.listdir("/")}
+    except mx.NotFoundError:
+        existing = set()
+    print(f"[orainge] {name}: {len(runs)} runs, saved in the orainge-outputs volume as {names[0]} to {names[-1]}")
+    print("  Progress, any time:  python workers/modal_app.py status")
+    # Any missing weights are fetched once here, not by every run at the same time
+    download_models.remote(which="all" if any("prompt" in run for run in runs) else "trellis2")
+    outcomes = make_model.starmap(set_arguments(names, runs, existing, final), return_exceptions=True)
+    target = pathlib.Path("orainge-outputs")
+    failed = 0
+    for run, outcome in zip(names, outcomes):
+        files = _copy_run(run, target / run)
+        if isinstance(outcome, BaseException):
+            failed += 1
+            reason = next((line for line in str(outcome).splitlines() if line.strip()), "")
+            print(f"{run}: failed ({type(outcome).__name__}: {reason})")
+        else:
+            print(f"{run}: {', '.join(files)}")
+    print(f"Done: {len(runs) - failed} of {len(runs)} runs finished; files in {target}")
+    if failed:
+        retry = f"modal run --detach workers/modal_app.py::make_set --prompts {prompts} --name {name}"
+        print(f"Retry what failed: {retry}")
 
 
 def print_status() -> None:
@@ -513,7 +649,7 @@ def print_status() -> None:
     runs = sorted(
         (entry for entry in names("orainge-outputs") if entry.type == FileEntryType.DIRECTORY),
         key=lambda entry: entry.mtime,
-    )[-10:]
+    )[-20:]
     if not runs:
         print("Runs: none yet")
     volume = modal.Volume.from_name("orainge-outputs")
