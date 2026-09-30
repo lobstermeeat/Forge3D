@@ -42,6 +42,16 @@ export class CommandHistory {
     return this.redoStack.length > 0;
   }
 
+  /** The command the next undo would revert, if any. */
+  peekUndo(): Command | undefined {
+    return this.undoStack[this.undoStack.length - 1];
+  }
+
+  /** The command the next redo would re-apply, if any. */
+  peekRedo(): Command | undefined {
+    return this.redoStack[this.redoStack.length - 1];
+  }
+
   pushExecuted(command: Command): void {
     this.undoStack.push(command);
     this.redoStack.length = 0;

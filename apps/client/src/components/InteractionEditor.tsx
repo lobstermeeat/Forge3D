@@ -1,18 +1,20 @@
 import { useFormatStore } from '@/stores/formatStore';
 import { useEditorStore } from '@/stores/editorStore';
 import type { InteractionDef } from '@forge3d/shared';
+import { Icon } from '@/editor/Icon';
+import { PropRow, Select } from '@/editor/ui';
 
 const ACTION_OPTIONS: { value: InteractionDef['action']; label: string }[] = [
-  { value: 'showInfo', label: 'Show Info' },
-  { value: 'openUrl', label: 'Open URL' },
-  { value: 'navigate', label: 'Navigate' },
-  { value: 'playAnimation', label: 'Play Animation' },
+  { value: 'showInfo', label: 'Show info card' },
+  { value: 'openUrl', label: 'Open a link' },
+  { value: 'navigate', label: 'Go to another page' },
+  { value: 'playAnimation', label: 'Play an animation' },
 ];
 
 export function InteractionEditor() {
   const selectedEntityId = useEditorStore((s) => s.selectedEntityId);
-  const { interactions, addInteraction, updateInteraction, removeInteraction } =
-    useFormatStore();
+  const playing = useEditorStore((s) => s.isPlaying);
+  const { interactions, addInteraction, updateInteraction, removeInteraction } = useFormatStore();
 
   if (!selectedEntityId) return null;
 
@@ -51,102 +53,68 @@ export function InteractionEditor() {
     });
   };
 
-  return (
-    <div style={{ padding: '8px 12px', borderTop: '1px solid #313244' }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#a6adc8', marginBottom: 6 }}>
-        Interaction
-      </div>
-
-      {!interaction ? (
-        <button onClick={handleAdd} style={addBtnStyle}>
-          + Add Interaction
+  if (!interaction) {
+    return (
+      <div style={{ padding: '0 12px' }}>
+        <button
+          type="button"
+          className="f3-btn ghost"
+          style={{ width: '100%', boxShadow: 'inset 0 0 0 1px var(--line2)', borderStyle: 'dashed' }}
+          disabled={playing}
+          onClick={handleAdd}
+        >
+          <Icon name="bolt" size={14} />
+          Add a click action
         </button>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {/* Action type */}
-          <select
-            value={interaction.action}
-            onChange={(e) => handleActionChange(e.target.value as InteractionDef['action'])}
-            style={inputStyle}
-          >
-            {ACTION_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+      </div>
+    );
+  }
 
-          {/* Payload fields */}
-          {interaction.action === 'showInfo' && (
-            <>
-              <input
-                type="text"
-                placeholder="Title"
-                value={(interaction.payload['title'] as string) ?? ''}
-                onChange={(e) => handlePayloadChange('title', e.target.value)}
-                style={inputStyle}
-              />
-              <textarea
-                placeholder="Description"
-                value={(interaction.payload['description'] as string) ?? ''}
-                onChange={(e) => handlePayloadChange('description', e.target.value)}
-                rows={2}
-                style={{ ...inputStyle, resize: 'vertical' }}
-              />
-            </>
-          )}
+  const text = (key: string) => (interaction.payload[key] as string) ?? '';
 
-          {(interaction.action === 'openUrl' || interaction.action === 'navigate') && (
-            <input
-              type="text"
-              placeholder="URL"
-              value={(interaction.payload['url'] as string) ?? ''}
-              onChange={(e) => handlePayloadChange('url', e.target.value)}
-              style={inputStyle}
+  return (
+    <>
+      <PropRow label="When clicked">
+        <Select label="When clicked" value={interaction.action} options={ACTION_OPTIONS} onChange={handleActionChange} />
+      </PropRow>
+
+      {interaction.action === 'showInfo' && (
+        <>
+          <PropRow label="Title">
+            <input className="f3-input" aria-label="Info card title" placeholder="Card title" value={text('title')} onChange={(e) => handlePayloadChange('title', e.target.value)} />
+          </PropRow>
+          <PropRow label="Text" variant="top">
+            <textarea
+              className="f3-input"
+              aria-label="Info card text"
+              placeholder="What viewers read"
+              rows={3}
+              value={text('description')}
+              onChange={(e) => handlePayloadChange('description', e.target.value)}
+              style={{ resize: 'vertical' }}
             />
-          )}
-
-          {interaction.action === 'playAnimation' && (
-            <input
-              type="text"
-              placeholder="Animation clip name"
-              value={(interaction.payload['clip'] as string) ?? ''}
-              onChange={(e) => handlePayloadChange('clip', e.target.value)}
-              style={inputStyle}
-            />
-          )}
-
-          <button
-            onClick={() => removeInteraction(selectedEntityId)}
-            style={{ ...addBtnStyle, color: '#f38ba8', borderColor: '#f38ba8' }}
-          >
-            Remove Interaction
-          </button>
-        </div>
+          </PropRow>
+        </>
       )}
-    </div>
+
+      {(interaction.action === 'openUrl' || interaction.action === 'navigate') && (
+        <PropRow label="URL">
+          <input className="f3-input" aria-label="URL" placeholder="https://" value={text('url')} onChange={(e) => handlePayloadChange('url', e.target.value)} />
+        </PropRow>
+      )}
+
+      {interaction.action === 'playAnimation' && (
+        <PropRow label="Clip">
+          <input className="f3-input" aria-label="Animation clip name" placeholder="Animation clip name" value={text('clip')} onChange={(e) => handlePayloadChange('clip', e.target.value)} />
+        </PropRow>
+      )}
+
+      <div style={{ padding: '4px 12px 0' }}>
+        <button type="button" className="f3-btn danger" style={{ height: 26, fontSize: 12 }} disabled={playing} onClick={() => removeInteraction(selectedEntityId)}>
+          <Icon name="trash" size={13} />
+          Remove click action
+        </button>
+      </div>
+    </>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '4px 8px',
-  borderRadius: 4,
-  border: '1px solid #313244',
-  background: '#11111b',
-  color: '#cdd6f4',
-  fontSize: 11,
-  outline: 'none',
-  boxSizing: 'border-box',
-};
-
-const addBtnStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '6px 0',
-  borderRadius: 4,
-  border: '1px dashed #313244',
-  background: 'transparent',
-  color: '#a6adc8',
-  cursor: 'pointer',
-  fontSize: 11,
-};

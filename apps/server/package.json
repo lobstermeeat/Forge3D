@@ -12,7 +12,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'lint ok'",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",

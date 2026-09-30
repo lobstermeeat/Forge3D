@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import * as THREE from 'three';
 import { ease } from '@forge3d/engine';
 import type { ViewportControls } from '@forge3d/engine';
 import type { CameraKeyframe } from '@forge3d/shared';
 import { useFormatStore } from '@/stores/formatStore';
+import { Icon } from '@/editor/Icon';
 
 interface TimelinePanelProps {
   camera: THREE.PerspectiveCamera | null;
@@ -30,7 +31,6 @@ export function TimelinePanel({ camera, orbitControls }: TimelinePanelProps) {
     setPreviewPlaying,
   } = useFormatStore();
 
-  const [collapsed, setCollapsed] = useState(false);
   const previewRef = useRef<{ animId: number; savedPos: THREE.Vector3; savedTarget: THREE.Vector3 } | null>(null);
 
   const totalDuration = keyframes.length > 0 ? keyframes[keyframes.length - 1]!.time : 0;
@@ -143,174 +143,138 @@ export function TimelinePanel({ camera, orbitControls }: TimelinePanelProps) {
   const selectedKf = selectedKeyframeIndex !== null ? keyframes[selectedKeyframeIndex] : null;
 
   return (
-    <div style={{ background: '#181825', borderTop: '1px solid #313244' }}>
+    <div style={{ padding: '8px 12px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '6px 12px',
-          cursor: 'pointer',
-        }}
-        onClick={() => setCollapsed(!collapsed)}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#cdd6f4' }}>Timeline</span>
-          <span style={{ fontSize: 10, color: '#6c7086' }}>
-            {keyframes.length} keyframe{keyframes.length !== 1 ? 's' : ''} · {formatTime(totalDuration)}
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {!collapsed && (
-            <>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleRecordKeyframe(); }}
-                style={btnStyle}
-                title="Record camera position as keyframe"
-              >
-                + Keyframe
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handlePreviewToggle(); }}
-                disabled={keyframes.length < 2}
-                style={{
-                  ...btnStyle,
-                  opacity: keyframes.length < 2 ? 0.4 : 1,
-                  cursor: keyframes.length < 2 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {previewPlaying ? 'Stop' : 'Preview'}
-              </button>
-            </>
-          )}
-          <span style={{ fontSize: 10, color: '#6c7086' }}>{collapsed ? '▲' : '▼'}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--tx1)' }}>Camera path</span>
+        <span className="f3-mono" style={{ fontSize: 11, color: 'var(--tx3)' }}>
+          {keyframes.length} keyframe{keyframes.length !== 1 ? 's' : ''} · {formatTime(totalDuration)}
+        </span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button type="button" className="f3-btn ghost" style={{ height: 26, fontSize: 12 }} onClick={handleRecordKeyframe} title="Record the current camera as a keyframe">
+            <Icon name="keyadd" size={13} />
+            Key camera here
+          </button>
+          <button
+            type="button"
+            className="f3-btn ghost"
+            style={{ height: 26, fontSize: 12 }}
+            onClick={handlePreviewToggle}
+            disabled={keyframes.length < 2}
+            title={keyframes.length < 2 ? 'Add at least two keyframes to preview' : 'Fly the camera along the path'}
+          >
+            <Icon name={previewPlaying ? 'stop' : 'play'} size={11} />
+            {previewPlaying ? 'Stop' : 'Preview'}
+          </button>
         </div>
       </div>
 
-      {/* Body */}
-      {!collapsed && (
-        <div style={{ padding: '0 12px 8px' }}>
-          {/* Track */}
-          <div
-            style={{
-              position: 'relative',
-              height: 32,
-              background: '#313244',
-              borderRadius: 4,
-              marginBottom: 8,
-            }}
-          >
-            {totalDuration > 0 &&
-              keyframes.map((kf, i) => {
-                const left = (kf.time / totalDuration) * 100;
-                const isSelected = selectedKeyframeIndex === i;
-                return (
-                  <div
-                    key={i}
-                    onClick={() => selectKeyframe(isSelected ? null : i)}
-                    style={{
-                      position: 'absolute',
-                      left: `${left}%`,
-                      top: '50%',
-                      transform: 'translate(-50%, -50%) rotate(45deg)',
-                      width: 10,
-                      height: 10,
-                      background: isSelected ? '#f38ba8' : '#89b4fa',
-                      cursor: 'pointer',
-                      borderRadius: 2,
-                    }}
-                    title={`${kf.time.toFixed(1)}s`}
-                  />
-                );
-              })}
-          </div>
+      {/* Track */}
+      <div
+        style={{
+          position: 'relative',
+          height: 30,
+          background: 'var(--bg3)',
+          borderRadius: 6,
+          margin: '0 6px',
+        }}
+      >
+        {keyframes.length === 0 && (
+          <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11.5, color: 'var(--tx3)' }}>
+            Frame a shot in the viewport, then press “Key camera here”.
+          </span>
+        )}
+        {keyframes.map((kf, i) => {
+          const left = totalDuration > 0 ? (kf.time / totalDuration) * 100 : 0;
+          const isSelected = selectedKeyframeIndex === i;
+          return (
+            <button
+              type="button"
+              key={i}
+              onClick={() => selectKeyframe(isSelected ? null : i)}
+              aria-label={`Keyframe at ${kf.time.toFixed(1)} seconds`}
+              aria-pressed={isSelected}
+              style={{
+                position: 'absolute',
+                left: `${left}%`,
+                top: '50%',
+                transform: 'translate(-50%, -50%) rotate(45deg)',
+                width: 11,
+                height: 11,
+                background: isSelected ? 'var(--acc)' : 'var(--bg1)',
+                boxShadow: 'inset 0 0 0 1.5px var(--acc)',
+                borderRadius: 2,
+              }}
+              title={`${kf.time.toFixed(1)}s`}
+            />
+          );
+        })}
+      </div>
 
-          {/* Selected keyframe details */}
-          {selectedKf && selectedKeyframeIndex !== null && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <label style={detailLabelStyle}>Time:</label>
-              <input
-                type="number"
-                value={selectedKf.time}
-                step={0.1}
-                min={0}
-                onChange={(e) =>
-                  updateKeyframe(selectedKeyframeIndex, { time: parseFloat(e.target.value) || 0 })
+      {/* Selected keyframe details */}
+      {selectedKf && selectedKeyframeIndex !== null && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <label style={detailLabelStyle}>
+            Time
+            <input
+              type="number"
+              className="f3-input f3-mono"
+              value={selectedKf.time}
+              step={0.1}
+              min={0}
+              onChange={(e) => updateKeyframe(selectedKeyframeIndex, { time: parseFloat(e.target.value) || 0 })}
+              style={{ width: 70 }}
+            />
+          </label>
+          <label style={detailLabelStyle}>
+            Easing
+            <select
+              className="f3-input"
+              value={selectedKf.easing}
+              onChange={(e) =>
+                updateKeyframe(selectedKeyframeIndex, {
+                  easing: e.target.value as CameraKeyframe['easing'],
+                })
+              }
+              style={{ width: 120 }}
+            >
+              {EASING_OPTIONS.map((e) => (
+                <option key={e} value={e}>
+                  {e}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="f3-btn ghost"
+            style={{ height: 26, fontSize: 12 }}
+            onClick={() => {
+              if (camera && selectedKf) {
+                camera.position.set(selectedKf.position[0], selectedKf.position[1], selectedKf.position[2]);
+                const target = orbitControls?.current?.target;
+                if (target) {
+                  target.set(selectedKf.target[0], selectedKf.target[1], selectedKf.target[2]);
                 }
-                style={detailInputStyle}
-              />
-              <label style={detailLabelStyle}>Easing:</label>
-              <select
-                value={selectedKf.easing}
-                onChange={(e) =>
-                  updateKeyframe(selectedKeyframeIndex, {
-                    easing: e.target.value as CameraKeyframe['easing'],
-                  })
-                }
-                style={{ ...detailInputStyle, width: 100 }}
-              >
-                {EASING_OPTIONS.map((e) => (
-                  <option key={e} value={e}>
-                    {e}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => {
-                  if (camera && selectedKf) {
-                    camera.position.set(
-                      selectedKf.position[0],
-                      selectedKf.position[1],
-                      selectedKf.position[2],
-                    );
-                    const target = orbitControls?.current?.target;
-                    if (target) {
-                      target.set(selectedKf.target[0], selectedKf.target[1], selectedKf.target[2]);
-                    }
-                  }
-                }}
-                style={btnStyle}
-                title="Move camera to this keyframe"
-              >
-                Go To
-              </button>
-              <button
-                onClick={() => removeKeyframe(selectedKeyframeIndex)}
-                style={{ ...btnStyle, color: '#f38ba8' }}
-              >
-                Delete
-              </button>
-            </div>
-          )}
+              }
+            }}
+            title="Move the camera to this keyframe"
+          >
+            Go to
+          </button>
+          <button type="button" className="f3-btn danger" style={{ height: 26, fontSize: 12 }} onClick={() => removeKeyframe(selectedKeyframeIndex)}>
+            Delete
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-const btnStyle: React.CSSProperties = {
-  padding: '3px 8px',
-  borderRadius: 4,
-  border: '1px solid #313244',
-  background: '#1e1e2e',
-  color: '#cdd6f4',
-  cursor: 'pointer',
-  fontSize: 10,
-  fontWeight: 500,
-};
-
 const detailLabelStyle: React.CSSProperties = {
-  fontSize: 10,
-  color: '#a6adc8',
-};
-
-const detailInputStyle: React.CSSProperties = {
-  width: 60,
-  padding: '2px 6px',
-  borderRadius: 4,
-  border: '1px solid #313244',
-  background: '#11111b',
-  color: '#cdd6f4',
-  fontSize: 10,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 12,
+  color: 'var(--tx2)',
 };

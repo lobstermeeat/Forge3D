@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import * as THREE from 'three';
+import {
+  createStudioEnvironment,
+  STUDIO_ENVIRONMENT_INTENSITY,
+  VIEWER_TONE_MAPPING,
+} from '@forge3d/engine';
 import type { ExperienceData, ExperienceMeta } from '@forge3d/shared';
 import { SceneBuilder } from './SceneBuilder';
 import { ViewerControls } from './ViewerControls';
@@ -126,7 +131,7 @@ export function ViewerPage() {
         renderer.setSize(canvas.clientWidth, canvas.clientHeight);
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMapping = VIEWER_TONE_MAPPING;
 
         // Camera
         const cam = experienceData.camera;
@@ -140,6 +145,9 @@ export function ViewerPage() {
         // Scene
         const scene = new THREE.Scene();
         sceneBuilder.build(experienceData, scene);
+        // Same studio lighting as the editor, so PBR and metal surfaces don't render black
+        scene.environment = createStudioEnvironment(renderer);
+        scene.environmentIntensity = STUDIO_ENVIRONMENT_INTENSITY;
 
         // Controls
         controls = new ViewerControls({

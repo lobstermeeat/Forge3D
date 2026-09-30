@@ -1,4 +1,5 @@
 import type { MaterialDescriptor, TransformData, CameraData } from '../types/scene';
+import type { ExperienceData } from '../types/experience';
 
 export const DEFAULT_TRANSFORM: TransformData = {
   position: [0, 0, 0],
@@ -21,3 +22,9 @@ export const DEFAULT_CAMERA: CameraData = {
 };
 
 export const SCENE_VERSION = 1;
+
+/** Background and ambient light every published experience gets. The editor's Play mode matches it. */
+export const DEFAULT_ENVIRONMENT: ExperienceData['environment'] = {
+  backgroundColor: [0.067, 0.067, 0.106], // #11111b
+  ambientIntensity: 0.4,
+};
