@@ -25,6 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3.10 /usr/bin/python
 
+# The CUDA extensions build with --no-build-isolation, which needs wheel and a recent setuptools
+RUN python -m pip install --upgrade pip "setuptools>=70" wheel
+
 RUN pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
 # Prebuilt flash-attn for torch 2.6 / CUDA 12 / CPython 3.10 (building it takes over an hour)
 RUN pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.4.post1/flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
@@ -34,6 +37,7 @@ RUN pip install -r /tmp/requirements.txt
 
 # TRELLIS.2 and its CUDA extensions (all MIT), pinned. nvdiffrast and nvdiffrec are deliberately
 # not installed: their licenses allow research use only (see forge3d_worker/uv_raster.py).
+# --no-deps: o-voxel lists CuMesh and FlexGEMM as unpinned git dependencies.
 ARG TRELLIS2_COMMIT=75fbf0183001ed9876c8dbb35de6b68552ee08bd
 ARG CUMESH_COMMIT=12289e1062f0603f2f0d0771b02e1395d247f26f
 ARG FLEXGEMM_COMMIT=6dd94a859c26ee8246888502eada3dd8ad85532e
@@ -43,12 +47,12 @@ RUN git clone https://github.com/microsoft/TRELLIS.2 /opt/trellis2 \
     && git clone https://github.com/JeffreyXiang/CuMesh /tmp/CuMesh \
     && git -C /tmp/CuMesh checkout ${CUMESH_COMMIT} \
     && git -C /tmp/CuMesh submodule update --init --recursive \
-    && pip install /tmp/CuMesh --no-build-isolation \
+    && pip install /tmp/CuMesh --no-build-isolation --no-deps \
     && git clone https://github.com/JeffreyXiang/FlexGEMM /tmp/FlexGEMM \
     && git -C /tmp/FlexGEMM checkout ${FLEXGEMM_COMMIT} \
     && git -C /tmp/FlexGEMM submodule update --init --recursive \
-    && pip install /tmp/FlexGEMM --no-build-isolation \
-    && pip install /opt/trellis2/o-voxel --no-build-isolation \
+    && pip install /tmp/FlexGEMM --no-build-isolation --no-deps \
+    && pip install /opt/trellis2/o-voxel --no-build-isolation --no-deps \
     && rm -rf /tmp/CuMesh /tmp/FlexGEMM
 ENV PYTHONPATH=/opt/trellis2
 
