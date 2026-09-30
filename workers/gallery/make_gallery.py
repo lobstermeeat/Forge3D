@@ -81,6 +81,7 @@ class Model:
     gpu_seconds: Optional[float] = None
     seconds: Optional[float] = None
     viewer: Optional[str] = None  # the copy the page's 3D viewer opens
+    timings: dict = field(default_factory=dict)  # the worker's seconds per stage
 
 
 @dataclass
@@ -162,6 +163,7 @@ def load_runs(root: pathlib.Path, out: pathlib.Path) -> list[tuple[Run, pathlib.
                             megabytes=round((folder / name).stat().st_size / 1e6, 2),
                             gpu_seconds=info.get("gpu_seconds"),
                             seconds=info.get("seconds"),
+                            timings=info.get("timings") or {},
                         )
                     )
         runs.append((run, folder))
@@ -232,12 +234,16 @@ def page(runs: list[Run], title: str, subtitle: str, three_version: Optional[str
         )
         models = []
         for model in sorted(run.models, key=lambda m: m.mode != "final"):
+            # Hovering the GPU time shows where it went (generate, export, compress, upload)
+            stages = ", ".join(f"{k.removesuffix('_s')} {v:.0f} s" for k, v in model.timings.items())
             facts = " · ".join(
                 x
                 for x in (
-                    f"{model.triangles:,}\u00a0triangles" if model.triangles else "",
-                    f"{model.megabytes}\u00a0MB" if model.megabytes else "",
-                    f"{_seconds(model.gpu_seconds)}\u00a0GPU" if model.gpu_seconds else "",
+                    e(f"{model.triangles:,}\u00a0triangles") if model.triangles else "",
+                    e(f"{model.megabytes}\u00a0MB") if model.megabytes else "",
+                    f'<span title="{e(stages)}">{e(_seconds(model.gpu_seconds))}\u00a0GPU</span>'
+                    if model.gpu_seconds
+                    else "",
                 )
                 if x
             )
@@ -255,7 +261,7 @@ def page(runs: list[Run], title: str, subtitle: str, three_version: Optional[str
             )
             models.append(
                 f'<figure class="model {e(model.mode)}"><div class="strip">{strip}</div>'
-                f"<figcaption><span><b>{e(model.mode.capitalize())}</b> {e(facts)}</span>{view}</figcaption>"
+                f"<figcaption><span><b>{e(model.mode.capitalize())}</b> {facts}</span>{view}</figcaption>"
                 "</figure>"
             )
         status = (

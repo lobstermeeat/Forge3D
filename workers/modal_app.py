@@ -590,7 +590,8 @@ def make_set(prompts: str, final: bool = True, name: str = "") -> None:
     """
     A test set in one go: one run per line of a text file (see workers/test-sets/). The runs share
     warm GPU containers, so a set costs less than the same runs one by one. With --detach it
-    finishes without this computer, and the same --name continues an interrupted set.
+    finishes without this computer, and the same --name continues an interrupted set. The results
+    are copied to orainge-outputs/<name>/, ready for workers/gallery/make_gallery.py.
     """
     import modal.exception as mx
 
@@ -610,8 +611,9 @@ def make_set(prompts: str, final: bool = True, name: str = "") -> None:
     print("  Progress, any time:  python workers/modal_app.py status")
     # Any missing weights are fetched once here, not by every run at the same time
     download_models.remote(which="all" if any("prompt" in run for run in runs) else "trellis2")
-    outcomes = make_model.starmap(set_arguments(names, runs, existing, final), return_exceptions=True)
-    target = pathlib.Path("orainge-outputs")
+    # All at once, so every run finishes before the copies start and the map closes cleanly
+    outcomes = list(make_model.starmap(set_arguments(names, runs, existing, final), return_exceptions=True))
+    target = pathlib.Path("orainge-outputs") / name
     failed = 0
     for run, outcome in zip(names, outcomes):
         files = _copy_run(run, target / run)
