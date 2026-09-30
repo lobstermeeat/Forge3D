@@ -1,0 +1,55 @@
+== Deploy the job API that Orainge Studio's AI panel calls
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Created Function download_models.
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-ai-api.modal.run (unauthenticated)
+├── ✓ Created Function make_model.
+├── ✓ Created Function FluxSchnell.*.
+└── ✓ Created Function Trellis2.*.
+✓ App deployed in 1.902s! 🎉
+
+View Deployment: https://modal.com/apps/lobstermeeat/main/deployed/orainge-ai
+AI_WORKERS_URL=https://lobstermeeat--orainge-ai-api.modal.run
+
+== The worker token (checked inside Modal; never printed)
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-Z8grY2RHdoLbZj6Wu7q8qY
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/check_api.py
+├── ✓ Created Function check.
+└── ✓ Created Function token_check.
+ORAINGE_WORKER_TOKEN is fine: long enough, nothing around it
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-Z8grY2RHdoLbZj6Wu7q8qY
+
+== Check it end to end, the way the server uses it: a prompt, four pictures, a preview
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-g88pliry1F0sPrN1btA6qG
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/check_api.py
+├── ✓ Created Function token_check.
+└── ✓ Created Function check.
+Token: refused without it or with a wrong one; accepted with it
+reference: queued as fc-01M3T004ZHFA82P89J2PRKC0MF (0.4 s)
+Pictures: 4 PNGs (694 KB, 465 KB, 717 KB, 436 KB) after 55 s, 9.756 s of it on the GPU
+trellis2: queued as fc-01M3T01V3EDDRK2KXQS083HAR0 (1.2 s)
+Preview: 29,677 triangles, 0.3 MB, seed 1962666446, after 142 s, 38 s of it on the GPU
+Credits: Built with DINOv3; 3D generation: TRELLIS.2 (Microsoft, MIT)
+The job API works end to end ({'pictures': 54.7, 'preview': 142.4}). Saved the pictures and the preview in ops-out/private/api-check/
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-g88pliry1F0sPrN1btA6qG
+exit status: 0

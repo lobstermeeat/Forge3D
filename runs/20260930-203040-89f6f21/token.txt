@@ -1,0 +1,10 @@
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-Z8grY2RHdoLbZj6Wu7q8qY
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/check_api.py
+├── ✓ Created Function check.
+└── ✓ Created Function token_check.
+ORAINGE_WORKER_TOKEN is fine: long enough, nothing around it
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-Z8grY2RHdoLbZj6Wu7q8qY
