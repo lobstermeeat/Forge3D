@@ -84,10 +84,17 @@ def check_flow(url: str, token: str, prompt: str, log: Callable[[str], None] = p
     if status != 200 or sorted(index.get("workers", [])) != ["reference", "trellis2"]:
         raise RuntimeError(f"GET / answered {status} {index}")
     log("Token: refused without it or with a wrong one; accepted with it")
+    for worker in ("reference", "trellis2"):
+        status, warming = request(url, token, "POST", f"/{worker}/warm")
+        if status != 200 or warming.get("status") != "WARMING":
+            raise RuntimeError(f"POST /{worker}/warm answered {status} {warming}")
+    log("Warm-up: both workers accepted it")
 
     refs, ref_seconds = run_job(
         url, token, "reference", {"prompt": prompt, "count": 4, "request_id": "api-check"}, log
     )
+    scores = [picture.get("score") for picture in refs["images"]]
+    log(f"Scores: {scores}")
     pictures = [base64.b64decode(picture["base64"]) for picture in refs["images"]]
     if len(pictures) != 4 or not all(p.startswith(b"\x89PNG") for p in pictures):
         raise RuntimeError(f"expected 4 PNG pictures, got {len(pictures)}")

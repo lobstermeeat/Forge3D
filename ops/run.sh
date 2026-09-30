@@ -4,18 +4,16 @@
 # ops-out/private/ only encrypted (see ops/seal.sh).
 set -euo pipefail
 
-# The picture chosen for each prompt, from the contact sheets of step 1
-picks="1=4,2=3,3=2,4=4,5=4,6=3,7=2,8=4,9=2,10=3,11=2,12=4,13=2,14=4,15=4,16=2,17=3,18=4,19=2,20=1"
-
-echo "== Phase 2, step 2: a preview and a final from each picked picture"
-modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/phase2.txt --name phase2 --picks "$picks"
-
-echo
-echo "== The runs, for the gallery and scoring"
-mkdir -p ops-out/private/phase2-runs
-cp -r orainge-outputs/phase2/. ops-out/private/phase2-runs/
-du -sh ops-out/private/phase2-runs
+echo "== Deploy Phase 4: cleaner textures, the memory retry, picture scores and warm-up"
+modal deploy workers/modal_app.py | tee ops-out/deploy.txt
+url=$(grep -o 'https://[a-z0-9-]*--orainge-ai-api\.modal\.run' ops-out/deploy.txt | head -1 || true)
+[ -n "$url" ] || { echo "The deploy didn't print the job API's URL"; exit 1; }
 
 echo
-echo "== Status"
-python workers/modal_app.py status | tail -45
+echo "== Phase 2 again from the same 20 pictures: the same seeds (phase2b) and the next seeds (phase2c)"
+modal run ops/rerun_set.py --source phase2 --names phase2b,phase2c --out ops-out/private
+du -sh ops-out/private/*
+
+echo
+echo "== The job API end to end, with scores and warm-up"
+modal run ops/check_api.py --url "$url" --prompt "a wooden rocking chair" --out ops-out/private/api-check
