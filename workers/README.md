@@ -88,8 +88,9 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
    modal setup
    ```
 
-3. Store two secrets. The worker token is a password you make up for the job API; the server
-   sends it with every request:
+3. Store two secrets. The worker token is a random password of at least 32 characters for the
+   job API (with a shorter one, the API stays off and answers every request with 503 and the
+   reason). The server sends it with every request:
 
    ```sh
    modal secret create huggingface-secret HF_TOKEN=hf_…

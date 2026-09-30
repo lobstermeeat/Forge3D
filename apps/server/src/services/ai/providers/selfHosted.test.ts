@@ -245,9 +245,9 @@ describe('SelfHostedProvider', () => {
     ]);
     const provider = createSelfHostedProvider(
       {
-        // A trailing slash is fine; Modal wins over RunPod
+        // A trailing slash, or a line break after the token, is fine; Modal wins over RunPod
         AI_WORKERS_URL: 'https://orainge--orainge-ai-api.modal.run/',
-        AI_WORKERS_TOKEN: 'worker-token',
+        AI_WORKERS_TOKEN: 'worker-token\n',
         RUNPOD_API_KEY: 'k',
         RUNPOD_TRELLIS2_ENDPOINT_ID: 'ep',
       },

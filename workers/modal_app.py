@@ -351,10 +351,10 @@ def _download(name: str, force: bool) -> None:
 @modal.asgi_app()
 def api():
     """https://<workspace>--orainge-ai-api.modal.run: set it as the server's AI_WORKERS_URL."""
-    from job_api import ModalCalls, create_app
+    from job_api import ModalCalls, app_for_token
 
     calls = ModalCalls({"trellis2": Trellis2().generate, "reference": FluxSchnell().generate})
-    return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
+    return app_for_token(os.environ.get("ORAINGE_WORKER_TOKEN"), calls)
 
 
 RUN_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")

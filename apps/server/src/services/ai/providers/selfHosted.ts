@@ -241,7 +241,8 @@ export function createSelfHostedProvider(
 ): SelfHostedProvider | null {
   const workersUrl = env['AI_WORKERS_URL']?.trim().replace(/\/+$/, '');
   if (workersUrl) {
-    const token = env['AI_WORKERS_TOKEN'];
+    // Trimmed like the job API trims its copy: a pasted token often ends in a line break
+    const token = env['AI_WORKERS_TOKEN']?.trim();
     if (!token) throw new Error('AI_WORKERS_URL is set but AI_WORKERS_TOKEN is not');
     return new SelfHostedProvider(
       new JobEndpoint(`${workersUrl}/trellis2`, token, fetchImpl),
