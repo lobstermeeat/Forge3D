@@ -4,15 +4,15 @@
 # ops-out/private/ only encrypted (see ops/seal.sh).
 set -euo pipefail
 
-echo "== FLUX.1 [schnell] weights (the terms are accepted now)"
-modal run --detach workers/modal_app.py::download_models --which reference
+echo "== Deploy the job API that Orainge Studio's AI panel calls"
+modal deploy workers/modal_app.py | tee ops-out/deploy.txt
+url=$(grep -o 'https://[a-z0-9-]*--orainge-ai-api\.modal\.run' ops-out/deploy.txt | head -1 || true)
+if [ -z "$url" ]; then
+  echo "The deploy didn't print the job API's URL"
+  exit 1
+fi
+echo "AI_WORKERS_URL=$url"
 
 echo
-echo "== Text to 3D: the starter set"
-modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/starter.txt --name starter
-bash ops/gallery.sh orainge-outputs/starter "Orainge Starter Set" \
-  "Eight prompts, each a different kind of game asset. FLUX.1 [schnell] draws four pictures per prompt (the outlined one went on to 3D), then TRELLIS.2 builds the preview and the final. View in 3D opens the final to turn, zoom and check its wireframe."
-
-echo
-echo "== Status"
-python workers/modal_app.py status
+echo "== Check it end to end, the way the server uses it: a prompt, four pictures, a preview"
+modal run ops/check_api.py --url "$url"
