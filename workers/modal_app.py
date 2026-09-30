@@ -1,10 +1,14 @@
 """
 Orainge's AI workers on Modal (https://modal.com): serverless GPUs billed by the second.
 
-    modal run workers/modal_app.py::download_models      # once: weights into a Modal volume
-    modal run workers/modal_app.py::try_prompt --prompt "a brass pocket watch"
-    modal run workers/modal_app.py::try_image --image reference-123.png
+    modal run --detach workers/modal_app.py::make --prompt "a brass pocket watch" --final
+    python workers/modal_app.py status                   # what's ready, what's running, what's left
     modal deploy workers/modal_app.py                    # the job API the server calls
+
+`make` runs the whole flow in Modal's cloud (weights on first use, reference images, preview,
+final) and saves every step in the orainge-outputs volume. With --detach it keeps going when
+this computer sleeps or goes offline, and `--run NAME` continues a run from its last finished
+step.
 
 The GPU code is the same as in the RunPod images (trellis2/, flux-schnell/); only the entry
 points differ. The job API (job_api.py) speaks RunPod's protocol, so the server's client works
@@ -14,14 +18,19 @@ with both. One-time setup (Hugging Face access, Modal secrets) is in README.md.
 from __future__ import annotations
 
 import base64
+import json
 import os
 import pathlib
-from typing import Any, Callable
+import re
+import time
+from typing import Any, Callable, Optional
 
 import modal
 
 WORKERS = pathlib.Path(__file__).parent
 MODELS = "/models"
+OUTPUTS = "/outputs"
+APP_NAME = "orainge-ai"
 
 # Pinned exactly like trellis2/Dockerfile (tests/test_modal_app.py keeps them in sync)
 TORCH = ("torch==2.6.0", "torchvision==0.21.0")
@@ -41,8 +50,10 @@ TRELLIS2_GPU = "L40S"
 TRELLIS2_LOW_VRAM = "0"
 FLUX_GPU = "L40S"  # FLUX.1 [schnell] needs about 34 GB
 
-app = modal.App("orainge-ai")
+app = modal.App(APP_NAME)
 models = modal.Volume.from_name("orainge-models", create_if_missing=True)
+# What `make` produces, one folder per run, so results outlive the computer that asked for them
+outputs = modal.Volume.from_name("orainge-outputs", create_if_missing=True)
 
 # Results are returned inline (base64, 8 MB limit) unless R2 is configured: create a Modal secret
 # with the R2_* variables (see README) and deploy with ORAINGE_R2_SECRET set to its name.
@@ -123,6 +134,9 @@ api_image = (
     .pip_install("fastapi[standard]>=0.115,<1")
     .add_local_file(WORKERS / "job_api.py", "/root/job_api.py")
 )
+
+# For `make`, which only coordinates the GPU workers
+light_image = modal.Image.debian_slim(python_version="3.11")
 
 
 def run_job(handle: Callable[[dict], dict], job: dict) -> dict:
@@ -220,7 +234,7 @@ WEIGHT_SCRIPTS = {"trellis2": "/root/weights/trellis2.py", "reference": "/root/w
     volumes={MODELS: models},
     secrets=[modal.Secret.from_name("huggingface", required_keys=["HF_TOKEN"])],
     cpu=2.0,
-    timeout=3600,
+    timeout=3 * 3600,  # generous for slow Hugging Face transfers; an interrupted run resumes
 )
 def download_models(which: str = "all", force: bool = False) -> None:
     """Downloads the pinned weights (about 50 GB) into the orainge-models volume. CPU only."""
@@ -266,53 +280,238 @@ def api():
     return create_app(os.environ["ORAINGE_WORKER_TOKEN"], calls)
 
 
-def _save(asset: dict, target: pathlib.Path) -> None:
+RUN_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")
+
+
+def _asset_bytes(asset: dict) -> bytes:
+    """A stored file as the workers report it: inline base64, or a public R2 URL."""
     if asset.get("base64"):
-        target.write_bytes(base64.b64decode(asset["base64"]))
-    elif asset.get("url"):
+        return base64.b64decode(asset["base64"])
+    if asset.get("url"):
         import urllib.request
 
         with urllib.request.urlopen(asset["url"], timeout=120) as response:
-            target.write_bytes(response.read())
+            return response.read()
+    raise RuntimeError(f"{asset.get('key')} was stored without a public URL; set R2_PUBLIC_BASE_URL")
+
+
+def run_pipeline(
+    folder: pathlib.Path,
+    *,
+    prompt: Optional[str],
+    image: Optional[bytes],
+    image_name: str,
+    final: bool,
+    seed: Optional[int],
+    ensure_weights: Callable[[str], Any],
+    reference: Callable[[dict], dict],
+    trellis: Callable[[dict], dict],
+    fetch: Callable[[dict], bytes],
+    save: Callable[[], Any],
+) -> dict:
+    """
+    Prompt or image -> reference images -> preview GLB -> (optionally) final GLB, written into
+    `folder`. Each finished step is recorded in progress.json, so running it again on the same
+    folder skips what is done and continues where it stopped.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    progress_file = folder / "progress.json"
+    run = folder.name
+    if progress_file.exists():
+        # A continued run keeps its prompt, image and seed; it can only add the final step
+        state: dict = json.loads(progress_file.read_text())
+        if (prompt and prompt != state.get("prompt")) or image is not None or (
+            seed is not None and seed != state.get("seed")
+        ):
+            raise ValueError(f"{run} already exists; start a new run to change its prompt, image or seed")
     else:
-        raise SystemExit(f"{asset['key']} was stored without a public URL; set R2_PUBLIC_BASE_URL")
+        if not prompt and image is None:
+            raise ValueError("a run needs a prompt or an image")
+        state = {"prompt": prompt, "seed": seed, "steps": {}}
+        if image is not None:
+            state["input"] = f"input-{image_name or 'image'}"
+            (folder / state["input"]).write_bytes(image)
+    state["final"] = final = final or bool(state.get("final"))
+    prompt = state.get("prompt")
+    steps: dict = state["steps"]
+
+    def record(step: str, **fields: Any) -> None:
+        steps[step] = {**steps.get(step, {}), **fields}
+        state["updated"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+        progress_file.write_text(json.dumps(state, indent=2))
+        save()
+
+    def done(step: str) -> bool:
+        entry = steps.get(step, {})
+        return entry.get("status") == "done" and all((folder / f).exists() for f in entry.get("files", []))
+
+    def attempt(step: str, work: Callable[[], dict]) -> None:
+        if done(step):
+            return
+        record(step, status="running", error=None)
+        started = time.monotonic()
+        try:
+            fields = work()
+        except Exception as err:
+            record(step, status="failed", error=f"{type(err).__name__}: {err}")
+            raise
+        record(step, status="done", seconds=round(time.monotonic() - started, 1), **fields)
+
+    def checked(result: dict) -> dict:
+        if result.get("error"):
+            raise RuntimeError(result["error"])
+        return result
+
+    def weights() -> dict:
+        for name in ["trellis2", "reference"] if prompt else ["trellis2"]:
+            ensure_weights(name)
+        return {}
+
+    def reference_images() -> dict:
+        result = checked(reference({"input": {"prompt": prompt, "count": 4, "request_id": run}}))
+        files = []
+        for picture in result["images"]:
+            name = f"reference-{picture['seed']}.png"
+            (folder / name).write_bytes(fetch(picture))
+            files.append(name)
+        # The first picture goes on to 3D; `--image` on another one makes that one instead
+        state["input"] = files[0]
+        return {"files": files}
+
+    def model(mode: str) -> Callable[[], dict]:
+        def work() -> dict:
+            job: dict = {
+                "image_base64": base64.b64encode((folder / state["input"]).read_bytes()).decode("ascii"),
+                "mode": mode,
+                "request_id": run,
+            }
+            if state.get("seed") is not None:
+                job["seed"] = state["seed"]
+            result = checked(trellis({"input": job}))
+            # The final reuses the preview's seed, so it refines the shape the preview showed
+            state["seed"] = result["seed"]
+            name = f"{mode}-{result['seed']}.glb"
+            (folder / name).write_bytes(fetch(result["glb"]))
+            return {"files": [name], "triangles": result["triangles"], "timings": result["timings"]}
+
+        return work
+
+    attempt("weights", weights)
+    if prompt:
+        attempt("reference", reference_images)
+    attempt("preview", model("preview"))
+    if final:
+        attempt("final", model("final"))
+    return state
 
 
-@app.local_entrypoint()
-def try_prompt(prompt: str, count: int = 4, seed: int = -1) -> None:
-    """Saves reference images for a prompt in the current folder."""
-    job: dict[str, Any] = {"prompt": prompt, "count": count}
-    if seed >= 0:
-        job["seed"] = seed
-    result = FluxSchnell().generate.remote({"input": job})
-    if "error" in result:
-        raise SystemExit(result["error"])
-    for image in result["images"]:
-        target = pathlib.Path(f"reference-{image['seed']}.png")
-        _save(image, target)
-        print(f"Saved {target}")
-    first = result["images"][0]["seed"]
-    print(f"Make one 3D: modal run workers/modal_app.py::try_image --image reference-{first}.png")
-
-
-@app.local_entrypoint()
-def try_image(image: str, mode: str = "preview", seed: int = -1) -> None:
-    """Turns an image into a GLB saved next to it."""
-    source = pathlib.Path(image)
-    job: dict[str, Any] = {"image_base64": base64.b64encode(source.read_bytes()).decode("ascii"), "mode": mode}
-    if seed >= 0:
-        job["seed"] = seed
-    result = Trellis2().generate.remote({"input": job})
-    if "error" in result:
-        raise SystemExit(result["error"])
-    target = source.with_name(f"{source.stem}-{result['mode']}-{result['seed']}.glb")
-    _save(result["glb"], target)
-    print(
-        f"Saved {target}: {result['triangles']:,} triangles, {result['bytes'] / 1e6:.1f} MB, "
-        f"timings {result['timings']}"
+@app.function(image=light_image, volumes={OUTPUTS: outputs}, timeout=4 * 3600)
+def make_model(
+    run: str, prompt: str = "", image: bytes = b"", image_name: str = "", final: bool = False, seed: int = -1
+) -> dict:
+    """The whole flow in the cloud; see run_pipeline. Results land in orainge-outputs/<run>/."""
+    if not RUN_NAME.fullmatch(run):
+        raise ValueError("the run name must be 1-64 letters, digits, '-' or '_'")
+    return run_pipeline(
+        pathlib.Path(OUTPUTS) / run,
+        prompt=prompt or None,
+        image=image or None,
+        image_name=pathlib.Path(image_name).name,
+        final=final,
+        seed=seed if seed >= 0 else None,
+        ensure_weights=lambda name: download_models.remote(which=name),
+        reference=lambda job: FluxSchnell().generate.remote(job),
+        trellis=lambda job: Trellis2().generate.remote(job),
+        fetch=_asset_bytes,
+        save=outputs.commit,
     )
-    if result["mode"] == "preview":
-        print(
-            "Same shape at final quality: modal run workers/modal_app.py::try_image "
-            f"--image {image} --mode final --seed {result['seed']}"
-        )
+
+
+@app.local_entrypoint()
+def make(prompt: str = "", image: str = "", final: bool = False, seed: int = -1, run: str = "") -> None:
+    """
+    Prompt or image to 3D in Modal's cloud. Start it with `modal run --detach` and it finishes
+    even if this computer sleeps or goes offline; `--run NAME` continues an earlier run.
+    """
+    if not (prompt or image or run):
+        raise SystemExit("Give --prompt or --image, or --run NAME to continue a run")
+    if prompt and image:
+        raise SystemExit("Give either --prompt or --image, not both")
+    run = run or time.strftime("run-%Y%m%d-%H%M%S")
+    if not RUN_NAME.fullmatch(run):
+        raise SystemExit("--run must be 1-64 letters, digits, '-' or '_'")
+    source = pathlib.Path(image) if image else None
+    print(f"[orainge] {run}: saving each step in the orainge-outputs volume under {run}/")
+    print("  Progress, any time:  python workers/modal_app.py status")
+    print(f"  Pick up an unfinished run:  modal run --detach workers/modal_app.py::make --run {run}")
+    state = make_model.remote(
+        run=run,
+        prompt=prompt,
+        image=source.read_bytes() if source else b"",
+        image_name=source.name if source else "",
+        final=final,
+        seed=seed,
+    )
+    # Still connected: copy the results here too
+    target = pathlib.Path("orainge-outputs") / run
+    target.mkdir(parents=True, exist_ok=True)
+    files = [f for step in state["steps"].values() for f in step.get("files", [])]
+    for name in files:
+        with open(target / name, "wb") as f:
+            outputs.read_file_into_fileobj(f"{run}/{name}", f)
+    print(f"Done: {', '.join(files)} in {target}")
+    if not state.get("final"):
+        print(f"Final quality, same shape: modal run --detach workers/modal_app.py::make --run {run} --final")
+
+
+def print_status() -> None:
+    """Weights, deployment and recent runs, read straight from Modal (nothing is built or started)."""
+    import modal.exception as mx
+    from modal.types import FileEntryType
+
+    def names(volume: str, path: str = "/") -> list:
+        try:
+            return modal.Volume.from_name(volume).listdir(path)
+        except mx.NotFoundError:
+            return []
+
+    ready = {entry.path.strip("/") for entry in names("orainge-models")}
+    for name in WEIGHT_SCRIPTS:
+        print(f"Weights {name}: {'ready' if f'.{name}-weights' in ready else 'not downloaded yet'}")
+    try:
+        print(f"Job API: {modal.Function.from_name(APP_NAME, 'api').get_web_url()}")
+    except mx.NotFoundError:
+        print("Job API: not deployed (modal deploy workers/modal_app.py)")
+
+    runs = sorted(
+        (entry for entry in names("orainge-outputs") if entry.type == FileEntryType.DIRECTORY),
+        key=lambda entry: entry.mtime,
+    )[-10:]
+    if not runs:
+        print("Runs: none yet")
+    volume = modal.Volume.from_name("orainge-outputs")
+    for entry in runs:
+        run = entry.path.strip("/")
+        try:
+            state = json.loads(b"".join(volume.read_file(f"{run}/progress.json")))
+        except (mx.NotFoundError, FileNotFoundError, ValueError):
+            print(f"{run}: no progress recorded")
+            continue
+        steps = ", ".join(f"{step} {info.get('status')}" for step, info in state["steps"].items())
+        print(f"{run} ({state.get('prompt') or state.get('input')}): {steps}; updated {state.get('updated')}")
+        for step, info in state["steps"].items():
+            if info.get("status") == "failed":
+                print(f"  {step} failed: {info.get('error')}")
+                print(f"  Continue it: modal run --detach workers/modal_app.py::make --run {run}")
+            if info.get("status") == "running":
+                print("  (a step marked running with no recent update was interrupted; continue it the same way)")
+        print(f"  Download: modal volume get orainge-outputs {run} .")
+
+
+if __name__ == "__main__":
+    import sys
+
+    if sys.argv[1:] == ["status"]:
+        print_status()
+    else:
+        print(__doc__)
