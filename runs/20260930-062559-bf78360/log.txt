@@ -1,0 +1,207 @@
+== Deploy the job API that Orainge Studio's AI panel calls
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Created Function download_models.
+├── ✓ Created Function make_model.
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-ai-api.modal.run (unauthenticated)
+├── ✓ Created Function FluxSchnell.*.
+└── ✓ Created Function Trellis2.*.
+✓ App deployed in 2.928s! 🎉
+
+View Deployment: https://modal.com/apps/lobstermeeat/main/deployed/orainge-ai
+AI_WORKERS_URL=https://lobstermeeat--orainge-ai-api.modal.run
+
+== Check it end to end, the way the server uses it: a prompt, four pictures, a preview
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-tCH6hk49kpUotfwTdNKLWD
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/check_api.py
+└── ✓ Created Function check.
+Traceback (most recent call last):
+Stopping app - uncaught exception raised locally: TimeoutError('The read operation timed out').
+  File "/pkg/modal/_runtime/container_io_manager.py", line 987, in handle_input_exception
+    yield
+  File "/pkg/modal/_container_entrypoint.py", line 189, in run_input_sync
+    values = io_context.call_function_sync()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/pkg/modal/_runtime/container_io_manager.py", line 266, in call_function_sync
+    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/check_api.py", line 115, in check
+    return check_flow(url, os.environ["ORAINGE_WORKER_TOKEN"], prompt)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/check_api.py", line 65, in check_flow
+    status, _ = request(url, None, "GET", "/")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/check_api.py", line 36, in request
+    with urllib.request.urlopen(req, timeout=120) as res:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 216, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 519, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 536, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 496, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 1391, in https_open
+    return self.do_open(http.client.HTTPSConnection, req,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/urllib/request.py", line 1352, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/http/client.py", line 1395, in getresponse
+    response.begin()
+  File "/usr/local/lib/python3.11/http/client.py", line 325, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/http/client.py", line 286, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/socket.py", line 718, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/ssl.py", line 1314, in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/ssl.py", line 1166, in read
+    return self._sslobj.read(len, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: The read operation timed out
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /home/runner/work/Forge3D/Forge3D/ops/check_api.py:120 in main               │
+│                                                                              │
+│   119 def main(url: str, prompt: str = "a red fire hydrant", out: str = "ops │
+│ ❱ 120 │   result = check.remote(url, prompt)                                 │
+│   121 │   folder = pathlib.Path(out)                                         │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ object.py:45 in wrapped                                                      │
+│                                                                              │
+│    44 │   │   await self.hydrate()                                           │
+│ ❱  45 │   │   return await method(self, *args, **kwargs)                     │
+│    46                                                                        │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ functions.py:2067 in remote                                                  │
+│                                                                              │
+│   2066 │   │                                                                 │
+│ ❱ 2067 │   │   return await self._call_function(args, kwargs)                │
+│   2068                                                                       │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ functions.py:2004 in _call_function                                          │
+│                                                                              │
+│   2003 │   │                                                                 │
+│ ❱ 2004 │   │   return await invocation.run_function()                        │
+│   2005                                                                       │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ functions.py:515 in run_function                                             │
+│                                                                              │
+│    514 │   │   │   # No more retries left.                                   │
+│ ❱  515 │   │   │   return await _process_result(                             │
+│    516 │   │   │   │   await_response.output.result, await_response.output.d │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_ │
+│ utils/function_utils.py:572 in _process_result                               │
+│                                                                              │
+│   571 │   │   │                                                              │
+│ ❱ 572 │   │   │   raise exc_with_hints(exc)                                  │
+│   573                                                                        │
+│                                                                              │
+│     ...Remote call to Modal Function (ta-01M3RFQS3M5GTMNC6TEP0HP67R)...      │
+│                                                                              │
+│ /root/check_api.py:115 in check                                              │
+│                                                                              │
+│ ❱ 115 return check_flow(url, os.environ["ORAINGE_WORKER_TOKEN"], prompt)     │
+│                                                                              │
+│                                                                              │
+│ /root/check_api.py:65 in check_flow                                          │
+│                                                                              │
+│ ❱ 65 status, _ = request(url, None, "GET", "/")                              │
+│                                                                              │
+│                                                                              │
+│ /root/check_api.py:36 in request                                             │
+│                                                                              │
+│ ❱ 36 with urllib.request.urlopen(req, timeout=120) as res:                   │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/urllib/request.py:216 in urlopen                   │
+│                                                                              │
+│ ❱ 216 return opener.open(url, data, timeout)                                 │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/urllib/request.py:519 in open                      │
+│                                                                              │
+│ ❱ 519 response = self._open(req, data)                                       │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/urllib/request.py:536 in _open                     │
+│                                                                              │
+│ ❱ 536 result = self._call_chain(self.handle_open, protocol, protocol +       │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/urllib/request.py:496 in _call_chain               │
+│                                                                              │
+│ ❱ 496 result = func(*args)                                                   │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/urllib/request.py:1391 in https_open               │
+│                                                                              │
+│ ❱ 1391 return self.do_open(http.client.HTTPSConnection, req,                 │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/urllib/request.py:1352 in do_open                  │
+│                                                                              │
+│ ❱ 1352 r = h.getresponse()                                                   │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/http/client.py:1395 in getresponse                 │
+│                                                                              │
+│ ❱ 1395 response.begin()                                                      │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/http/client.py:325 in begin                        │
+│                                                                              │
+│ ❱ 325 version, status, reason = self._read_status()                          │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/http/client.py:286 in _read_status                 │
+│                                                                              │
+│ ❱ 286 line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")               │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/socket.py:718 in readinto                          │
+│                                                                              │
+│ ❱ 718 return self._sock.recv_into(b)                                         │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/ssl.py:1314 in recv_into                           │
+│                                                                              │
+│ ❱ 1314 return self.read(nbytes, buffer)                                      │
+│                                                                              │
+│                                                                              │
+│ /usr/local/lib/python3.11/ssl.py:1166 in read                                │
+│                                                                              │
+│ ❱ 1166 return self._sslobj.read(len, buffer)                                 │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+TimeoutError: The read operation timed out
+exit status: 1
