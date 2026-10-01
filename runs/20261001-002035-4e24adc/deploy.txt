@@ -1,0 +1,22 @@
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Created Function download_models.
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-ai-api.modal.run (unauthenticated)
+├── ✓ Created Function make_model.
+├── ✓ Created Function FluxSchnell.*.
+└── ✓ Created Function Trellis2.*.
+✓ App deployed in 2.919s! 🎉
+
+View Deployment: https://modal.com/apps/lobstermeeat/main/deployed/orainge-ai
