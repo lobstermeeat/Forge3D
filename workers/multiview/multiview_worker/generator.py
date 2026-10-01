@@ -92,23 +92,27 @@ def prepare_reference(
     return Image.fromarray((rgb * 255).clip(0, 255).astype(np.uint8))
 
 
-def control_images(device: str) -> Any:
-    """The six views' camera conditions, as MV-Adapter's inference script makes them."""
+def control_images(device: str, elevation: float = ELEVATION, half_extent: float = HALF_EXTENT) -> Any:
+    """
+    The six views' camera conditions (Plücker ray maps), as MV-Adapter's inference script makes
+    them. The worker uses the trained cameras (cameras.py); other elevations and frame sizes are
+    for experiments.
+    """
     from mvadapter.utils.geometry import get_plucker_embeds_from_cameras_ortho
     from mvadapter.utils.mesh_utils import get_orthogonal_camera
 
     count = len(AZIMUTHS)
     cameras = get_orthogonal_camera(
-        elevation_deg=[ELEVATION] * count,
+        elevation_deg=[elevation] * count,
         distance=[DISTANCE] * count,
-        left=-HALF_EXTENT,
-        right=HALF_EXTENT,
-        bottom=-HALF_EXTENT,
-        top=HALF_EXTENT,
+        left=-half_extent,
+        right=half_extent,
+        bottom=-half_extent,
+        top=half_extent,
         azimuth_deg=[azimuth + AZIMUTH_OFFSET for azimuth in AZIMUTHS],
         device=device,
     )
-    plucker = get_plucker_embeds_from_cameras_ortho(cameras.c2w, [2 * HALF_EXTENT] * count, IMAGE_SIZE)
+    plucker = get_plucker_embeds_from_cameras_ortho(cameras.c2w, [2 * half_extent] * count, IMAGE_SIZE)
     return ((plucker + 1.0) / 2.0).clamp(0, 1)
 
 
