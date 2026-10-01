@@ -29,8 +29,14 @@ import modal
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 # Locally modal_app.py is in workers/; in the containers it is added to /root (below)
 for candidate in (ROOT / "workers", pathlib.Path("/root")):
-    if (candidate / "modal_app.py").exists() and str(candidate) not in sys.path:
-        sys.path.insert(0, str(candidate))
+    try:
+        found = (candidate / "modal_app.py").is_file()
+    except OSError:  # /root on GitHub's runners can't even be looked into
+        found = False
+    if found:
+        if str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+        break
 from modal_app import MODELS, MULTIVIEW_GPU, OUTPUTS, WORKERS, download_image, models, multiview_image, outputs  # noqa: E402
 
 app = modal.App("orainge-exp-mv")
