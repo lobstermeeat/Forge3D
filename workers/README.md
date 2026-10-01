@@ -94,8 +94,45 @@ fit, while TRELLIS.2's cascade has no cheaper setting for a 1024³ final (see `F
 Finals also carry `projection`, whether the picture was painted onto the model (see above); its
 time is part of `export_s`.
 
+With `AI_MULTIVIEW=1` on the server (see The Studio's AI panel), both the preview and the final also
+get the picture's other sides from the `multiview` worker, the same views for both:
+
+```json
+{
+  "image_base64": "…",
+  "views": [{ "image_base64": "…", "azimuth": 90, "elevation": 0 }, …],
+  "mode": "preview",
+  "request_id": "gen_42"
+}
+```
+
+Each view has `image_base64` or `image_url`, like the picture; the server sends its own copies inline
+(a few MB more per job; RunPod takes at most 10 MB in a `/run` request). The picture stays the main image,
+and the projection still paints from it. The result reports how many views the model was built from as
+`"views_used": 6`. A worker from before views ignores them and leaves that out, and the server then logs
+a warning.
+
 `flux-schnell` input: `{ "prompt": "a brass pocket watch", "count": 4, "seed": 5, "request_id": "gen_42" }`.
 Output: `{ "images": [{ "key", "url", "seed" }, …], "prompt", "seconds" }`.
+
+`multiview` input: `{ "image_base64": "…", "request_id": "gen_42" }`, the picked picture or the
+uploaded photo (`image_url` can replace `image_base64`; `seed` is optional). Output:
+
+```json
+{
+  "views": [
+    { "azimuth": 0, "elevation": 0, "key": "ai/gen_42/view-0.png", "url": "https://assets…/ai/gen_42/view-0.png" },
+    …
+  ],
+  "camera": { "type": "orthographic", … },
+  "seconds": 21.4
+}
+```
+
+Six views at azimuths 0, 45, 90, 180, 270 and 315, where 0 is the picture's front, all at elevation 0,
+as PNG cutouts (RGBA); without R2 each comes back inline (`"url": null` and `base64`). The server keeps
+the views whose `azimuth` and `elevation` are numbers, copies them into its storage and sends them on to
+the 3D worker with their angles; the camera and framing are the 3D worker's to know.
 
 Invalid input (including an image where no object stands out from the background) comes back
 as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`. After
@@ -246,9 +283,31 @@ copied into the server's storage (`UPLOAD_DIR`), so they outlive the workers' ou
 user can have 3 models in progress and 30 an hour until credits exist
 (`apps/server/src/services/ai/studio.ts`).
 
+**The other sides (`AI_MULTIVIEW=1`, off by default).** TRELLIS.2 invents the sides a picture doesn't
+show. With `AI_MULTIVIEW=1` on the server, the picked picture (or the uploaded photo) first goes to the
+`multiview` worker, which draws it from 6 sides; the panel shows "Drawing the other sides", then builds
+the preview from the picture and the views, with the views as small thumbnails under the picture while
+the preview and the final are made. The views are copied into the server's storage and kept with the
+generation (the `views` and `views_error` columns: run `drizzle-kit push` as above after updating), so
+the final and Try again use the same ones, and picking another picture draws new ones.
+
+The views only help, so they never fail a generation. If their job can't start, fails, comes back
+broken or takes longer than 3 minutes (it is then cancelled), the preview is made from the picture
+alone; the server logs why and keeps it as `views_error`, and the panel says the back is guessed.
+While FLUX draws, the server starts the multiview worker as well as TRELLIS.2, and starts TRELLIS.2
+again when the views start for users who took over 2 minutes to pick; the panel starts the multiview
+worker while the user chooses a photo. A generation drawing its views counts as one in progress.
+
+On Modal the server calls the job API's `multiview` worker (`/multiview/run`, `/status`, `/cancel`
+and `/warm`), which `modal_app.py` has to register next to `trellis2` and `reference`; until it does,
+each views job fails to start (404) and the model is made from the picture alone. On RunPod, give the
+server `RUNPOD_MULTIVIEW_ENDPOINT_ID`; without it the step is skipped.
+
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
 labelled pictures (rated, with the second always the best) and return a small house model after
 a second or two. A prompt with the word "fail", or a photo under 64 px, shows the error states.
+With `AI_MULTIVIEW=1` too, they draw 6 views of a box (the front orange, the sides green and the
+back blue), except for a photo under 128 px, whose model is then made from the photo alone.
 It refuses to run in production.
 
 ## Deploying on RunPod

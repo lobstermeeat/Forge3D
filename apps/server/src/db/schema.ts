@@ -103,11 +103,19 @@ export const aiGenerations = pgTable('ai_generations', {
   prompt: text('prompt'),
   /** The picture that goes to 3D: the uploaded photo, or the reference picture the user picked */
   imageUrl: text('image_url'),
-  // drawing -> picking -> previewing -> reviewing -> finishing -> done; or failed
+  // drawing -> picking -> [viewing ->] previewing -> reviewing -> finishing -> done; or failed
   status: text('status').notNull().default('drawing'),
   jobId: text('job_id'),
-  /** references | preview | final: the job running now, or the one that failed */
+  /** references | views | preview | final: the job running now, or the one that failed */
   jobKind: text('job_kind'),
+  /**
+   * The picture drawn from other sides (AI_MULTIVIEW=1), which the preview and final are built
+   * from: azimuth in degrees around the object (0 is the picture's front) and elevation in
+   * degrees above its middle. Null when the step didn't run or gave nothing.
+   */
+  views: jsonb('views').$type<{ url: string; azimuth: number; elevation: number }[]>(),
+  /** Why the model is made from the picture alone: the multiview job failed or took too long */
+  viewsError: text('views_error'),
   /**
    * The pictures drawn for a prompt. When the worker rates them: score (0..1, how good a start
    * for 3D) and issues (what makes it a worse one, e.g. "cut off at the bottom").
