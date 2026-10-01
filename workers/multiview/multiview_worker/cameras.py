@@ -3,21 +3,24 @@ Where the six views are seen from: MV-Adapter's own cameras, spelled out for the
 
 MV-Adapter's image-to-multiview model draws one object from six fixed orthographic cameras
 (`get_orthogonal_camera` as upstream's scripts/inference_i2mv_sdxl.py calls it, with the
-azimuths shifted by -90°). Its world is right-handed with +Z up and the object at the origin, and
-the picture is the view from -Y:
+azimuths shifted by -90°). Its world is right-handed with +Z up and the object at the origin:
 
-- **Azimuth 0 is the picture's own view**, redrawn level (elevation 0). **Positive azimuth moves
-  the camera counter-clockwise seen from above, towards the picture's right-hand side**: the 90°
-  view shows the side that is on the right of the picture (whose front then faces image-left),
-  180° the back, 270° the side on the left of the picture. Equivalently, from view to view the
-  object turns clockwise seen from above.
+- **Azimuth 0 looks at the front of the object in the picture, level** (elevation 0). The model was
+  trained to draw fixed views of an object from a picture taken from anywhere, so it turns the
+  object to face the 0° camera: a head-on picture matches its 0° view, but a three-quarter picture
+  sits between views (Phase 2's arcade machine, about 20° to the left of 0°), and pictures that
+  look down are redrawn level. The picture is not one of the six cameras.
+- **Positive azimuth moves the camera counter-clockwise seen from above**, towards the side that
+  is on the right of the 0° view: the 90° view shows that side, with the front facing image-left;
+  180° shows the back, 270° the left side. From view to view the object turns clockwise.
 - The camera at azimuth a, elevation e is at d·(cos e·sin a, -cos e·cos a, sin e), d = 1.8, looking
   at the origin; image right is (cos a, sin a, 0) and image up is +Z at elevation 0 (no roll).
   `camera_to_world` gives the 4x4 matrix (OpenGL convention: columns right, up, back, position).
 - Every view is orthographic and frames [-0.55, 0.55]² of its image plane in 768 x 768 pixels,
   centred on the origin: 698.2 pixels per world unit in every view (`project`).
-- The picture's object is centred and scaled so that its longer side spans 90% of the frame in
-  the 0° view (691 px, 0.99 world units); the other views share that scale.
+- The picture's object is centred and scaled so that its longer side spans 90% of the frame (691
+  px, 0.99 world units); the 0° view keeps that framing and the other views share its scale, so a
+  wide object can overflow the frame at 45° and 315°.
 """
 
 from __future__ import annotations
@@ -32,7 +35,7 @@ IMAGE_SIZE = 768
 HALF_EXTENT = 0.55  # the orthographic frame spans [-0.55, 0.55] world units each way
 DISTANCE = 1.8
 FILL = 0.9  # the picture's object, longer side, as a share of the frame
-# MV-Adapter's azimuth 0 looks from +X; its inference script subtracts 90° so that 0 is the picture's
+# MV-Adapter's azimuth 0 looks from +X; its inference script subtracts 90° so that 0 is the front
 AZIMUTH_OFFSET = -90
 
 
@@ -78,12 +81,13 @@ def camera_info() -> dict:
         "distance": DISTANCE,
         "elevation": ELEVATION,
         "up": [0, 0, 1],
-        "picture_camera": [0, -1, 0],
+        "front": [0, -1, 0],
         "fill": FILL,
         "azimuth": (
-            "degrees; 0 is the picture's own view, redrawn level; positive azimuth moves the camera "
-            "counter-clockwise seen from above (up = +Z), towards the picture's right: 90 shows the "
-            "picture's right-hand side, 180 the back, 270 its left-hand side"
+            "degrees; 0 looks level at the front of the object in the picture (a three-quarter or "
+            "downward picture is not itself one of the views); positive azimuth moves the camera "
+            "counter-clockwise seen from above (up = +Z): 90 shows the side on the right of the 0 "
+            "view, 180 the back, 270 the left side"
         ),
         "position": "distance * (cos(elevation) sin(azimuth), -cos(elevation) cos(azimuth), sin(elevation))",
         "pixel": (
@@ -91,7 +95,7 @@ def camera_info() -> dict:
             "point's offsets along the camera's right (cos azimuth, sin azimuth, 0) and up (+Z) axes"
         ),
         "framing": (
-            "the picture's object is centred, its longer side scaled to fill of the frame in the 0 degree "
-            "view; every view has the same scale"
+            "the object is centred, its longer side at fill of the frame in the 0 view; every view has "
+            "the same scale, so wide objects can overflow at 45 and 315"
         ),
     }
