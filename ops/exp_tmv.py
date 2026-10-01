@@ -62,6 +62,15 @@ SYNTHETIC_RUNS = [
     _mv("syn3-multi-w2", "synthetic", [90, 180, 270], "multidiffusion", 2.0),
 ]
 
+FOUR, SIX = [0, 90, 180, 270], [0, 45, 90, 180, 270, 315]
+REAL_MODES = [
+    SINGLE,
+    _mv("real4-stoch-w2", "real", FOUR, "stochastic", 2.0),
+    _mv("real4-multi-w2", "real", FOUR, "multidiffusion", 2.0),
+    _mv("real6-stoch-w2", "real", SIX, "stochastic", 2.0),
+    _mv("real6-multi-w2", "real", SIX, "multidiffusion", 2.0),
+]
+
 PLANS: dict[str, list[dict]] = {
     # Consistent views first: does the mechanism keep a shape it is shown from every side?
     "synthetic": [
@@ -70,6 +79,8 @@ PLANS: dict[str, list[dict]] = {
         {"number": "08", "runs": SYNTHETIC_RUNS},
         {"number": "13", "runs": SYNTHETIC_RUNS},
     ],
+    # The MV line's MV-Adapter views of the four back failures: mode and number of views
+    "real1": [{"number": n, "runs": REAL_MODES} for n in ("04", "06", "08", "11")],
 }
 
 

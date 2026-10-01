@@ -7,16 +7,7 @@
 # Never `modal deploy workers/modal_app.py` here: that replaces the production app orainge-ai.
 set -euo pipefail
 
-echo "== Synthetic views, smoke test: the shield (single, stochastic, multidiffusion, a preview)"
-modal run ops/exp_tmv.py --plan synthetic --only 06 --out ops-out/private
-python3 -c "
-import json; s = json.load(open('ops-out/tmv-synthetic.json'))
-bad = [n for o in s['objects'].values() for n, r in o.get('runs', {}).items() if r.get('error')] + [k for k, o in s['objects'].items() if 'error' in o]
-print('errors:', bad); raise SystemExit(1 if bad else 0)
-"
-mv ops-out/tmv-synthetic.json ops-out/tmv-synthetic-06.json
-
-echo
-echo "== Synthetic views: the arcade machine, the camera and the car"
-modal run ops/exp_tmv.py --plan synthetic --only 04,08,13 --out ops-out/private
+echo "== MV-Adapter views of the four back failures: single, then stochastic and multidiffusion, 4 and 6 views"
+modal volume ls orainge-outputs phase6/views 2>&1 | head -30
+modal run ops/exp_tmv.py --plan real1 --out ops-out/private
 du -sh ops-out/private
