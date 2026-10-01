@@ -7,6 +7,9 @@
 # `modal deploy workers/modal_app.py`, which would replace the production app orainge-ai.
 set -euo pipefail
 
-echo "== MV-Adapter weights, then the views of the four back failures (04, 06, 08, 11)"
-modal run ops/exp_mv.py::views --only 04,06,08,11
-du -sh ops-out/private/views/* || true
+echo "== The other sixteen Phase 2 pictures, default settings (04, 06, 08 and 11 are done)"
+modal run ops/exp_mv.py::views --only 01,02,03,05,07,09,10,12,13,14,15,16,17,18,19,20
+echo "== Simple input changes on the four back failures"
+modal run ops/exp_mv.py::views --only 04,06,08,11 \
+  --variants "caption:prompt=caption;seed1:seed=1;g5:guidance=5;fill80:fill=0.8;s30:steps=30"
+du -sh ops-out/private/views || true
