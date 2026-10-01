@@ -1,0 +1,24 @@
+== MV-Adapter weights, then the views of the four back failures (04, 06, 08, 11)
+╭───────────────────── Traceback (most recent call last) ──────────────────────╮
+│ /home/runner/work/Forge3D/Forge3D/ops/exp_mv.py:32 in <module>               │
+│                                                                              │
+│    31 for candidate in (ROOT / "workers", pathlib.Path("/root")):            │
+│ ❱  32 │   if (candidate / "modal_app.py").exists() and str(candidate) not in │
+│    33 │   │   sys.path.insert(0, str(candidate))                             │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/pathlib.py:1235 in    │
+│ exists                                                                       │
+│                                                                              │
+│   1234 │   │   try:                                                          │
+│ ❱ 1235 │   │   │   self.stat()                                               │
+│   1236 │   │   except OSError as e:                                          │
+│                                                                              │
+│ /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/pathlib.py:1013 in    │
+│ stat                                                                         │
+│                                                                              │
+│   1012 │   │   """                                                           │
+│ ❱ 1013 │   │   return os.stat(self, follow_symlinks=follow_symlinks)         │
+│   1014                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+PermissionError: [Errno 13] Permission denied: '/root/modal_app.py'
+exit status: 1
