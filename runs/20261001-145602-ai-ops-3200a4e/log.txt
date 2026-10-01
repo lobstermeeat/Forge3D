@@ -1,0 +1,14 @@
+== Relay check: the apps on Modal
+                                      Apps                                      
+                                                                                
+                              Descript                      Created    Stopped  
+  App ID                      ion        State      Tasks   at         at       
+ ────────────────────────────────────────────────────────────────────────────── 
+  ap-R1eRFxiY4NVHOXoqeACOjQ   orainge-   deployed   0       2026-09-            
+                              ai                            30 06:23            
+                                                            UTC                 
+  ap-bgEQxTg7fwKp80nSoWCitP   orainge-   deployed   0       2026-09-            
+                              ai-image                      30 03:55            
+                              s                             UTC                 
+                                                                                
+exit status: 0
