@@ -30,6 +30,21 @@ to either through `apps/server/src/services/ai` (`SelfHostedProvider`).
 
 Uploaded images can skip step 1. Images with transparency skip background removal.
 
+**Finals get the picture painted on** (`trellis2/forge3d_worker/projection.py`, `Preset.project_picture`).
+TRELLIS.2 bakes colour from a coarse voxel field, so painted detail (a lion on a shield, graffiti)
+comes out smeared. After `to_glb`, the worker finds the camera the picture was taken from (a search
+over views scored by how well the model's silhouette matches the picture's, with the model's own
+colours to tell symmetric views apart), takes the picture's lighting out (its exposure and its
+shading, fitted against the texture where both show the same paint), then blends it into the
+base-colour texture where the surface faces that camera and is visible to it: fading out at grazing
+angles, near outlines, depth edges and misfits, and at specular highlights on glossy surfaces. Where
+the texture got a paint's colour wrong (a near-black "cola" milk tea, a red fox pictured orange), that
+paint takes the picture's colour, fading round the sides instead of ending in a seam. It never fails
+a job: when the silhouettes don't match closely (IoU under 0.93), another camera fits as well but
+would paint a different shape, or too little would change, the texture is left as TRELLIS.2 made it,
+and the result's optional `projection` field says why (`applied`, `reason`, `iou`, `colour`, `pose`,
+`seconds`). Previews skip it: it adds a few seconds and the preview is only for choosing.
+
 ## Job contracts
 
 `trellis2` input:
@@ -59,6 +74,9 @@ stale one. Output:
   "credits": ["Built with DINOv3", "3D generation: TRELLIS.2 (Microsoft, MIT)"]
 }
 ```
+
+Finals also carry `projection`, whether the picture was painted onto the model (see above); its
+time is part of `export_s`.
 
 `flux-schnell` input: `{ "prompt": "a brass pocket watch", "count": 4, "seed": 5, "request_id": "gen_42" }`.
 Output: `{ "images": [{ "key", "url", "seed" }, …], "prompt", "seconds" }`.
@@ -300,8 +318,10 @@ python -m pytest workers/flux-schnell/tests
 
 Run the three folders separately: they share test file names.
 
-The tests cover input validation, job handling, the checkpoint check, the job API and the
-nvdiffrast stand-in (against a brute-force rasterizer and analytic results). Before the first
+The tests cover input validation, job handling, the checkpoint check, the job API, the
+nvdiffrast stand-in (against a brute-force rasterizer and analytic results) and the picture
+projection (synthetic models pictured from known cameras: the camera found, the colours painted,
+the fall-backs). Before the first
 production deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine
 that has nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real
 hardware.
