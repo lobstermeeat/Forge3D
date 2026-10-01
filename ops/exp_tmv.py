@@ -63,6 +63,8 @@ SYNTHETIC_RUNS = [
 ]
 
 FOUR, SIX = [0, 90, 180, 270], [0, 45, 90, 180, 270, 315]
+# The five drawn views without the redrawn front (the picture already shows it)
+FIVE = [45, 90, 180, 270, 315]
 REAL_MODES = [
     SINGLE,
     _mv("real4-stoch-w2", "real", FOUR, "stochastic", 2.0),
@@ -70,6 +72,27 @@ REAL_MODES = [
     _mv("real6-stoch-w2", "real", SIX, "stochastic", 2.0),
     _mv("real6-multi-w2", "real", SIX, "multidiffusion", 2.0),
 ]
+# real1 showed: four views and multidiffusion is the setting that helps (six views hurt, the 45/315
+# drawings being the weak ones; stochastic washes the front out). Weights around it: the picture equal to
+# each view, or well above them; and the drawn front left out (the picture shows that side already)
+THREE = [90, 180, 270]
+REAL_WEIGHTS = [
+    SINGLE,
+    _mv("real4-multi-w1", "real", FOUR, "multidiffusion", 1.0),
+    _mv("real4-multi-w4", "real", FOUR, "multidiffusion", 4.0),
+    _mv("real3-multi-w2", "real", THREE, "multidiffusion", 2.0),
+]
+# What a control gets: the setting under consideration for production, and the cheap mode
+REAL_CONTROL = [
+    SINGLE,
+    _mv("real4-multi-w2", "real", FOUR, "multidiffusion", 2.0),
+    _mv("real4-stoch-w2", "real", FOUR, "stochastic", 2.0),
+]
+
+
+def _preview(runs: list) -> list:
+    """The same runs with the '512' pipeline (the books never fit the cascade: they fell back to it anyway)."""
+    return [{**run, "mode": "preview"} for run in runs]
 
 PLANS: dict[str, list[dict]] = {
     # Consistent views first: does the mechanism keep a shape it is shown from every side?
@@ -81,6 +104,14 @@ PLANS: dict[str, list[dict]] = {
     ],
     # The MV line's MV-Adapter views of the four back failures: mode and number of views
     "real1": [{"number": n, "runs": REAL_MODES} for n in ("04", "06", "08", "11")],
+    # Weights and the drawn front, on the two whose views are good and the arcade
+    "real2": [
+        {"number": "06", "runs": REAL_WEIGHTS},
+        {"number": "04", "runs": REAL_WEIGHTS},
+        {"number": "11", "runs": _preview(REAL_WEIGHTS)},
+    ],
+    # Controls that must not get worse (views from the MV line, when they are on the volume)
+    "controls": [{"number": n, "runs": REAL_CONTROL} for n in ("01", "09", "13")],
 }
 
 
@@ -301,7 +332,7 @@ class Lab:
             packed = base64.b64decode(result["glb"]["base64"])
             entry.update({k: result.get(k) for k in ("timings", "pipeline", "views_used", "triangles", "projection")})
             entry["gpu_s"] = round(sum(result["timings"].values()), 1)
-            if run["name"] == "single" and job["mode"] == "final":
+            if run["name"] == "single":  # the reference, in whatever mode the plan runs this object
                 pose = (result.get("projection") or {}).get("pose") or {"azimuth": 0.0}
                 reference = {"raw": self.raw, "azimuth": float(pose["azimuth"])}
             try:
