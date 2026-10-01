@@ -1,0 +1,342 @@
+{
+  "plan": "synthetic",
+  "objects": {
+    "06": {
+      "source": "phase2-06-wooden-shield-with-a-lion",
+      "seed": 1654818878,
+      "label": "06-wooden-shield-with-a-lion",
+      "runs": {
+        "06-wooden-shield-with-a-lion-single": {
+          "run": {
+            "name": "single",
+            "views": "none"
+          },
+          "wall_s": 49.8,
+          "peak_gib": 19.9,
+          "timings": {
+            "generate_s": 23.824,
+            "export_s": 24.386,
+            "compress_s": 1.577,
+            "upload_s": 0.003
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 0,
+          "triangles": 94219,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9909,
+            "colour": 0.5385,
+            "coverage": 0.1376,
+            "pose": {
+              "azimuth": 6.9,
+              "elevation": 5.0,
+              "roll": 0.0,
+              "fov": 36.4,
+              "scale": 1.006,
+              "shift": [
+                0.0,
+                0.0028
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#5c3011",
+                "to": "#60271b",
+                "share": 0.221
+              }
+            ],
+            "decals": 1651,
+            "seconds": 1.262
+          },
+          "gpu_s": 49.8,
+          "metrics": {
+            "extents": [
+              0.6612,
+              1.0015,
+              0.0957
+            ],
+            "area": 3.9911,
+            "watertight": false,
+            "faces": 94219
+          }
+        },
+        "06-wooden-shield-with-a-lion-syn3-stoch-w2": {
+          "run": {
+            "name": "syn3-stoch-w2",
+            "views": "synthetic",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "stochastic",
+            "picture_weight": 2.0
+          },
+          "wall_s": 33.6,
+          "peak_gib": 19.8,
+          "timings": {
+            "generate_s": 13.981,
+            "export_s": 18.01,
+            "compress_s": 1.535,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 99294,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9873,
+            "colour": 0.324,
+            "coverage": 0.1382,
+            "pose": {
+              "azimuth": 10.0,
+              "elevation": 8.8,
+              "roll": 0.0,
+              "fov": 29.0,
+              "scale": 1.011,
+              "shift": [
+                0.0002,
+                0.0031
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#a06b2d",
+                "to": "#a45926",
+                "share": 0.209
+              }
+            ],
+            "decals": 2542,
+            "seconds": 0.391
+          },
+          "gpu_s": 33.5,
+          "metrics": {
+            "extents": [
+              0.6527,
+              1.0014,
+              0.0946
+            ],
+            "area": 3.9819,
+            "watertight": false,
+            "faces": 99294,
+            "vs_single": {
+              "extent_ratio": [
+                0.987,
+                1.0,
+                0.989
+              ],
+              "area_ratio": 0.998,
+              "silhouette_iou": [
+                0.98,
+                0.979,
+                0.913,
+                0.979,
+                0.98,
+                0.979,
+                0.913,
+                0.979,
+                0.885
+              ],
+              "silhouette_area_ratio": [
+                0.996,
+                0.982,
+                0.97,
+                0.982,
+                0.996,
+                0.982,
+                0.97,
+                0.982,
+                0.948
+              ],
+              "mean_iou": 0.954,
+              "mean_area_ratio": 0.979,
+              "chamfer_mean": 0.00627,
+              "chamfer_p90": 0.00996
+            }
+          }
+        },
+        "06-wooden-shield-with-a-lion-syn3-multi-w2": {
+          "run": {
+            "name": "syn3-multi-w2",
+            "views": "synthetic",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0
+          },
+          "wall_s": 62.4,
+          "peak_gib": 19.6,
+          "timings": {
+            "generate_s": 36.949,
+            "export_s": 23.77,
+            "compress_s": 1.57,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 97504,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9914,
+            "colour": 0.4236,
+            "coverage": 0.1725,
+            "pose": {
+              "azimuth": 347.5,
+              "elevation": -3.8,
+              "roll": 0.0,
+              "fov": 1.4,
+              "scale": 1.008,
+              "shift": [
+                0.0002,
+                0.0041
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#633c10",
+                "to": "#572317",
+                "share": 0.171
+              },
+              {
+                "from": "#492b0d",
+                "to": "#562216",
+                "share": 0.087
+              }
+            ],
+            "decals": 2170,
+            "seconds": 0.334
+          },
+          "gpu_s": 62.3,
+          "metrics": {
+            "extents": [
+              0.6625,
+              1.0014,
+              0.0903
+            ],
+            "area": 3.8111,
+            "watertight": false,
+            "faces": 97504,
+            "vs_single": {
+              "extent_ratio": [
+                1.002,
+                1.0,
+                0.944
+              ],
+              "area_ratio": 0.955,
+              "silhouette_iou": [
+                0.985,
+                0.988,
+                0.928,
+                0.988,
+                0.985,
+                0.988,
+                0.928,
+                0.988,
+                0.909
+              ],
+              "silhouette_area_ratio": [
+                1.008,
+                0.989,
+                0.95,
+                0.989,
+                1.008,
+                0.989,
+                0.95,
+                0.989,
+                0.936
+              ],
+              "mean_iou": 0.965,
+              "mean_area_ratio": 0.979,
+              "chamfer_mean": 0.0058,
+              "chamfer_p90": 0.00933
+            }
+          }
+        },
+        "06-wooden-shield-with-a-lion-syn3-stoch-w2-preview": {
+          "run": {
+            "name": "syn3-stoch-w2-preview",
+            "views": "synthetic",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "stochastic",
+            "picture_weight": 2.0,
+            "mode": "preview"
+          },
+          "wall_s": 10.9,
+          "peak_gib": 18.3,
+          "timings": {
+            "generate_s": 4.6,
+            "export_s": 5.492,
+            "compress_s": 0.739,
+            "upload_s": 0.001
+          },
+          "pipeline": "512",
+          "views_used": 3,
+          "triangles": 28393,
+          "projection": null,
+          "gpu_s": 10.8,
+          "metrics": {
+            "extents": [
+              0.6521,
+              1.0031,
+              0.0972
+            ],
+            "area": 3.3958,
+            "watertight": false,
+            "faces": 28393,
+            "vs_single": {
+              "extent_ratio": [
+                0.986,
+                1.002,
+                1.016
+              ],
+              "area_ratio": 0.851,
+              "silhouette_iou": [
+                0.979,
+                0.987,
+                0.917,
+                0.986,
+                0.979,
+                0.987,
+                0.917,
+                0.986,
+                0.89
+              ],
+              "silhouette_area_ratio": [
+                0.998,
+                0.991,
+                0.988,
+                0.992,
+                0.998,
+                0.991,
+                0.988,
+                0.992,
+                0.976
+              ],
+              "mean_iou": 0.959,
+              "mean_area_ratio": 0.99,
+              "chamfer_mean": 0.00595,
+              "chamfer_p90": 0.00928
+            }
+          }
+        }
+      },
+      "load_s": 97.2,
+      "seconds": 177.1
+    }
+  },
+  "wall_s": 282.4,
+  "gpu_minutes": 4.6
+}

@@ -1,0 +1,744 @@
+{
+  "plan": "synthetic",
+  "objects": {
+    "04": {
+      "source": "phase2-04-retro-arcade-machine",
+      "seed": 949054593,
+      "label": "04-retro-arcade-machine",
+      "runs": {
+        "04-retro-arcade-machine-single": {
+          "run": {
+            "name": "single",
+            "views": "none"
+          },
+          "wall_s": 44.5,
+          "peak_gib": 21.8,
+          "timings": {
+            "generate_s": 21.81,
+            "export_s": 21.633,
+            "compress_s": 1.036,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 0,
+          "triangles": 97452,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9801,
+            "colour": 0.5482,
+            "coverage": 0.1396,
+            "pose": {
+              "azimuth": 338.8,
+              "elevation": 3.8,
+              "roll": 0.0,
+              "fov": 20.2,
+              "scale": 1.004,
+              "shift": [
+                0.0003,
+                -0.0037
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#6c1e22",
+                "to": "#a67d84",
+                "share": 0.016
+              }
+            ],
+            "decals": 82,
+            "seconds": 0.97
+          },
+          "gpu_s": 44.5,
+          "metrics": {
+            "extents": [
+              0.3598,
+              1.0017,
+              0.5427
+            ],
+            "area": 6.2773,
+            "watertight": false,
+            "faces": 97452
+          }
+        },
+        "04-retro-arcade-machine-syn3-stoch-w2": {
+          "run": {
+            "name": "syn3-stoch-w2",
+            "views": "synthetic",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "stochastic",
+            "picture_weight": 2.0
+          },
+          "wall_s": 42.1,
+          "peak_gib": 20.5,
+          "timings": {
+            "generate_s": 17.501,
+            "export_s": 23.482,
+            "compress_s": 1.107,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 96063,
+          "projection": {
+            "applied": false,
+            "reason": "ambiguous camera: a view 141 degrees away fits as well but sees a different shape",
+            "iou": 0.9731,
+            "colour": 0.0093,
+            "pose": {
+              "azimuth": 339.8,
+              "elevation": 13.8,
+              "roll": 0.0,
+              "fov": 0.0,
+              "scale": 1.005,
+              "shift": [
+                -0.0034,
+                -0.0037
+              ]
+            },
+            "seconds": 0.247
+          },
+          "gpu_s": 42.1,
+          "metrics": {
+            "extents": [
+              0.3435,
+              1.0016,
+              0.5548
+            ],
+            "area": 4.6321,
+            "watertight": false,
+            "faces": 96063,
+            "vs_single": {
+              "extent_ratio": [
+                0.955,
+                1.0,
+                1.022
+              ],
+              "area_ratio": 0.738,
+              "silhouette_iou": [
+                0.949,
+                0.99,
+                0.97,
+                0.991,
+                0.949,
+                0.99,
+                0.97,
+                0.991,
+                0.94
+              ],
+              "silhouette_area_ratio": [
+                0.959,
+                0.996,
+                1.021,
+                0.996,
+                0.959,
+                0.996,
+                1.021,
+                0.996,
+                0.97
+              ],
+              "mean_iou": 0.971,
+              "mean_area_ratio": 0.991,
+              "chamfer_mean": 0.00754,
+              "chamfer_p90": 0.01187
+            }
+          }
+        },
+        "04-retro-arcade-machine-syn3-multi-w2": {
+          "run": {
+            "name": "syn3-multi-w2",
+            "views": "synthetic",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0
+          },
+          "wall_s": 95.9,
+          "peak_gib": 22.5,
+          "timings": {
+            "generate_s": 71.834,
+            "export_s": 22.923,
+            "compress_s": 1.142,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 98850,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9854,
+            "colour": 0.6936,
+            "coverage": 0.1358,
+            "pose": {
+              "azimuth": 339.4,
+              "elevation": 5.0,
+              "roll": 0.0,
+              "fov": 17.3,
+              "scale": 1.0,
+              "shift": [
+                0.0002,
+                -0.0006
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#d53f3d",
+                "to": "#bb5958",
+                "share": 0.32
+              },
+              {
+                "from": "#332726",
+                "to": "#7b5e62",
+                "share": 0.198
+              }
+            ],
+            "decals": 37,
+            "seconds": 0.388
+          },
+          "gpu_s": 95.9,
+          "metrics": {
+            "extents": [
+              0.364,
+              1.0016,
+              0.5529
+            ],
+            "area": 6.349,
+            "watertight": false,
+            "faces": 98850,
+            "vs_single": {
+              "extent_ratio": [
+                1.012,
+                1.0,
+                1.019
+              ],
+              "area_ratio": 1.011,
+              "silhouette_iou": [
+                0.989,
+                0.993,
+                0.982,
+                0.99,
+                0.989,
+                0.993,
+                0.982,
+                0.99,
+                0.976
+              ],
+              "silhouette_area_ratio": [
+                0.999,
+                1.001,
+                1.013,
+                1.006,
+                0.999,
+                1.001,
+                1.013,
+                1.006,
+                1.025
+              ],
+              "mean_iou": 0.987,
+              "mean_area_ratio": 1.007,
+              "chamfer_mean": 0.00651,
+              "chamfer_p90": 0.01091
+            }
+          }
+        }
+      },
+      "load_s": 94.7,
+      "seconds": 192.2
+    },
+    "08": {
+      "source": "phase2-08-vintage-film-camera",
+      "seed": 849334850,
+      "label": "08-vintage-film-camera",
+      "runs": {
+        "08-vintage-film-camera-single": {
+          "run": {
+            "name": "single",
+            "views": "none"
+          },
+          "wall_s": 54.5,
+          "peak_gib": 22.8,
+          "timings": {
+            "generate_s": 29.25,
+            "export_s": 23.626,
+            "compress_s": 1.592,
+            "upload_s": 0.003
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 0,
+          "triangles": 93683,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9619,
+            "colour": 0.6081,
+            "coverage": 0.0747,
+            "pose": {
+              "azimuth": 0.0,
+              "elevation": 0.0,
+              "roll": 0.0,
+              "fov": 0.0,
+              "scale": 0.973,
+              "shift": [
+                0.0081,
+                0.0
+              ]
+            },
+            "mode": "detail only",
+            "decals": 137,
+            "seconds": 1.255
+          },
+          "gpu_s": 54.5,
+          "metrics": {
+            "extents": [
+              1.0003,
+              0.6311,
+              0.738
+            ],
+            "area": 6.6549,
+            "watertight": false,
+            "faces": 93683
+          }
+        },
+        "08-vintage-film-camera-syn3-stoch-w2": {
+          "run": {
+            "name": "syn3-stoch-w2",
+            "views": "synthetic",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "stochastic",
+            "picture_weight": 2.0
+          },
+          "wall_s": 47.1,
+          "peak_gib": 22.2,
+          "timings": {
+            "generate_s": 25.521,
+            "export_s": 19.919,
+            "compress_s": 1.584,
+            "upload_s": 0.003
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 99006,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9651,
+            "colour": 0.5631,
+            "coverage": 0.0798,
+            "pose": {
+              "azimuth": 358.8,
+              "elevation": 0.0,
+              "roll": 0.0,
+              "fov": 0.0,
+              "scale": 0.96,
+              "shift": [
+                0.01,
+                0.0006
+              ]
+            },
+            "mode": "detail only",
+            "decals": 110,
+            "seconds": 0.81
+          },
+          "gpu_s": 47.0,
+          "metrics": {
+            "extents": [
+              0.9998,
+              0.6346,
+              0.7536
+            ],
+            "area": 6.1026,
+            "watertight": false,
+            "faces": 99006,
+            "vs_single": {
+              "extent_ratio": [
+                0.999,
+                1.006,
+                1.021
+              ],
+              "area_ratio": 0.917,
+              "silhouette_iou": [
+                0.97,
+                0.974,
+                0.964,
+                0.977,
+                0.97,
+                0.974,
+                0.964,
+                0.977,
+                0.95
+              ],
+              "silhouette_area_ratio": [
+                1.014,
+                1.021,
+                1.026,
+                1.015,
+                1.014,
+                1.021,
+                1.026,
+                1.015,
+                1.019
+              ],
+              "mean_iou": 0.969,
+              "mean_area_ratio": 1.019,
+              "chamfer_mean": 0.01241,
+              "chamfer_p90": 0.02077
+            }
+          }
+        },
+        "08-vintage-film-camera-syn3-multi-w2": {
+          "run": {
+            "name": "syn3-multi-w2",
+            "views": "synthetic",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0
+          },
+          "wall_s": 98.5,
+          "peak_gib": 21.6,
+          "timings": {
+            "generate_s": 74.668,
+            "export_s": 22.169,
+            "compress_s": 1.592,
+            "upload_s": 0.003
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 98515,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9534,
+            "colour": 0.5159,
+            "coverage": 0.0851,
+            "pose": {
+              "azimuth": 0.0,
+              "elevation": 4.4,
+              "roll": 0.0,
+              "fov": 11.5,
+              "scale": 0.96,
+              "shift": [
+                0.0087,
+                -0.0056
+              ]
+            },
+            "mode": "detail only",
+            "decals": 112,
+            "seconds": 0.31
+          },
+          "gpu_s": 98.4,
+          "metrics": {
+            "extents": [
+              0.9987,
+              0.6358,
+              0.7545
+            ],
+            "area": 5.4646,
+            "watertight": false,
+            "faces": 98515,
+            "vs_single": {
+              "extent_ratio": [
+                0.998,
+                1.007,
+                1.022
+              ],
+              "area_ratio": 0.821,
+              "silhouette_iou": [
+                0.977,
+                0.977,
+                0.962,
+                0.984,
+                0.977,
+                0.977,
+                0.962,
+                0.984,
+                0.952
+              ],
+              "silhouette_area_ratio": [
+                1.012,
+                1.016,
+                1.031,
+                1.015,
+                1.012,
+                1.016,
+                1.031,
+                1.015,
+                1.009
+              ],
+              "mean_iou": 0.972,
+              "mean_area_ratio": 1.017,
+              "chamfer_mean": 0.01129,
+              "chamfer_p90": 0.01874
+            }
+          }
+        }
+      },
+      "load_s": 100.8,
+      "seconds": 212.4
+    },
+    "13": {
+      "source": "phase2-13-cute-cartoon-car-bright-blue",
+      "seed": 207648777,
+      "label": "13-cute-cartoon-car-bright-blue",
+      "runs": {
+        "13-cute-cartoon-car-bright-blue-single": {
+          "run": {
+            "name": "single",
+            "views": "none"
+          },
+          "wall_s": 52.2,
+          "peak_gib": 22.7,
+          "timings": {
+            "generate_s": 30.697,
+            "export_s": 20.272,
+            "compress_s": 1.209,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 0,
+          "triangles": 96089,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9798,
+            "colour": 0.5158,
+            "coverage": 0.0774,
+            "pose": {
+              "azimuth": 35.0,
+              "elevation": 10.6,
+              "roll": -1.5,
+              "fov": 29.0,
+              "scale": 1.005,
+              "shift": [
+                0.0012,
+                -0.0019
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#1296be",
+                "to": "#6e9bb0",
+                "share": 0.068
+              }
+            ],
+            "decals": 418,
+            "seconds": 0.392
+          },
+          "gpu_s": 52.2,
+          "metrics": {
+            "extents": [
+              0.5753,
+              0.4674,
+              1.0013
+            ],
+            "area": 6.3921,
+            "watertight": false,
+            "faces": 96089
+          }
+        },
+        "13-cute-cartoon-car-bright-blue-syn3-stoch-w2": {
+          "run": {
+            "name": "syn3-stoch-w2",
+            "views": "synthetic",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "stochastic",
+            "picture_weight": 2.0
+          },
+          "wall_s": 48.4,
+          "peak_gib": 21.3,
+          "timings": {
+            "generate_s": 24.599,
+            "export_s": 22.538,
+            "compress_s": 1.223,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 94289,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9726,
+            "colour": 0.4829,
+            "coverage": 0.0847,
+            "pose": {
+              "azimuth": 32.5,
+              "elevation": 10.6,
+              "roll": 0.0,
+              "fov": 29.0,
+              "scale": 0.994,
+              "shift": [
+                -0.005,
+                -0.0025
+              ]
+            },
+            "mode": "detail only",
+            "decals": 308,
+            "seconds": 0.957
+          },
+          "gpu_s": 48.4,
+          "metrics": {
+            "extents": [
+              0.5367,
+              0.4418,
+              1.0012
+            ],
+            "area": 5.083,
+            "watertight": false,
+            "faces": 94289,
+            "vs_single": {
+              "extent_ratio": [
+                0.933,
+                0.945,
+                1.0
+              ],
+              "area_ratio": 0.795,
+              "silhouette_iou": [
+                0.877,
+                0.913,
+                0.928,
+                0.911,
+                0.877,
+                0.913,
+                0.928,
+                0.911,
+                0.941
+              ],
+              "silhouette_area_ratio": [
+                0.912,
+                0.918,
+                0.932,
+                0.916,
+                0.912,
+                0.918,
+                0.932,
+                0.916,
+                0.943
+              ],
+              "mean_iou": 0.911,
+              "mean_area_ratio": 0.922,
+              "chamfer_mean": 0.01106,
+              "chamfer_p90": 0.01893
+            }
+          }
+        },
+        "13-cute-cartoon-car-bright-blue-syn3-multi-w2": {
+          "run": {
+            "name": "syn3-multi-w2",
+            "views": "synthetic",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0
+          },
+          "wall_s": 105.5,
+          "peak_gib": 22.0,
+          "timings": {
+            "generate_s": 81.537,
+            "export_s": 22.662,
+            "compress_s": 1.207,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 98749,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9725,
+            "colour": 0.4608,
+            "coverage": 0.0751,
+            "pose": {
+              "azimuth": 33.1,
+              "elevation": 10.0,
+              "roll": -1.0,
+              "fov": 29.0,
+              "scale": 0.998,
+              "shift": [
+                -0.0028,
+                -0.0019
+              ]
+            },
+            "mode": "detail only",
+            "decals": 357,
+            "seconds": 1.145
+          },
+          "gpu_s": 105.4,
+          "metrics": {
+            "extents": [
+              0.5262,
+              0.443,
+              1.0015
+            ],
+            "area": 5.7573,
+            "watertight": false,
+            "faces": 98749,
+            "vs_single": {
+              "extent_ratio": [
+                0.915,
+                0.948,
+                1.0
+              ],
+              "area_ratio": 0.901,
+              "silhouette_iou": [
+                0.873,
+                0.918,
+                0.931,
+                0.919,
+                0.873,
+                0.918,
+                0.931,
+                0.919,
+                0.94
+              ],
+              "silhouette_area_ratio": [
+                0.903,
+                0.922,
+                0.936,
+                0.924,
+                0.903,
+                0.922,
+                0.936,
+                0.924,
+                0.942
+              ],
+              "mean_iou": 0.914,
+              "mean_area_ratio": 0.923,
+              "chamfer_mean": 0.01139,
+              "chamfer_p90": 0.01937
+            }
+          }
+        }
+      },
+      "load_s": 0.0,
+      "seconds": 225.4
+    }
+  },
+  "wall_s": 548.7,
+  "gpu_minutes": 13.8
+}
