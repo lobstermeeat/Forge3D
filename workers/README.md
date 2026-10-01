@@ -129,6 +129,20 @@ of GPU memory gets one retry in Pixal3D's low-VRAM mode. In the Phase 6 experime
 15–40 s to generate alone and 40–70 s with six views, plus 15–25 s to export, at 28–31 GB of GPU
 memory on an L40S with everything resident; loading the models takes about 90 s.
 
+A picture alone is built in its camera's frame (Pixal3D has no notion of gravity: an object
+pictured from above would lean towards the viewer by that elevation), so the worker levels it.
+It runs TRELLIS.2's `512` preview of the same picture and seed first (the preview the user
+approves; `TRELLIS2_MODEL_DIR`, loaded beside Pixal3D and kept off the GPU between uses), finds
+the picture's camera against it with the projection's silhouette search, and turns the model by
+that elevation and roll before the picture is painted on (`pixal3d_worker/level.py`). The result
+carries `"camera"."tilt"` (what it was turned by and where that came from), `"pose"` (the search:
+`pose`, `iou`, `colour`, `runner_up`, whether it passed the gate and why not) and `"level"` (what
+the export turned). The gate is the projection's own (silhouette IoU at least 0.93, no rival camera
+seeing another shape) plus a guard against cameras placed more than 10 degrees below the horizon;
+a failed gate, or a failed preview, means no levelling, reported. `PIXAL3D_LEVEL=none` turns it
+off; `given` takes a pose the caller sets (experiments). The preview adds 15–25 s to a final on an
+L40S (generation 5–10 s, export 8–12 s, the search 1–2 s) and about 90 s to the container's start.
+
 Invalid input (including an image where no object stands out from the background) comes back
 as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`. After
 a GPU fault the worker also replaces its container (RunPod: `refresh_worker`; Modal: the

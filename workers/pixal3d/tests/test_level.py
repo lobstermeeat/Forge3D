@@ -143,3 +143,25 @@ def test_a_camera_well_below_the_horizon_is_not_trusted(monkeypatch):
     report = level.estimate_pose(mesh, picture_of(mesh, -20.0), device="cpu")
     assert report["applied"] is False and "below the horizon" in report["reason"]
     assert report["pose"]["elevation"] == -20.0 and level.tilt(report) == (0.0, 0.0)
+
+
+def test_a_rival_camera_that_agrees_on_the_tilt_is_harmless(monkeypatch):
+    # The projection would give up (which side to paint?); the tilt only needs elevation and roll
+    mesh = frustum()
+    best = torch.tensor([[275.0, 8.8, 0.0, 0.3, 0.0, 0.0, 0.0]])
+    rival_same_tilt = torch.tensor([[357.5, 5.0, 0.0, 0.7, 0.0, 0.0, 0.0]])
+    rival_other_tilt = torch.tensor([[357.5, 30.0, 0.0, 0.7, 0.0, 0.0, 0.0]])
+    monkeypatch.setattr(P, "_polish", lambda model, pic, params: params)
+    monkeypatch.setattr(P, "_shape_difference", lambda za, zb: 1.0)  # a different shape, always
+    monkeypatch.setattr(P, "_iou", lambda a, b: torch.tensor(0.96))
+
+    def pose_with(rivals):
+        return lambda model, pic, clock: P._Pose(best, 0.96, 0.6, 0.96, None, rivals, [])
+
+    monkeypatch.setattr(P, "_estimate_pose", pose_with(rival_same_tilt))
+    report = level.estimate_pose(mesh, picture_of(mesh, 9.0), device="cpu")
+    assert report["applied"] is True and report["rivals"][0]["tilt_gap"] == 3.8
+    assert level.tilt(report) == (8.8, 0.0)
+    monkeypatch.setattr(P, "_estimate_pose", pose_with(rival_other_tilt))
+    report = level.estimate_pose(mesh, picture_of(mesh, 9.0), device="cpu")
+    assert report["applied"] is False and "ambiguous camera" in report["reason"] and "21 degrees of tilt" in report["reason"]
