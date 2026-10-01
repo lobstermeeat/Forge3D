@@ -173,12 +173,25 @@ def test_views_without_alpha_are_matted_uncropped():
     assert torch.allclose(packed["images"][512][0, 0], cond_tensor(cutout(colour=(0, 100, 100)), 512), atol=1e-6)
 
 
-def test_view_camera_frames_the_rig():
+def test_the_rig_frames_the_object_to_fill_the_cube():
+    # The test views' object is 60 of 96 px tall, whatever frame the job's camera claims
     rt = runtime()
     rt.generate_views(photo(), six_views(), PRESETS["final"], seed=1, camera=ViewCamera(half_extent=0.6))
     packed = rt.pipeline.runs[0][1]
-    expected = cameras.distance_for_half_width(0.6, cameras.NEAR_ORTHO_FOV_DEG)
+    half = 0.99 / (2 * 60 / 96)
+    expected = cameras.distance_for_half_width(half, cameras.NEAR_ORTHO_FOV_DEG)
     assert float(packed["camera_distance"][0, 0]) == pytest.approx(expected, rel=1e-6)
+    assert rt.last_camera["half_extent"] == pytest.approx(half, abs=1e-4)
+    assert rt.last_camera["given_half_extent"] == 0.6 and rt.last_camera["extent"] == pytest.approx(0.75)
+    assert rt.last_camera["views"][0] == [0.0, 0.0]
+
+
+def test_freeing_gpu_memory_clears_a_stale_cuda_error(monkeypatch, capsys):
+    monkeypatch.setattr(pipeline, "clear_cuda_error", lambda: "CUDA error: out of memory")
+    Pixal3DRuntime._free_gpu_memory()
+    assert "cleared a stale CUDA error" in capsys.readouterr().out
+    monkeypatch.undo()
+    assert pipeline.clear_cuda_error() is None  # without CUDA (these tests) there is nothing to clear
 
 
 def test_single_view_weights_refuse_views_and_run_the_picture():
