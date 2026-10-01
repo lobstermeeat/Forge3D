@@ -27,6 +27,13 @@ to either through `apps/server/src/services/ai` (`SelfHostedProvider`).
    `AssetLoader` decodes them; the decoders are served from `/decoders/` by the client's Vite
    config. (ETC1S, Basis' smaller format, turned neighbouring UV charts into grime and specks
    at the mip levels a model shows at normal viewing distance.)
+5. Before packing, each pass gets its own shading normals (`trellis2/forge3d_worker/normals.py`;
+   positions don't move). TRELLIS.2 often draws round things as wide flat facets: a potion's bulb
+   came out as a 32-sided polygon, 11° from facet to facet, which a glossy material mirrors as a
+   grid of blocks. A bilateral filter over the face normals smooths differences up to about 10°
+   across 32 voxels of the pass's grid and keeps larger ones, so low-poly facets and panel lines
+   stay, and edges sharper than 60° stay crisp (their vertices are split). gltfpack keeps the
+   normals as 8-bit octahedral vectors (within 1.2°).
 
 Uploaded images can skip step 1. Images with transparency skip background removal.
 
@@ -309,7 +316,8 @@ python -m pytest workers/flux-schnell/tests
 
 Run the three folders separately: they share test file names.
 
-The tests cover input validation, job handling, the checkpoint check, the job API and the
+The tests cover input validation, job handling, the out-of-memory retry and fallback, shading
+normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API and the
 nvdiffrast stand-in (against a brute-force rasterizer and analytic results). Before the first
 production deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine
 that has nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real

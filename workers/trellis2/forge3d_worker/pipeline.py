@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 from PIL import Image
 
-from . import uv_raster
+from . import normals, uv_raster
 from .inputs import InputError
 from .settings import Preset
 
@@ -235,4 +235,18 @@ class Trellis2Runtime:
         material = glb.visual.material
         if getattr(material, "baseColorTexture", None) is not None:
             material.baseColorTexture = unpremultiply(material.baseColorTexture)
+        glb = shade(glb, mesh.voxel_size)
         return glb.export(file_type="glb"), int(len(glb.faces))
+
+
+def shade(glb: Any, voxel_size: float) -> Any:
+    """
+    The exported mesh with smooth, feature-preserving shading normals (see normals.py). They only change
+    how light falls on it, so if they fail the remesher's own normals are kept and the job goes on.
+    """
+    try:
+        return normals.with_shading_normals(glb, float(voxel_size))
+    except Exception as err:  # noqa: BLE001 - any failure here is cosmetic
+        reason = f"{type(err).__name__}: {_one_line(err)}"
+        print(f"[forge3d] shading normals failed, keeping the remesher's: {reason}")
+        return glb
