@@ -1,0 +1,1143 @@
+== Weights already in the volume
+dinov3-vitl16
+TRELLIS.2-4B
+BiRefNet
+FLUX.1-schnell
+stable-diffusion-xl-base-1.0
+sdxl-vae-fp16-fix
+mv-adapter
+.multiview-weights
+.reference-weights
+.trellis2-weights
+== Pixal3D's weights (CPU)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-1PxhUj5Ubs5zQjx2cBEbnu
+Building image im-ffQgw6StX8SeWxA4Uqotb5
+
+=> Step 0: FROM base
+
+=> Step 1: RUN git clone https://github.com/TencentARC/Pixal3D /opt/pixal3d && git -C /opt/pixal3d checkout f7cf38429b0bd264f1995f0f8743a88b1c728b94 && git -C /opt/pixal3d submodule update --init --recursive
+Cloning into '/opt/pixal3d'...
+Note: switching to 'f7cf38429b0bd264f1995f0f8743a88b1c728b94'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at f7cf384 feat: support multi-view image input
+
+=> Step 2: RUN echo /opt/pixal3d > "$(python -c "import site; print(site.getsitepackages()[0])")/pixal3d-repo.pth"
+
+=> Step 3: RUN git clone https://github.com/valeoai/NAF /opt/naf && git -C /opt/naf checkout 37f2dfc180f2de53d98bd601109c0da0dd6b0f43 && git -C /opt/naf submodule update --init --recursive
+Cloning into '/opt/naf'...
+Note: switching to '37f2dfc180f2de53d98bd601109c0da0dd6b0f43'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD is now at 37f2dfc Add eval depth probing
+Saving image...
+Image saved, took 907.00ms
+
+Built image im-ffQgw6StX8SeWxA4Uqotb5 in 8.72s
+
+
+Building image im-xYUyGMa3pwbXm83iNoBZ0y
+
+=> Step 0: FROM base
+
+=> Step 1: RUN python -m pip install --no-deps 'utils3d @ git+https://github.com/EasternJournalist/utils3d.git@3fab839f0be9931dac7c8488eb0e1600c236e183' 'moge @ git+https://github.com/microsoft/MoGe.git@07444410f1e33f402353b99d6ccd26bd31e469e8'
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Collecting utils3d @ git+https://github.com/EasternJournalist/utils3d.git@3fab839f0be9931dac7c8488eb0e1600c236e183
+  Cloning https://github.com/EasternJournalist/utils3d.git (to revision 3fab839f0be9931dac7c8488eb0e1600c236e183) to ./tmp/pip-install-26la8v01/utils3d_2d1377da5c214545ac77382256761158
+  Running command git clone --filter=blob:none --quiet https://github.com/EasternJournalist/utils3d.git /tmp/pip-install-26la8v01/utils3d_2d1377da5c214545ac77382256761158
+  Running command git rev-parse -q --verify '3fab839f0be9931dac7c8488eb0e1600c236e183^{commit}'
+  3fab839f0be9931dac7c8488eb0e1600c236e183
+  Running command git checkout -q 3fab839f0be9931dac7c8488eb0e1600c236e183
+  Resolved https://github.com/EasternJournalist/utils3d.git to commit 3fab839f0be9931dac7c8488eb0e1600c236e183
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Collecting moge @ git+https://github.com/microsoft/MoGe.git@07444410f1e33f402353b99d6ccd26bd31e469e8
+  Cloning https://github.com/microsoft/MoGe.git (to revision 07444410f1e33f402353b99d6ccd26bd31e469e8) to ./tmp/pip-install-26la8v01/moge_719db18609a7420ebab8994cce6174be
+  Running command git clone --filter=blob:none --quiet https://github.com/microsoft/MoGe.git /tmp/pip-install-26la8v01/moge_719db18609a7420ebab8994cce6174be
+  Running command git rev-parse -q --verify '07444410f1e33f402353b99d6ccd26bd31e469e8^{commit}'
+  07444410f1e33f402353b99d6ccd26bd31e469e8
+  Running command git checkout -q 07444410f1e33f402353b99d6ccd26bd31e469e8
+  Resolved https://github.com/microsoft/MoGe.git to commit 07444410f1e33f402353b99d6ccd26bd31e469e8
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: utils3d, moge
+  Building wheel for utils3d (pyproject.toml): started
+  Building wheel for utils3d (pyproject.toml): finished with status 'done'
+  Created wheel for utils3d: filename=utils3d-1.3-py3-none-any.whl size=130372 sha256=0d3f6bc3153f3cdb0c241f3d82af60894cfd2f7c9f43502f42994173d40775d5
+  Stored in directory: /tmp/pip-ephem-wheel-cache-5wrw6auc/wheels/39/94/c8/328cc054a4048efbb1d4c5fa3109a2ba5c86a42e0eb507b9c8
+  Building wheel for moge (pyproject.toml): started
+  Building wheel for moge (pyproject.toml): finished with status 'done'
+  Created wheel for moge: filename=moge-2.0.0-py3-none-any.whl size=114627 sha256=37e4e5662fe11add4610d79f045ed7e2e9913d450639a079382ca647c6b7ca95
+  Stored in directory: /tmp/pip-ephem-wheel-cache-5wrw6auc/wheels/1a/7f/69/fb603dc8e9b039835c7e1a5a5a81f80587f07eaf7c29920e8e
+Successfully built utils3d moge
+Installing collected packages: utils3d, moge
+
+Successfully installed moge-2.0.0 utils3d-1.3
+Saving image...
+Image saved, took 839.33ms
+
+Built image im-xYUyGMa3pwbXm83iNoBZ0y in 9.68s
+
+
+Building image im-de4c7cYtVDPsbU5Bu8TErg
+
+=> Step 0: FROM base
+
+=> Step 1: COPY /.requirements.txt /.requirements.txt
+
+=> Step 2: RUN python -m pip install -r /.requirements.txt
+Looking in indexes: http://pypi-mirror.modal.local:5555/simple
+Collecting transformers==4.57.3 (from -r /.requirements.txt (line 5))
+  Downloading transformers-4.57.3-py3-none-any.whl.metadata (43 kB)
+Collecting scipy<2,>=1.11 (from -r /.requirements.txt (line 7))
+  Downloading scipy-1.15.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (61 kB)
+Requirement already satisfied: filelock in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (3.32.3)
+Requirement already satisfied: huggingface-hub<1.0,>=0.34.0 in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (0.36.2)
+Requirement already satisfied: numpy>=1.17 in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (2.2.6)
+Requirement already satisfied: packaging>=20.0 in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (26.3)
+Requirement already satisfied: pyyaml>=5.1 in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (6.0.3)
+Requirement already satisfied: regex!=2019.12.17 in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (2026.9.29)
+Requirement already satisfied: requests in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (2.34.2)
+Requirement already satisfied: tokenizers<=0.23.0,>=0.22.0 in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (0.22.2)
+Requirement already satisfied: safetensors>=0.4.3 in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (0.8.0)
+Requirement already satisfied: tqdm>=4.27 in ./usr/local/lib/python3.10/site-packages (from transformers==4.57.3->-r /.requirements.txt (line 5)) (4.70.1)
+Requirement already satisfied: fsspec>=2023.5.0 in ./usr/local/lib/python3.10/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers==4.57.3->-r /.requirements.txt (line 5)) (2026.7.0)
+Requirement already satisfied: hf-xet<2.0.0,>=1.1.3 in ./usr/local/lib/python3.10/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers==4.57.3->-r /.requirements.txt (line 5)) (1.6.0)
+Requirement already satisfied: typing-extensions>=3.7.4.3 in ./usr/local/lib/python3.10/site-packages (from huggingface-hub<1.0,>=0.34.0->transformers==4.57.3->-r /.requirements.txt (line 5)) (4.16.0)
+Requirement already satisfied: charset_normalizer<4,>=2 in ./usr/local/lib/python3.10/site-packages (from requests->transformers==4.57.3->-r /.requirements.txt (line 5)) (3.5.1)
+Requirement already satisfied: idna<4,>=2.5 in ./usr/local/lib/python3.10/site-packages (from requests->transformers==4.57.3->-r /.requirements.txt (line 5)) (3.20)
+Requirement already satisfied: urllib3<3,>=1.26 in ./usr/local/lib/python3.10/site-packages (from requests->transformers==4.57.3->-r /.requirements.txt (line 5)) (2.8.0)
+Requirement already satisfied: certifi>=2023.5.7 in ./usr/local/lib/python3.10/site-packages (from requests->transformers==4.57.3->-r /.requirements.txt (line 5)) (2026.7.22)
+Downloading transformers-4.57.3-py3-none-any.whl (12.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.0/12.0 MB 269.0 MB/s  0:00:00
+Downloading scipy-1.15.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (37.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 37.7/37.7 MB 495.5 MB/s  0:00:00
+Installing collected packages: scipy, transformers
+  Attempting uninstall: transformers
+    Found existing installation: transformers 4.57.6
+    Uninstalling transformers-4.57.6:
+      Successfully uninstalled transformers-4.57.6
+
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+moge 2.0.0 requires gradio, which is not installed.
+moge 2.0.0 requires matplotlib, which is not installed.
+moge 2.0.0 requires opencv-python, which is not installed.
+moge 2.0.0 requires pipeline @ git+https://github.com/EasternJournalist/pipeline.git@866f059d2a05cde05e4a52211ec5051fd5f276d6, which is not installed.
+utils3d 1.3 requires matplotlib, which is not installed.
+utils3d 1.3 requires moderngl, which is not installed.
+Successfully installed scipy-1.15.3 transformers-4.57.3
+Saving image...
+Image saved, took 1.12s
+
+Built image im-de4c7cYtVDPsbU5Bu8TErg in 19.74s
+
+
+Building image im-QapDRvVRbyO9x2OcD69cJ9
+
+=> Step 0: FROM base
+
+=> Step 1: ENV PIXAL3D_MODEL_DIR=/models/pixal3d
+
+=> Step 2: ENV PIXAL3D_DINO_DIR=/models/dinov3-vitl16
+
+=> Step 3: ENV PIXAL3D_NAF_DIR=/opt/naf
+Saving image...
+Image saved, took 865.46ms
+
+Built image im-QapDRvVRbyO9x2OcD69cJ9 in 2.36s
+
+
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/exp_pixal3d.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/pixal3d/scripts/download_weights.p
+│   y
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/pixal3d/pixal3d_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Created Function fetch_weights.
+└── ✓ Created Function Pixal3D.*.
+DINOv3: identical to the copy Pixal3D names
+ckpts/ss_dec_conv3d_16l8_fp16: the TRELLIS.2 worker's copy (sha256 matches)
+ckpts/shape_dec_next_dc_f16c32_fp16: the TRELLIS.2 worker's copy (sha256 matches)
+ckpts/tex_dec_next_dc_f16c32_fp16: the TRELLIS.2 worker's copy (sha256 matches)
+ckpts/ss_flow_img_dit_1_3B_64_bf16: ready
+ckpts/slat_flow_img2shape_dit_1_3B_512_bf16: ready
+ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16: ready
+ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16: ready
+ckpts/ss_flow_img_dit_1_3B_64_bf16_mv: ready
+ckpts/slat_flow_img2shape_dit_1_3B_512_bf16_mv: ready
+ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16_mv: ready
+ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16_mv: ready
+Pixal3D weights ready in /models/pixal3d
+[pixal3d] weights (all): downloaded in 218 s
+Stopping app - local entrypoint completed.
+Runner terminated.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-1PxhUj5Ubs5zQjx2cBEbnu
+pixal3d/ckpts
+pixal3d/naf
+pixal3d/moge-2-vitl
+pixal3d/pipeline_mv.json
+pixal3d/pipeline.json
+pixal3d/README.md
+pixal3d/NOTICE
+pixal3d/LICENSE
+== Single picture, Pixal3D's single-view weights: the four back failures and two controls
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-bJl5D6VpOFHBnzVeoY6DMs
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/exp_pixal3d.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/pixal3d/scripts/download_weights.p
+│   y
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/pixal3d/pixal3d_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Created Function fetch_weights.
+└── ✓ Created Function Pixal3D.*.
+[pixal3d] single: 6 jobs on single weights
+[SPARSE] Conv backend: flex_gemm; Attention backend: flash_attn
+[ATTENTION] Using backend: flash_attn
+[pixal3d] loaded pipeline.json in 92.7 s (low VRAM: False)
+[pixal3d] single weights on NVIDIA L40S after 101 s
+[pixal3d] picture's field of view: 26.3 degrees
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:02,  4.34it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:02,  4.85it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.03it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.12it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.17it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.20it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.21it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.22it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.23it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.24it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.85it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.63it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:01,  6.05it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:01,  6.60it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  6.77it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  6.87it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:00<00:01,  6.96it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:00<00:00,  7.00it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:01<00:00,  7.01it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  7.00it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  7.04it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:01<00:00,  9.28it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  7.94it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:00<00:07,  1.38it/s]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:01<00:07,  1.38it/s]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:02<00:06,  1.38it/s]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:02<00:05,  1.38it/s]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:03<00:05,  1.38it/s]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:04<00:04,  1.38it/s]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:05<00:03,  1.37it/s]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:05<00:02,  1.37it/s]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:06<00:02,  1.37it/s]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:06<00:01,  1.63it/s]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:07<00:00,  1.86it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:07<00:00,  2.06it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:07<00:00,  1.57it/s]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:03,  2.77it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:00<00:03,  2.75it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:01<00:03,  2.74it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:01<00:02,  2.73it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:01<00:02,  2.73it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:02<00:02,  2.73it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:02<00:01,  2.73it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:02<00:01,  2.73it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:03<00:01,  2.73it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:03<00:00,  2.73it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:04<00:00,  2.73it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  2.73it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  2.73it/s]
+/usr/local/lib/python3.10/site-packages/cumesh/remeshing.py:220: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:62.)
+  normals0 = torch.cross(mesh_vertices[atempt_triangles_0[:, 1]] - mesh_vertices[atempt_triangles_0[:, 0]], mesh_vertices[atempt_triangles_0[:, 2]] - mesh_vertices[atempt_triangles_0[:, 0]])
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9923, "colour": 0.7071, "coverage": 0.1233, "pose": {"azimuth": 1.2, "elevation": 0.0, "roll": 0.0, "fov": 29.0, "scale": 1.012, "shift": [0.0, 0.0012]}, "mode": "recolour and detail", "recoloured": [{"from": "#d43645", "to": "#cb514e", "share": 0.79}], "decals": 58, "seconds": 0.864}
+[pixal3d] {"run": "single-phase2-04-retro-arcade-machine", "variant": "single", "seed": 949054593, "seconds": 47.3, "timings": {"generate_s": 24.128, "export_s": 21.866, "compress_s": 1.266, "upload_s": 0.002}, "triangles": 99335, "views_used": 0, "pipeline": "pixal3d-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.9923, "colour": 0.7071, "coverage": 0.1233, "pose": {"azimuth": 1.2, "elevation": 0.0, "roll": 0.0, "fov": 29.0, "scale": 1.012, "shift": [0.0, 0.0012]}, "mode": "recolour and detail", "recoloured": [{"from": "#d43645", "to": "#cb514e", "share": 0.79}], "decals": 58, "seconds": 0.864}, "camera": {"fov_deg": 26.27}, "peak_gpu_gb": 28.4, "load_seconds": 97.8, "container_seconds": 150.6, "gpu": "NVIDIA L40S"}
+[pixal3d] picture's field of view: 51.0 degrees
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.83it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.76it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.46it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.34it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.28it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.23it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.19it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.18it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.17it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.16it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.74it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.75it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:01,  8.59it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:01,  8.61it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  8.66it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:00,  8.65it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:00<00:00,  8.66it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:00<00:00,  8.71it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:00<00:00,  8.77it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:00<00:00,  8.81it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  8.75it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:01<00:00, 11.47it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  9.97it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:00<00:03,  3.42it/s]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:00<00:02,  3.40it/s]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:00<00:02,  3.40it/s]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:01<00:02,  3.40it/s]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:01<00:02,  3.39it/s]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:01<00:01,  3.39it/s]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:02<00:01,  3.39it/s]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:02<00:01,  3.39it/s]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:02<00:00,  3.39it/s]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:02<00:00,  4.02it/s]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:02<00:00,  4.59it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:03<00:00,  5.09it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:03<00:00,  3.88it/s]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:01,  6.88it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:00<00:01,  6.80it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  6.74it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  6.78it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:00<00:01,  6.76it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:00<00:00,  6.76it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:01<00:00,  6.77it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  6.76it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  6.75it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:01<00:00,  6.76it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:01<00:00,  6.76it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  6.76it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  6.76it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9898, "colour": 0.8224, "coverage": 0.1967, "pose": {"azimuth": 358.8, "elevation": 0.0, "roll": 0.0, "fov": 88.9, "scale": 1.006, "shift": [0.0012, 0.0006]}, "mode": "recolour and detail", "recoloured": [{"from": "#472314", "to": "#572115", "share": 0.223}], "decals": 1802, "seconds": 0.916}
+[pixal3d] {"run": "single-phase2-06-wooden-shield-with-a-lion", "variant": "single", "seed": 1654818878, "seconds": 40.4, "timings": {"generate_s": 14.73, "export_s": 24.187, "compress_s": 1.435, "upload_s": 0.002}, "triangles": 97678, "views_used": 0, "pipeline": "pixal3d-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.9898, "colour": 0.8224, "coverage": 0.1967, "pose": {"azimuth": 358.8, "elevation": 0.0, "roll": 0.0, "fov": 88.9, "scale": 1.006, "shift": [0.0012, 0.0006]}, "mode": "recolour and detail", "recoloured": [{"from": "#472314", "to": "#572115", "share": 0.223}], "decals": 1802, "seconds": 0.916}, "camera": {"fov_deg": 51.02}, "peak_gpu_gb": 28.4, "load_seconds": 97.8, "container_seconds": 193.9, "gpu": "NVIDIA L40S"}
+[pixal3d] picture's field of view: 19.8 degrees
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.83it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.76it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.47it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.35it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.28it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.24it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.21it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.20it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.19it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.16it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.72it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.75it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:01,  7.06it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:01,  7.10it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  7.09it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  7.13it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:00<00:00,  7.14it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:00<00:00,  7.13it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:00<00:00,  7.15it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  7.14it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  7.13it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:01<00:00,  9.32it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  8.15it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:00<00:08,  1.28it/s]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:01<00:07,  1.28it/s]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:02<00:07,  1.28it/s]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:03<00:06,  1.28it/s]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:03<00:05,  1.28it/s]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:04<00:04,  1.28it/s]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:05<00:03,  1.28it/s]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:06<00:03,  1.28it/s]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:07<00:02,  1.28it/s]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:07<00:01,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:07<00:00,  1.73it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:08<00:00,  1.92it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:08<00:00,  1.46it/s]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:04,  2.58it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:00<00:03,  2.56it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:01<00:03,  2.55it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:01<00:03,  2.55it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:01<00:02,  2.55it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:02<00:02,  2.55it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:02<00:01,  2.55it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:03<00:01,  2.55it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:03<00:01,  2.55it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:03<00:00,  2.55it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:04<00:00,  2.54it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  2.54it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  2.55it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9852, "colour": 0.8512, "coverage": 0.078, "pose": {"azimuth": 358.8, "elevation": -1.9, "roll": 0.0, "fov": 11.5, "scale": 1.008, "shift": [-0.0012, -0.0025]}, "mode": "detail only", "decals": 168, "seconds": 0.311}
+[pixal3d] {"run": "single-phase2-08-vintage-film-camera", "variant": "single", "seed": 849334850, "seconds": 45.4, "timings": {"generate_s": 23.058, "export_s": 20.793, "compress_s": 1.566, "upload_s": 0.003}, "triangles": 94095, "views_used": 0, "pipeline": "pixal3d-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.9852, "colour": 0.8512, "coverage": 0.078, "pose": {"azimuth": 358.8, "elevation": -1.9, "roll": 0.0, "fov": 11.5, "scale": 1.008, "shift": [-0.0012, -0.0025]}, "mode": "detail only", "decals": 168, "seconds": 0.311}, "camera": {"fov_deg": 19.8}, "peak_gpu_gb": 28.4, "load_seconds": 97.8, "container_seconds": 242.3, "gpu": "NVIDIA L40S"}
+[pixal3d] picture's field of view: 26.0 degrees
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.82it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.73it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.43it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.29it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.22it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.17it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.14it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.13it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.12it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.11it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.67it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.69it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:02,  4.47it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:02,  4.45it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:02,  4.44it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  4.44it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:01<00:01,  4.43it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:01<00:01,  4.43it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:01<00:01,  4.42it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  4.42it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:02<00:00,  4.41it/s]
+[1ASampling shape SLat (proj):  83%|████████▎ | 10/12 [00:02<00:00,  5.22it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:02<00:00,  5.97it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:02<00:00,  6.62it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:02<00:00,  5.05it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:01<00:18,  1.66s/it]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:03<00:16,  1.66s/it]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:04<00:14,  1.66s/it]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:06<00:13,  1.66s/it]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:08<00:11,  1.67s/it]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:09<00:10,  1.67s/it]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:11<00:08,  1.67s/it]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:13<00:06,  1.67s/it]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:15<00:05,  1.67s/it]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:15<00:02,  1.41s/it]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:16<00:01,  1.24s/it]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:17<00:00,  1.12s/it]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:17<00:00,  1.46s/it]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:09,  1.20it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:01<00:08,  1.19it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:02<00:07,  1.19it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:03<00:06,  1.19it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:04<00:05,  1.19it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:05<00:05,  1.19it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:05<00:04,  1.19it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:06<00:03,  1.19it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:07<00:02,  1.19it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:08<00:01,  1.19it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:09<00:00,  1.19it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:10<00:00,  1.19it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:10<00:00,  1.19it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9875, "colour": 0.8412, "coverage": 0.0357, "pose": {"azimuth": 0.0, "elevation": 1.2, "roll": 0.0, "fov": 42.5, "scale": 0.999, "shift": [0.0, 0.0012]}, "mode": "detail only", "decals": 142, "seconds": 0.326}
+[pixal3d] {"run": "single-phase2-11-stack-of-old-books-with-a-candle", "variant": "single", "seed": 8026098, "seconds": 65.4, "timings": {"generate_s": 39.311, "export_s": 24.568, "compress_s": 1.507, "upload_s": 0.002}, "triangles": 93758, "views_used": 0, "pipeline": "pixal3d-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.9875, "colour": 0.8412, "coverage": 0.0357, "pose": {"azimuth": 0.0, "elevation": 1.2, "roll": 0.0, "fov": 42.5, "scale": 0.999, "shift": [0.0, 0.0012]}, "mode": "detail only", "decals": 142, "seconds": 0.326}, "camera": {"fov_deg": 25.96}, "peak_gpu_gb": 29.1, "load_seconds": 97.8, "container_seconds": 310.4, "gpu": "NVIDIA L40S"}
+[pixal3d] picture's field of view: 25.6 degrees
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.79it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.70it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.38it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.26it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.20it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.15it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.12it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.11it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.10it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.09it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.65it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.67it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:01,  7.05it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:01,  7.10it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  7.11it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  7.09it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:00<00:00,  7.12it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:00<00:00,  7.11it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:00<00:00,  7.12it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  7.12it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  7.11it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:01<00:00,  9.35it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  8.13it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:00<00:07,  1.46it/s]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:01<00:06,  1.46it/s]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:02<00:06,  1.46it/s]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:02<00:05,  1.46it/s]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:03<00:04,  1.46it/s]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:04<00:04,  1.46it/s]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:04<00:03,  1.46it/s]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:05<00:02,  1.46it/s]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:06<00:02,  1.45it/s]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:06<00:01,  1.72it/s]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:06<00:00,  1.96it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:07<00:00,  2.17it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:07<00:00,  1.66it/s]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:03,  2.93it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:00<00:03,  2.90it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:01<00:03,  2.90it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:01<00:02,  2.89it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:01<00:02,  2.88it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:02<00:02,  2.88it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:02<00:01,  2.88it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:02<00:01,  2.88it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:03<00:01,  2.88it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:03<00:00,  2.87it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:03<00:00,  2.87it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  2.87it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  2.88it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9832, "colour": 0.7928, "coverage": 0.1095, "pose": {"azimuth": 0.0, "elevation": 0.0, "roll": 0.0, "fov": 30.4, "scale": 0.994, "shift": [-0.0028, 0.0]}, "mode": "recolour and detail", "recoloured": [{"from": "#5c2313", "to": "#864a17", "share": 0.025}], "decals": 54, "seconds": 0.321}
+[pixal3d] {"run": "single-phase2-01-cute-low-poly-fox-sitting-down", "variant": "single", "seed": 783047822, "seconds": 37.3, "timings": {"generate_s": 21.354, "export_s": 14.663, "compress_s": 1.295, "upload_s": 0.002}, "triangles": 95603, "views_used": 0, "pipeline": "pixal3d-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.9832, "colour": 0.7928, "coverage": 0.1095, "pose": {"azimuth": 0.0, "elevation": 0.0, "roll": 0.0, "fov": 30.4, "scale": 0.994, "shift": [-0.0028, 0.0]}, "mode": "recolour and detail", "recoloured": [{"from": "#5c2313", "to": "#864a17", "share": 0.025}], "decals": 54, "seconds": 0.321}, "camera": {"fov_deg": 25.58}, "peak_gpu_gb": 28.4, "load_seconds": 97.8, "container_seconds": 350.9, "gpu": "NVIDIA L40S"}
+[pixal3d] picture's field of view: 25.9 degrees
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.65it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.60it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.32it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.20it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.14it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.10it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.07it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.05it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.03it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.02it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.55it/s]Sampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.60it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:02,  4.35it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:02,  4.34it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:02,  4.33it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  4.33it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:01<00:01,  4.33it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:01<00:01,  4.33it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:01<00:01,  4.33it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  4.33it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:02<00:00,  4.33it/s]
+[1ASampling shape SLat (proj):  83%|████████▎ | 10/12 [00:02<00:00,  5.12it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:02<00:00,  5.85it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:02<00:00,  6.49it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:02<00:00,  4.95it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:01<00:18,  1.67s/it]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:03<00:16,  1.67s/it]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:05<00:15,  1.67s/it]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:06<00:13,  1.68s/it]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:08<00:11,  1.68s/it]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:10<00:10,  1.68s/it]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:11<00:08,  1.68s/it]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:13<00:06,  1.68s/it]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:15<00:05,  1.68s/it]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:15<00:02,  1.42s/it]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:16<00:01,  1.24s/it]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:17<00:00,  1.12s/it]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:17<00:00,  1.47s/it]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:09,  1.20it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:01<00:08,  1.19it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:02<00:07,  1.18it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:03<00:06,  1.18it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:04<00:05,  1.18it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:05<00:05,  1.18it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:05<00:04,  1.18it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:06<00:03,  1.18it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:07<00:02,  1.18it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:08<00:01,  1.18it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:09<00:00,  1.18it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:10<00:00,  1.18it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:10<00:00,  1.18it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9907, "colour": 0.6024, "coverage": 0.0754, "pose": {"azimuth": 359.4, "elevation": -0.6, "roll": -0.1, "fov": 29.0, "scale": 1.005, "shift": [-0.0009, 0.0019]}, "mode": "detail only", "decals": 277, "seconds": 0.319}
+[pixal3d] {"run": "single-phase2-13-cute-cartoon-car-bright-blue", "variant": "single", "seed": 207648777, "seconds": 66.0, "timings": {"generate_s": 39.342, "export_s": 25.077, "compress_s": 1.561, "upload_s": 0.003}, "triangles": 99935, "views_used": 0, "pipeline": "pixal3d-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.9907, "colour": 0.6024, "coverage": 0.0754, "pose": {"azimuth": 359.4, "elevation": -0.6, "roll": -0.1, "fov": 29.0, "scale": 1.005, "shift": [-0.0009, 0.0019]}, "mode": "detail only", "decals": 277, "seconds": 0.319}, "camera": {"fov_deg": 25.89}, "peak_gpu_gb": 29.1, "load_seconds": 97.8, "container_seconds": 419.9, "gpu": "NVIDIA L40S"}
+[pixal3d] single: 6 of 6 made; the container was up 420 s
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-bJl5D6VpOFHBnzVeoY6DMs
+== Multi-view weights on synthetic views of Phase 5 finals (the cameras' check)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-51022chcEHK2sKtufLIXrj
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/exp_pixal3d.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/pixal3d/scripts/download_weights.p
+│   y
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/pixal3d/pixal3d_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Created Function fetch_weights.
+└── ✓ Created Function Pixal3D.*.
+[pixal3d] synthetic: 3 jobs on multiview weights
+[SPARSE] Conv backend: flex_gemm; Attention backend: flash_attn
+[ATTENTION] Using backend: flash_attn
+[pixal3d] loaded pipeline_mv.json in 92.3 s (low VRAM: False)
+[pixal3d] multiview weights on NVIDIA L40S after 102 s
+[pixal3d] 6 views (main: view): [(0.0, 0.0), (45.0, 0.0), (90.0, 0.0), (180.0, 0.0), (270.0, 0.0), (315.0, 0.0)]
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:02,  4.61it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:02,  4.92it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  4.98it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.01it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:01<00:01,  5.04it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.04it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.06it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.06it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.07it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.05it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.61it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.49it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:02,  5.05it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.47it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.69it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.75it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.83it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:01<00:01,  5.89it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.81it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.85it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.80it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:01<00:00,  7.57it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  6.58it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:00<00:06,  1.81it/s]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:01<00:05,  1.81it/s]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:01<00:04,  1.81it/s]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:02<00:04,  1.81it/s]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:02<00:03,  1.81it/s]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:03<00:03,  1.81it/s]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:03<00:02,  1.81it/s]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:04<00:02,  1.81it/s]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:04<00:01,  1.81it/s]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:05<00:00,  2.15it/s]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:05<00:00,  2.45it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:05<00:00,  2.72it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:05<00:00,  2.07it/s]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:03,  3.64it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:00<00:02,  3.62it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:00<00:02,  3.60it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:01<00:02,  3.60it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:01<00:01,  3.59it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:01<00:01,  3.60it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:01<00:01,  3.59it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:02<00:01,  3.60it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:02<00:00,  3.59it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:02<00:00,  3.59it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:03<00:00,  3.60it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:03<00:00,  3.60it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:03<00:00,  3.60it/s]
+/usr/local/lib/python3.10/site-packages/cumesh/remeshing.py:220: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:62.)
+  normals0 = torch.cross(mesh_vertices[atempt_triangles_0[:, 1]] - mesh_vertices[atempt_triangles_0[:, 0]], mesh_vertices[atempt_triangles_0[:, 2]] - mesh_vertices[atempt_triangles_0[:, 0]])
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.988, "colour": 0.484, "coverage": 0.1871, "pose": {"azimuth": 337.5, "elevation": 4.7, "roll": 0.0, "fov": 24.5, "scale": 1.005, "shift": [0.0, -0.0025]}, "mode": "recolour and detail", "recoloured": [{"from": "#f23449", "to": "#d85653", "share": 0.481}, {"from": "#d54057", "to": "#d75a57", "share": 0.113}, {"from": "#5c2d35", "to": "#977177", "share": 0.019}], "decals": 56, "seconds": 1.009}
+[pixal3d] {"run": "syn6-phase2-04-retro-arcade-machine", "variant": "syn6", "seed": 949054593, "views_from": "phase2d-04-retro-arcade-machine/final-949054593.glb", "silhouette_iou": {"0": 0.985, "45": 0.987, "90": 0.972, "180": 0.985, "270": 0.972, "315": 0.985}, "seconds": 76.6, "timings": {"generate_s": 48.079, "export_s": 27.395, "compress_s": 1.006, "upload_s": 0.001}, "triangles": 98415, "views_used": 6, "pipeline": "pixal3d-mv-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.988, "colour": 0.484, "coverage": 0.1871, "pose": {"azimuth": 337.5, "elevation": 4.7, "roll": 0.0, "fov": 24.5, "scale": 1.005, "shift": [0.0, -0.0025]}, "mode": "recolour and detail", "recoloured": [{"from": "#f23449", "to": "#d85653", "share": 0.481}, {"from": "#d54057", "to": "#d75a57", "share": 0.113}, {"from": "#5c2d35", "to": "#977177", "share": 0.019}], "decals": 56, "seconds": 1.009}, "camera": {"views": [[0.0, 0.0], [45.0, 0.0], [90.0, 0.0], [180.0, 0.0], [270.0, 0.0], [315.0, 0.0]], "half_extent": 0.55}, "peak_gpu_gb": 30.9, "load_seconds": 97.5, "container_seconds": 183.5, "gpu": "NVIDIA L40S"}
+[pixal3d] the view at azimuth 45, elevation 0 reaches its frame's edge
+[pixal3d] the view at azimuth 90, elevation 0 reaches its frame's edge
+[pixal3d] the view at azimuth 270, elevation 0 reaches its frame's edge
+[pixal3d] the view at azimuth 315, elevation 0 reaches its frame's edge
+[pixal3d] 6 views (main: view): [(0.0, 0.0), (45.0, 0.0), (90.0, 0.0), (180.0, 0.0), (270.0, 0.0), (315.0, 0.0)]
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.36it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.54it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.30it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.19it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.15it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.09it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.08it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.07it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.05it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.03it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.57it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.60it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:02,  3.99it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:02,  3.99it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:02,  3.98it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:01<00:02,  3.97it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:01<00:01,  3.98it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:01<00:01,  3.95it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:01<00:01,  3.96it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:02<00:01,  3.96it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:02<00:00,  3.97it/s]
+[1ASampling shape SLat (proj):  83%|████████▎ | 10/12 [00:02<00:00,  4.71it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:02<00:00,  5.39it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:02<00:00,  5.96it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:02<00:00,  4.54it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:01<00:19,  1.80s/it]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:03<00:18,  1.81s/it]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:05<00:16,  1.80s/it]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:07<00:14,  1.81s/it]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:09<00:12,  1.80s/it]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:10<00:10,  1.80s/it]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:12<00:08,  1.80s/it]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:14<00:07,  1.79s/it]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:16<00:05,  1.80s/it]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:17<00:03,  1.52s/it]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:18<00:01,  1.33s/it]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:18<00:00,  1.20s/it]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:18<00:00,  1.58s/it]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:09,  1.11it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:01<00:09,  1.10it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:02<00:08,  1.10it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:03<00:07,  1.11it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:04<00:06,  1.11it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:05<00:05,  1.11it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:06<00:04,  1.11it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:07<00:03,  1.10it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:08<00:02,  1.09it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:09<00:01,  1.10it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:09<00:00,  1.10it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:10<00:00,  1.10it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:10<00:00,  1.10it/s]
+[forge3d] projection: {"applied": false, "reason": "the silhouettes don't match well enough (IoU 0.881 < 0.93)", "iou": 0.8809, "colour": 0.1922, "pose": {"azimuth": 50.0, "elevation": -22.5, "roll": -8.0, "fov": 0.0, "scale": 0.956, "shift": [0.0137, 0.0131]}, "seconds": 0.239}
+[pixal3d] {"run": "syn6-phase2-13-cute-cartoon-car-bright-blue", "variant": "syn6", "seed": 207648777, "views_from": "phase2d-13-cute-cartoon-car-bright-blue/final-207648777.glb", "silhouette_iou": {"0": 0.967, "45": 0.952, "90": 0.848, "180": 0.967, "270": 0.848, "315": 0.951}, "seconds": 92.2, "timings": {"generate_s": 70.044, "export_s": 20.922, "compress_s": 1.123, "upload_s": 0.002}, "triangles": 94149, "views_used": 6, "pipeline": "pixal3d-mv-1024_cascade", "projection": {"applied": false, "reason": "the silhouettes don't match well enough (IoU 0.881 < 0.93)", "iou": 0.8809, "colour": 0.1922, "pose": {"azimuth": 50.0, "elevation": -22.5, "roll": -8.0, "fov": 0.0, "scale": 0.956, "shift": [0.0137, 0.0131]}, "seconds": 0.239}, "camera": {"views": [[0.0, 0.0], [45.0, 0.0], [90.0, 0.0], [180.0, 0.0], [270.0, 0.0], [315.0, 0.0]], "half_extent": 0.55}, "peak_gpu_gb": 30.7, "load_seconds": 97.5, "container_seconds": 281.3, "gpu": "NVIDIA L40S"}
+[pixal3d] 4 views (main: view): [(0.0, 0.0), (90.0, 0.0), (180.0, 0.0), (270.0, 0.0)]
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.43it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.52it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.25it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.13it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.09it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.04it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.05it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  4.99it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.03it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.00it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.54it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.56it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:01,  5.59it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.59it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.67it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.67it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.63it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:01<00:01,  5.69it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.66it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.61it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.63it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:01<00:00,  7.37it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  6.44it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:00<00:09,  1.19it/s]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:01<00:08,  1.19it/s]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:02<00:07,  1.19it/s]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:03<00:06,  1.19it/s]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:04<00:05,  1.19it/s]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:05<00:05,  1.19it/s]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:05<00:04,  1.19it/s]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:06<00:03,  1.19it/s]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:07<00:02,  1.19it/s]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:07<00:01,  1.41it/s]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:08<00:00,  1.61it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:08<00:00,  1.79it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:08<00:00,  1.36it/s]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:04,  2.41it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:00<00:04,  2.40it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:01<00:03,  2.40it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:01<00:03,  2.40it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:02<00:02,  2.39it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:02<00:02,  2.38it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:02<00:02,  2.38it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:03<00:01,  2.38it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:03<00:01,  2.38it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:04<00:00,  2.38it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:04<00:00,  2.38it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:05<00:00,  2.38it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:05<00:00,  2.38it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.965, "colour": 0.3279, "coverage": 0.1351, "pose": {"azimuth": 340.0, "elevation": 2.5, "roll": 0.0, "fov": 18.7, "scale": 1.004, "shift": [-0.0019, -0.0045]}, "mode": "detail only", "decals": 54, "seconds": 0.391}
+[pixal3d] {"run": "syn4-phase2-04-retro-arcade-machine", "variant": "syn4", "seed": 949054593, "views_from": "phase2d-04-retro-arcade-machine/final-949054593.glb", "silhouette_iou": {"0": 0.981, "90": 0.965, "180": 0.981, "270": 0.965}, "seconds": 63.9, "timings": {"generate_s": 41.34, "export_s": 21.342, "compress_s": 1.105, "upload_s": 0.002}, "triangles": 96092, "views_used": 4, "pipeline": "pixal3d-mv-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.965, "colour": 0.3279, "coverage": 0.1351, "pose": {"azimuth": 340.0, "elevation": 2.5, "roll": 0.0, "fov": 18.7, "scale": 1.004, "shift": [-0.0019, -0.0045]}, "mode": "detail only", "decals": 54, "seconds": 0.391}, "camera": {"views": [[0.0, 0.0], [90.0, 0.0], [180.0, 0.0], [270.0, 0.0]], "half_extent": 0.55}, "peak_gpu_gb": 30.8, "load_seconds": 97.5, "container_seconds": 349.4, "gpu": "NVIDIA L40S"}
+[pixal3d] synthetic: 3 of 3 made; the container was up 349 s
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-51022chcEHK2sKtufLIXrj
+== Multi-view weights on the MV line's six views of the four back failures
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-5oZAUcgenMzKUxoRsIjW1K
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/exp_pixal3d.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/pixal3d/scripts/download_weights.p
+│   y
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/pixal3d/pixal3d_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Created Function fetch_weights.
+└── ✓ Created Function Pixal3D.*.
+[pixal3d] mvadapter: 4 jobs on multiview weights
+[SPARSE] Conv backend: flex_gemm; Attention backend: flash_attn
+[ATTENTION] Using backend: flash_attn
+[pixal3d] loaded pipeline_mv.json in 82.9 s (low VRAM: False)
+[pixal3d] multiview weights on NVIDIA L40S after 91 s
+[pixal3d] 6 views (main: view): [(0.0, 0.0), (45.0, 0.0), (90.0, 0.0), (180.0, 0.0), (270.0, 0.0), (315.0, 0.0)]
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:02,  4.21it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:02,  4.72it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  4.90it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  4.99it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:01<00:01,  5.03it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.07it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.09it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.09it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.09it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.10it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.67it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.48it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:02,  4.72it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.22it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.37it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.45it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.49it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:01<00:01,  5.52it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.54it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  5.55it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  5.56it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:01<00:00,  7.29it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  6.27it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:01<00:12,  1.10s/it]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:02<00:10,  1.10s/it]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:03<00:09,  1.10s/it]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:04<00:08,  1.10s/it]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:05<00:07,  1.10s/it]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:06<00:06,  1.10s/it]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:07<00:05,  1.10s/it]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:08<00:04,  1.10s/it]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:09<00:03,  1.10s/it]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:10<00:01,  1.07it/s]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:10<00:00,  1.23it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:11<00:00,  1.36it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:11<00:00,  1.04it/s]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:06,  1.82it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:01<00:05,  1.81it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:01<00:04,  1.80it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:02<00:04,  1.80it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:02<00:03,  1.80it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:03<00:03,  1.80it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:03<00:02,  1.80it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:04<00:02,  1.80it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:05<00:01,  1.80it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:05<00:01,  1.80it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:06<00:00,  1.79it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:06<00:00,  1.79it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:06<00:00,  1.80it/s]
+/usr/local/lib/python3.10/site-packages/cumesh/remeshing.py:220: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:62.)
+  normals0 = torch.cross(mesh_vertices[atempt_triangles_0[:, 1]] - mesh_vertices[atempt_triangles_0[:, 0]], mesh_vertices[atempt_triangles_0[:, 2]] - mesh_vertices[atempt_triangles_0[:, 0]])
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9665, "colour": 0.5703, "coverage": 0.1069, "pose": {"azimuth": 335.2, "elevation": 2.7, "roll": -0.2, "fov": 29.0, "scale": 1.013, "shift": [0.0, 0.0006]}, "mode": "recolour and detail", "recoloured": [{"from": "#d62928", "to": "#d45552", "share": 0.271}], "decals": 74, "seconds": 1.178}
+[pixal3d] {"run": "mv6-phase2-04-retro-arcade-machine", "variant": "mv6", "seed": 949054593, "views_from": "phase6/views/phase2-04-retro-arcade-machine", "silhouette_iou": {"0": 0.986, "45": 0.973, "90": 0.958, "180": 0.989, "270": 0.958, "315": 0.974}, "seconds": 83.0, "timings": {"generate_s": 58.132, "export_s": 23.374, "compress_s": 1.406, "upload_s": 0.002}, "triangles": 94540, "views_used": 6, "pipeline": "pixal3d-mv-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.9665, "colour": 0.5703, "coverage": 0.1069, "pose": {"azimuth": 335.2, "elevation": 2.7, "roll": -0.2, "fov": 29.0, "scale": 1.013, "shift": [0.0, 0.0006]}, "mode": "recolour and detail", "recoloured": [{"from": "#d62928", "to": "#d45552", "share": 0.271}], "decals": 74, "seconds": 1.178}, "camera": {"views": [[0.0, 0.0], [45.0, 0.0], [90.0, 0.0], [180.0, 0.0], [270.0, 0.0], [315.0, 0.0]], "half_extent": 0.55}, "peak_gpu_gb": 30.9, "load_seconds": 88.4, "container_seconds": 177.9, "gpu": "NVIDIA L40S"}
+[pixal3d] 6 views (main: view): [(0.0, 0.0), (45.0, 0.0), (90.0, 0.0), (180.0, 0.0), (270.0, 0.0), (315.0, 0.0)]
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.50it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.52it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.25it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.14it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.07it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.03it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.01it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  4.99it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  4.97it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  4.97it/s]
+[1ASampling sparse structure (proj):  92%|█████████▏| 11/12 [00:02<00:00,  5.87it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.69it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.53it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:01,  6.92it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:01,  7.06it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  7.04it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  7.03it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:00<00:00,  7.01it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:00<00:00,  7.03it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:00<00:00,  7.07it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  7.05it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  7.06it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:01<00:00,  9.25it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:01<00:00,  8.05it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:00<00:07,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:01<00:06,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:01<00:05,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:02<00:05,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:03<00:04,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:03<00:03,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:04<00:03,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:05<00:02,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:05<00:01,  1.51it/s]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:06<00:01,  1.79it/s]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:06<00:00,  2.04it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:06<00:00,  2.26it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:06<00:00,  1.72it/s]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:03,  3.03it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:00<00:03,  3.01it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:00<00:02,  3.00it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:01<00:02,  2.99it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:01<00:02,  3.00it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:02<00:02,  3.00it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:02<00:01,  2.99it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:02<00:01,  2.99it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:03<00:01,  3.00it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:03<00:00,  3.00it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:03<00:00,  3.00it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  3.00it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  3.00it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9892, "colour": 0.5429, "coverage": 0.1335, "pose": {"azimuth": 3.8, "elevation": 1.2, "roll": 0.0, "fov": 27.5, "scale": 1.002, "shift": [0.0006, 0.0]}, "mode": "recolour and detail", "recoloured": [{"from": "#caa78b", "to": "#e48d45", "share": 0.234}, {"from": "#bb8c68", "to": "#c96f2f", "share": 0.162}, {"from": "#6d4b49", "to": "#b66a4e", "share": 0.075}, {"from": "#d0c4bb", "to": "#da8c4e", "share": 0.096}], "decals": 1877, "seconds": 0.336}
+[pixal3d] {"run": "mv6-phase2-06-wooden-shield-with-a-lion", "variant": "mv6", "seed": 1654818878, "views_from": "phase6/views/phase2-06-wooden-shield-with-a-lion", "silhouette_iou": {"0": 0.977, "45": 0.98, "90": 0.943, "180": 0.98, "270": 0.943, "315": 0.981}, "seconds": 72.0, "timings": {"generate_s": 48.97, "export_s": 21.409, "compress_s": 1.514, "upload_s": 0.002}, "triangles": 96920, "views_used": 6, "pipeline": "pixal3d-mv-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.9892, "colour": 0.5429, "coverage": 0.1335, "pose": {"azimuth": 3.8, "elevation": 1.2, "roll": 0.0, "fov": 27.5, "scale": 1.002, "shift": [0.0006, 0.0]}, "mode": "recolour and detail", "recoloured": [{"from": "#caa78b", "to": "#e48d45", "share": 0.234}, {"from": "#bb8c68", "to": "#c96f2f", "share": 0.162}, {"from": "#6d4b49", "to": "#b66a4e", "share": 0.075}, {"from": "#d0c4bb", "to": "#da8c4e", "share": 0.096}], "decals": 1877, "seconds": 0.336}, "camera": {"views": [[0.0, 0.0], [45.0, 0.0], [90.0, 0.0], [180.0, 0.0], [270.0, 0.0], [315.0, 0.0]], "half_extent": 0.55}, "peak_gpu_gb": 30.9, "load_seconds": 88.4, "container_seconds": 254.5, "gpu": "NVIDIA L40S"}
+[pixal3d] 6 views (main: view): [(0.0, 0.0), (45.0, 0.0), (90.0, 0.0), (180.0, 0.0), (270.0, 0.0), (315.0, 0.0)]
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.44it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.49it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.24it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.13it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.07it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.03it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:00,  5.01it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  4.99it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  4.97it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  4.96it/s]
+[1ASampling sparse structure (proj):  92%|█████████▏| 11/12 [00:02<00:00,  5.86it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.68it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.52it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:02,  4.84it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:02,  4.81it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:00<00:01,  4.82it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:00<00:01,  4.81it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:01<00:01,  4.81it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:01<00:01,  4.80it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:01<00:01,  4.80it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:01<00:00,  4.81it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:01<00:00,  4.81it/s]
+[1ASampling shape SLat (proj):  83%|████████▎ | 10/12 [00:01<00:00,  5.69it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:02<00:00,  6.51it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:02<00:00,  7.21it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:02<00:00,  5.50it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:01<00:13,  1.25s/it]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:02<00:12,  1.25s/it]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:03<00:11,  1.25s/it]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:04<00:09,  1.25s/it]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:06<00:08,  1.25s/it]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:07<00:07,  1.25s/it]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:08<00:06,  1.25s/it]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:09<00:04,  1.25s/it]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:11<00:03,  1.25s/it]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:11<00:02,  1.05s/it]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:12<00:00,  1.09it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:13<00:00,  1.20it/s]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:13<00:00,  1.09s/it]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:00<00:06,  1.61it/s]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:01<00:06,  1.60it/s]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:01<00:05,  1.60it/s]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:02<00:05,  1.60it/s]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:03<00:04,  1.60it/s]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:03<00:03,  1.60it/s]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:04<00:03,  1.60it/s]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:05<00:02,  1.60it/s]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:05<00:01,  1.60it/s]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:06<00:01,  1.60it/s]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:06<00:00,  1.60it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:07<00:00,  1.60it/s]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:07<00:00,  1.60it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9818, "colour": 0.7448, "coverage": 0.0765, "pose": {"azimuth": 0.0, "elevation": -2.9, "roll": 0.2, "fov": 0.0, "scale": 1.007, "shift": [0.0012, 0.0037]}, "mode": "detail only", "decals": 250, "seconds": 0.304}
+[pixal3d] {"run": "mv6-phase2-08-vintage-film-camera", "variant": "mv6", "seed": 849334850, "views_from": "phase6/views/phase2-08-vintage-film-camera", "silhouette_iou": {"0": 0.968, "45": 0.976, "90": 0.93, "180": 0.962, "270": 0.927, "315": 0.974}, "seconds": 82.1, "timings": {"generate_s": 59.473, "export_s": 20.973, "compress_s": 1.541, "upload_s": 0.003}, "triangles": 99203, "views_used": 6, "pipeline": "pixal3d-mv-1024_cascade", "projection": {"applied": true, "reason": "applied", "iou": 0.9818, "colour": 0.7448, "coverage": 0.0765, "pose": {"azimuth": 0.0, "elevation": -2.9, "roll": 0.2, "fov": 0.0, "scale": 1.007, "shift": [0.0012, 0.0037]}, "mode": "detail only", "decals": 250, "seconds": 0.304}, "camera": {"views": [[0.0, 0.0], [45.0, 0.0], [90.0, 0.0], [180.0, 0.0], [270.0, 0.0], [315.0, 0.0]], "half_extent": 0.55}, "peak_gpu_gb": 30.8, "load_seconds": 88.4, "container_seconds": 343.8, "gpu": "NVIDIA L40S"}
+[pixal3d] the view at azimuth 45, elevation 0 reaches its frame's edge
+[pixal3d] the view at azimuth 315, elevation 0 reaches its frame's edge
+[pixal3d] 6 views (main: view): [(0.0, 0.0), (45.0, 0.0), (90.0, 0.0), (180.0, 0.0), (270.0, 0.0), (315.0, 0.0)]
+
+[1ASampling sparse structure (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure (proj):   8%|▊         | 1/12 [00:00<00:01,  6.47it/s]
+[1ASampling sparse structure (proj):  17%|█▋        | 2/12 [00:00<00:01,  5.48it/s]
+[1ASampling sparse structure (proj):  25%|██▌       | 3/12 [00:00<00:01,  5.21it/s]
+[1ASampling sparse structure (proj):  33%|███▎      | 4/12 [00:00<00:01,  5.10it/s]
+[1ASampling sparse structure (proj):  42%|████▏     | 5/12 [00:00<00:01,  5.04it/s]
+[1ASampling sparse structure (proj):  50%|█████     | 6/12 [00:01<00:01,  5.00it/s]
+[1ASampling sparse structure (proj):  58%|█████▊    | 7/12 [00:01<00:01,  4.98it/s]
+[1ASampling sparse structure (proj):  67%|██████▋   | 8/12 [00:01<00:00,  4.96it/s]
+[1ASampling sparse structure (proj):  75%|███████▌  | 9/12 [00:01<00:00,  4.94it/s]
+[1ASampling sparse structure (proj):  83%|████████▎ | 10/12 [00:01<00:00,  4.93it/s]
+[1ASampling sparse structure (proj):  92%|█████████▏| 11/12 [00:02<00:00,  5.82it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  6.64it/s]
+[1ASampling sparse structure (proj): 100%|██████████| 12/12 [00:02<00:00,  5.49it/s]
+
+[1ASampling shape SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat (proj):   8%|▊         | 1/12 [00:00<00:04,  2.26it/s]
+[1ASampling shape SLat (proj):  17%|█▋        | 2/12 [00:00<00:04,  2.27it/s]
+[1ASampling shape SLat (proj):  25%|██▌       | 3/12 [00:01<00:03,  2.27it/s]
+[1ASampling shape SLat (proj):  33%|███▎      | 4/12 [00:01<00:03,  2.27it/s]
+[1ASampling shape SLat (proj):  42%|████▏     | 5/12 [00:02<00:03,  2.26it/s]
+[1ASampling shape SLat (proj):  50%|█████     | 6/12 [00:02<00:02,  2.26it/s]
+[1ASampling shape SLat (proj):  58%|█████▊    | 7/12 [00:03<00:02,  2.26it/s]
+[1ASampling shape SLat (proj):  67%|██████▋   | 8/12 [00:03<00:01,  2.26it/s]
+[1ASampling shape SLat (proj):  75%|███████▌  | 9/12 [00:03<00:01,  2.26it/s]
+[1ASampling shape SLat (proj):  83%|████████▎ | 10/12 [00:04<00:00,  2.68it/s]
+[1ASampling shape SLat (proj):  92%|█████████▏| 11/12 [00:04<00:00,  3.06it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  3.39it/s]
+[1ASampling shape SLat (proj): 100%|██████████| 12/12 [00:04<00:00,  2.59it/s]
+
+[1ASampling HR shape SLat (proj, 1024):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling HR shape SLat (proj, 1024):   8%|▊         | 1/12 [00:03<00:42,  3.90s/it]
+[1ASampling HR shape SLat (proj, 1024):  17%|█▋        | 2/12 [00:07<00:39,  3.91s/it]
+[1ASampling HR shape SLat (proj, 1024):  25%|██▌       | 3/12 [00:11<00:35,  3.92s/it]
+[1ASampling HR shape SLat (proj, 1024):  33%|███▎      | 4/12 [00:15<00:31,  3.92s/it]
+[1ASampling HR shape SLat (proj, 1024):  42%|████▏     | 5/12 [00:19<00:27,  3.93s/it]
+[1ASampling HR shape SLat (proj, 1024):  50%|█████     | 6/12 [00:23<00:23,  3.93s/it]
+[1ASampling HR shape SLat (proj, 1024):  58%|█████▊    | 7/12 [00:27<00:19,  3.94s/it]
+[1ASampling HR shape SLat (proj, 1024):  67%|██████▋   | 8/12 [00:31<00:15,  3.94s/it]
+[1ASampling HR shape SLat (proj, 1024):  75%|███████▌  | 9/12 [00:35<00:11,  3.95s/it]
+[1ASampling HR shape SLat (proj, 1024):  83%|████████▎ | 10/12 [00:37<00:06,  3.34s/it]
+[1ASampling HR shape SLat (proj, 1024):  92%|█████████▏| 11/12 [00:39<00:02,  2.93s/it]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:41<00:00,  2.64s/it]
+[1ASampling HR shape SLat (proj, 1024): 100%|██████████| 12/12 [00:41<00:00,  3.45s/it]
+
+[1ASampling texture SLat (proj):   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat (proj):   8%|▊         | 1/12 [00:01<00:21,  1.98s/it]
+[1ASampling texture SLat (proj):  17%|█▋        | 2/12 [00:03<00:19,  1.99s/it]
+[1ASampling texture SLat (proj):  25%|██▌       | 3/12 [00:05<00:17,  1.99s/it]
+[1ASampling texture SLat (proj):  33%|███▎      | 4/12 [00:07<00:15,  2.00s/it]
+[1ASampling texture SLat (proj):  42%|████▏     | 5/12 [00:09<00:13,  2.00s/it]
+[1ASampling texture SLat (proj):  50%|█████     | 6/12 [00:11<00:11,  2.00s/it]
+[1ASampling texture SLat (proj):  58%|█████▊    | 7/12 [00:13<00:09,  2.00s/it]
+[1ASampling texture SLat (proj):  67%|██████▋   | 8/12 [00:15<00:07,  2.00s/it]
+[1ASampling texture SLat (proj):  75%|███████▌  | 9/12 [00:17<00:05,  2.00s/it]
+[1ASampling texture SLat (proj):  83%|████████▎ | 10/12 [00:19<00:03,  2.00s/it]
+[1ASampling texture SLat (proj):  92%|█████████▏| 11/12 [00:21<00:01,  2.00s/it]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:23<00:00,  2.00s/it]
+[1ASampling texture SLat (proj): 100%|██████████| 12/12 [00:23<00:00,  2.00s/it]
+[forge3d] out of GPU memory exporting, retrying with the models off the GPU: [CuMesh] CUDA error: File: /tmp/CuMesh/src/utils.h Line: 43 Error code: 2 Error text: out of memory
+Traceback (most recent call last):
+  File "/root/forge3d_worker/service.py", line 67, in handle_job
+    raw, triangles = runtime.export(mesh, preset)
+  File "/root/pixal3d_worker/service.py", line 54, in export
+    return self.runtime.export(mesh, preset)
+  File "/root/forge3d_worker/pipeline.py", line 262, in export
+    return self._export(mesh, preset)
+  File "/root/forge3d_worker/pipeline.py", line 273, in _export
+    glb = self._o_voxel.postprocess.to_glb(
+  File "/root/pixal3d_worker/pipeline.py", line 116, in to_glb
+    glb = self._postprocess.to_glb(*args, **kwargs)
+[pixal3d] mv6 phase2-11-stack-of-old-books-with-a-candle: failed: RuntimeError: mv6-phase2-11-stack-of-old-books-with-a-candle: generation failed: RuntimeError: CUDA error: out of memory
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+[pixal3d] mvadapter: 3 of 4 made; the container was up 344 s
+  File "/usr/local/lib/python3.10/site-packages/o_voxel/postprocess.py", line 78, in to_glb
+    grid_size = ((aabb[1] - aabb[0]) / voxel_size).round().int()
+RuntimeError: CUDA error: out of memory
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+Traceback (most recent call last):
+  File "/pkg/modal/_runtime/container_io_manager.py", line 987, in handle_input_exception
+    yield
+  File "/pkg/modal/_container_entrypoint.py", line 189, in run_input_sync
+    values = io_context.call_function_sync()
+  File "/pkg/modal/_runtime/container_io_manager.py", line 266, in call_function_sync
+    expected_value_or_values = self.finalized_function.callable(*args, **kwargs)
+  File "/root/exp_pixal3d.py", line 373, in make
+    raise RuntimeError(f"{run}: {result['error']}")
+RuntimeError: mv6-phase2-11-stack-of-old-books-with-a-candle: generation failed: RuntimeError: CUDA error: out of memory
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-5oZAUcgenMzKUxoRsIjW1K
+15M	ops-out/private/mvadapter
+12M	ops-out/private/single
+7.7M	ops-out/private/synthetic
+exit status: 0

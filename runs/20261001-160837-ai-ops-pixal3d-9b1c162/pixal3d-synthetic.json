@@ -1,0 +1,240 @@
+[
+  {
+    "run": "syn6-phase2-04-retro-arcade-machine",
+    "variant": "syn6",
+    "seed": 949054593,
+    "views_from": "phase2d-04-retro-arcade-machine/final-949054593.glb",
+    "silhouette_iou": {
+      "0": 0.985,
+      "45": 0.987,
+      "90": 0.972,
+      "180": 0.985,
+      "270": 0.972,
+      "315": 0.985
+    },
+    "seconds": 76.6,
+    "timings": {
+      "generate_s": 48.079,
+      "export_s": 27.395,
+      "compress_s": 1.006,
+      "upload_s": 0.001
+    },
+    "triangles": 98415,
+    "views_used": 6,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.988,
+      "colour": 0.484,
+      "coverage": 0.1871,
+      "pose": {
+        "azimuth": 337.5,
+        "elevation": 4.7,
+        "roll": 0.0,
+        "fov": 24.5,
+        "scale": 1.005,
+        "shift": [
+          0.0,
+          -0.0025
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#f23449",
+          "to": "#d85653",
+          "share": 0.481
+        },
+        {
+          "from": "#d54057",
+          "to": "#d75a57",
+          "share": 0.113
+        },
+        {
+          "from": "#5c2d35",
+          "to": "#977177",
+          "share": 0.019
+        }
+      ],
+      "decals": 56,
+      "seconds": 1.009
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.55
+    },
+    "peak_gpu_gb": 30.9,
+    "load_seconds": 97.5,
+    "container_seconds": 183.5,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "syn6-phase2-13-cute-cartoon-car-bright-blue",
+    "variant": "syn6",
+    "seed": 207648777,
+    "views_from": "phase2d-13-cute-cartoon-car-bright-blue/final-207648777.glb",
+    "silhouette_iou": {
+      "0": 0.967,
+      "45": 0.952,
+      "90": 0.848,
+      "180": 0.967,
+      "270": 0.848,
+      "315": 0.951
+    },
+    "seconds": 92.2,
+    "timings": {
+      "generate_s": 70.044,
+      "export_s": 20.922,
+      "compress_s": 1.123,
+      "upload_s": 0.002
+    },
+    "triangles": 94149,
+    "views_used": 6,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": false,
+      "reason": "the silhouettes don't match well enough (IoU 0.881 < 0.93)",
+      "iou": 0.8809,
+      "colour": 0.1922,
+      "pose": {
+        "azimuth": 50.0,
+        "elevation": -22.5,
+        "roll": -8.0,
+        "fov": 0.0,
+        "scale": 0.956,
+        "shift": [
+          0.0137,
+          0.0131
+        ]
+      },
+      "seconds": 0.239
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.55
+    },
+    "peak_gpu_gb": 30.7,
+    "load_seconds": 97.5,
+    "container_seconds": 281.3,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "syn4-phase2-04-retro-arcade-machine",
+    "variant": "syn4",
+    "seed": 949054593,
+    "views_from": "phase2d-04-retro-arcade-machine/final-949054593.glb",
+    "silhouette_iou": {
+      "0": 0.981,
+      "90": 0.965,
+      "180": 0.981,
+      "270": 0.965
+    },
+    "seconds": 63.9,
+    "timings": {
+      "generate_s": 41.34,
+      "export_s": 21.342,
+      "compress_s": 1.105,
+      "upload_s": 0.002
+    },
+    "triangles": 96092,
+    "views_used": 4,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.965,
+      "colour": 0.3279,
+      "coverage": 0.1351,
+      "pose": {
+        "azimuth": 340.0,
+        "elevation": 2.5,
+        "roll": 0.0,
+        "fov": 18.7,
+        "scale": 1.004,
+        "shift": [
+          -0.0019,
+          -0.0045
+        ]
+      },
+      "mode": "detail only",
+      "decals": 54,
+      "seconds": 0.391
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.55
+    },
+    "peak_gpu_gb": 30.8,
+    "load_seconds": 97.5,
+    "container_seconds": 349.4,
+    "gpu": "NVIDIA L40S"
+  }
+]

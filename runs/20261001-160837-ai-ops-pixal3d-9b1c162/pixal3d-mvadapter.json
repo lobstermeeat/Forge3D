@@ -1,0 +1,269 @@
+[
+  {
+    "run": "mv6-phase2-04-retro-arcade-machine",
+    "variant": "mv6",
+    "seed": 949054593,
+    "views_from": "phase6/views/phase2-04-retro-arcade-machine",
+    "silhouette_iou": {
+      "0": 0.986,
+      "45": 0.973,
+      "90": 0.958,
+      "180": 0.989,
+      "270": 0.958,
+      "315": 0.974
+    },
+    "seconds": 83.0,
+    "timings": {
+      "generate_s": 58.132,
+      "export_s": 23.374,
+      "compress_s": 1.406,
+      "upload_s": 0.002
+    },
+    "triangles": 94540,
+    "views_used": 6,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9665,
+      "colour": 0.5703,
+      "coverage": 0.1069,
+      "pose": {
+        "azimuth": 335.2,
+        "elevation": 2.7,
+        "roll": -0.2,
+        "fov": 29.0,
+        "scale": 1.013,
+        "shift": [
+          0.0,
+          0.0006
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#d62928",
+          "to": "#d45552",
+          "share": 0.271
+        }
+      ],
+      "decals": 74,
+      "seconds": 1.178
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.55
+    },
+    "peak_gpu_gb": 30.9,
+    "load_seconds": 88.4,
+    "container_seconds": 177.9,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv6-phase2-06-wooden-shield-with-a-lion",
+    "variant": "mv6",
+    "seed": 1654818878,
+    "views_from": "phase6/views/phase2-06-wooden-shield-with-a-lion",
+    "silhouette_iou": {
+      "0": 0.977,
+      "45": 0.98,
+      "90": 0.943,
+      "180": 0.98,
+      "270": 0.943,
+      "315": 0.981
+    },
+    "seconds": 72.0,
+    "timings": {
+      "generate_s": 48.97,
+      "export_s": 21.409,
+      "compress_s": 1.514,
+      "upload_s": 0.002
+    },
+    "triangles": 96920,
+    "views_used": 6,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9892,
+      "colour": 0.5429,
+      "coverage": 0.1335,
+      "pose": {
+        "azimuth": 3.8,
+        "elevation": 1.2,
+        "roll": 0.0,
+        "fov": 27.5,
+        "scale": 1.002,
+        "shift": [
+          0.0006,
+          0.0
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#caa78b",
+          "to": "#e48d45",
+          "share": 0.234
+        },
+        {
+          "from": "#bb8c68",
+          "to": "#c96f2f",
+          "share": 0.162
+        },
+        {
+          "from": "#6d4b49",
+          "to": "#b66a4e",
+          "share": 0.075
+        },
+        {
+          "from": "#d0c4bb",
+          "to": "#da8c4e",
+          "share": 0.096
+        }
+      ],
+      "decals": 1877,
+      "seconds": 0.336
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.55
+    },
+    "peak_gpu_gb": 30.9,
+    "load_seconds": 88.4,
+    "container_seconds": 254.5,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv6-phase2-08-vintage-film-camera",
+    "variant": "mv6",
+    "seed": 849334850,
+    "views_from": "phase6/views/phase2-08-vintage-film-camera",
+    "silhouette_iou": {
+      "0": 0.968,
+      "45": 0.976,
+      "90": 0.93,
+      "180": 0.962,
+      "270": 0.927,
+      "315": 0.974
+    },
+    "seconds": 82.1,
+    "timings": {
+      "generate_s": 59.473,
+      "export_s": 20.973,
+      "compress_s": 1.541,
+      "upload_s": 0.003
+    },
+    "triangles": 99203,
+    "views_used": 6,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9818,
+      "colour": 0.7448,
+      "coverage": 0.0765,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": -2.9,
+        "roll": 0.2,
+        "fov": 0.0,
+        "scale": 1.007,
+        "shift": [
+          0.0012,
+          0.0037
+        ]
+      },
+      "mode": "detail only",
+      "decals": 250,
+      "seconds": 0.304
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.55
+    },
+    "peak_gpu_gb": 30.8,
+    "load_seconds": 88.4,
+    "container_seconds": 343.8,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv6-phase2-11-stack-of-old-books-with-a-candle",
+    "error": "RuntimeError: mv6-phase2-11-stack-of-old-books-with-a-candle: generation failed: RuntimeError: CUDA error: out of memory\nCUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.\nFor debugging consider passing CUDA_LAUNCH_BLOCKING=1\nCompile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.\n"
+  }
+]
