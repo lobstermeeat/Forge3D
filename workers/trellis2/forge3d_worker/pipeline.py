@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import contextlib
 import gc
 import json
 import os
 import traceback
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from PIL import Image
 
-from . import normals, projection, uv_raster
-from .inputs import InputError
-from .settings import Preset
+from . import multiview, normals, projection, uv_raster
+from .inputs import InputError, View
+from .settings import MULTIVIEW, MultiView, Preset
 
 MODEL_DIR = os.environ.get("TRELLIS2_MODEL_DIR", "/models/TRELLIS.2-4B")
 # The background-removed picture (RGBA, full frame) travels from generate() to export() on the mesh
@@ -128,6 +129,10 @@ class Trellis2Runtime:
 
     # The TRELLIS.2 pipeline that made the mesh the last generate() returned: the preset's, or its fallback
     pipeline_used: Optional[str] = None
+    # How many of the job's extra views helped make that mesh (a view with no object in it is left out)
+    views_used: int = 0
+    # How extra views steer the flows; the same for previews and finals (experiments set their own)
+    multiview: MultiView = MULTIVIEW
 
     def __init__(self, model_dir: str = MODEL_DIR) -> None:
         _configure_environment()
@@ -142,20 +147,30 @@ class Trellis2Runtime:
         pipeline.cuda()
         self.pipeline = pipeline
 
-    def generate(self, image: Any, preset: Preset, seed: int) -> Any:
+    def generate(self, image: Any, preset: Preset, seed: int, views: Sequence[View] = ()) -> Any:
         """
-        Image to mesh. Running out of GPU memory gets one retry in low-VRAM mode, and a final that still
-        runs out is made once more, still in low-VRAM mode, with the preview's pipeline (see
-        FALLBACK_PIPELINE). pipeline_used then says which pipeline made the mesh.
+        Image to mesh. ``views``, other pictures of the object (its sides and back), steer every flow
+        along with the image (see multiview.py); each is cut out and cropped like the image, and
+        views_used then says how many were used. The image alone is the cutout the projection paints.
+
+        Running out of GPU memory gets one retry in low-VRAM mode, and a final that still runs out is
+        made once more, still in low-VRAM mode, with the preview's pipeline (see FALLBACK_PIPELINE).
+        pipeline_used then says which pipeline made the mesh.
         """
         self.pipeline_used = preset.pipeline_type
+        self.views_used = 0
         try:
             # Background removal and cropping; fails when nothing stands out from the background
             prepared, cutout = self._preprocess(image)
         except ValueError as err:
             raise InputError("no object found in the image: use one object on a plain background") from err
+        extra = self._prepare_views(views)
+        self.views_used = len(extra)
+        if extra:
+            weights = ", ".join(f"{weight:g}" for weight in self._weights(extra))
+            print(f"[forge3d] {len(extra)} views besides the picture ({self.multiview.mode}; weights {weights})")
         try:
-            return self._run(prepared, preset.pipeline_type, seed, cutout)
+            return self._run(prepared, preset.pipeline_type, seed, cutout, extra)
         except Exception as err:
             if self.pipeline.low_vram or not is_out_of_memory(err):
                 raise
@@ -166,7 +181,7 @@ class Trellis2Runtime:
         try:
             self._offload()
             try:
-                return self._run(prepared, preset.pipeline_type, seed, cutout)
+                return self._run(prepared, preset.pipeline_type, seed, cutout, extra)
             except Exception as err:
                 fallback = FALLBACK_PIPELINE.get(preset.pipeline_type)
                 if fallback is None or not is_out_of_memory(err):
@@ -178,7 +193,7 @@ class Trellis2Runtime:
                 # The retry's traceback holds its tensors the same way: drop them before the cheaper run
                 traceback.clear_frames(err.__traceback__)
             self._free_gpu_memory()
-            mesh = self._run(prepared, fallback, seed, cutout)
+            mesh = self._run(prepared, fallback, seed, cutout, extra)
             self.pipeline_used = fallback
             return mesh
         except BaseException as err:
@@ -204,12 +219,39 @@ class Trellis2Runtime:
             cutout = image  # upstream skips background removal when the picture has its own alpha
         return prepared, cutout
 
+    def _prepare_views(self, views: Sequence[View]) -> list[tuple[Image.Image, float]]:
+        """Each view cut out and cropped as the picture is, with its weight; views with no object are left out."""
+        prepared = []
+        for number, view in enumerate(views):
+            try:
+                prepared.append((self.pipeline.preprocess_image(view.image), view.weight))
+            except ValueError:
+                print(f"[forge3d] views[{number}] (azimuth {view.azimuth:g}) left out: no object found in it")
+        return prepared
+
+    def _weights(self, views: Sequence[tuple[Image.Image, float]]) -> list[float]:
+        return [self.multiview.picture_weight, *(weight for _, weight in views)]
+
     def _run(
-        self, prepared: Image.Image, pipeline_type: str, seed: int, cutout: Optional[Image.Image] = None
+        self,
+        prepared: Image.Image,
+        pipeline_type: str,
+        seed: int,
+        cutout: Optional[Image.Image] = None,
+        views: Sequence[tuple[Image.Image, float]] = (),
     ) -> Any:
-        # Same seed, same sparse structure: the final keeps the shape of the preview the user approved.
-        # Its texture is sampled afresh at the higher resolution, so details can differ
-        mesh = self.pipeline.run(prepared, seed=seed, pipeline_type=pipeline_type, preprocess_image=False)[0]
+        # Without views, upstream's single-picture run exactly
+        conditions = (
+            multiview.conditioned_on(
+                self.pipeline, [prepared, *(image for image, _ in views)], self._weights(views), self.multiview.mode
+            )
+            if views
+            else contextlib.nullcontext()
+        )
+        # Same seed (and views), same sparse structure: the final keeps the shape of the preview the user
+        # approved. Its texture is sampled afresh at the higher resolution, so details can differ
+        with conditions:
+            mesh = self.pipeline.run(prepared, seed=seed, pipeline_type=pipeline_type, preprocess_image=False)[0]
         if cutout is not None:
             try:
                 setattr(mesh, CUTOUT, cutout)

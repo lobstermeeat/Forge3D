@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import time
 import traceback
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol, Sequence
 
-from .inputs import Fetch, InputError, parse_job
+from .inputs import Fetch, InputError, View, parse_job
 from .settings import CREDITS, PRESETS, Preset
 from .storage import Storage
 
@@ -15,10 +15,11 @@ class Runtime(Protocol):
     """
     The GPU side. After generate() it may set ``pipeline_used`` to the TRELLIS.2 pipeline that actually
     made the mesh (a final that runs out of GPU memory falls back to the preview's); without it, the
-    preset's pipeline is reported.
+    preset's pipeline is reported. It gets ``views`` only when the job has some, and may then set
+    ``views_used`` to how many it used (all of them, if it doesn't say).
     """
 
-    def generate(self, image: Any, preset: Preset, seed: int) -> Any: ...
+    def generate(self, image: Any, preset: Preset, seed: int, views: Sequence[View] = ()) -> Any: ...
 
     def export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]: ...
 
@@ -42,8 +43,10 @@ def handle_job(
     fetch: Optional[Fetch] = None,
 ) -> dict:
     """
-    Input: ``{"image_url" | "image_base64", "mode": "preview" | "final", "seed"?, "request_id"?}``.
-    Reuse the preview's ``seed`` for the final pass so the final refines the approved shape.
+    Input: ``{"image_url" | "image_base64", "mode": "preview" | "final", "seed"?, "request_id"?, "views"?}``,
+    where ``views`` are other pictures of the object: ``[{"image_url" | "image_base64", "azimuth",
+    "elevation", "weight"?}]``. Reuse the preview's ``seed`` and ``views`` for the final pass so the final
+    refines the approved shape.
     """
     try:
         spec = parse_job(job.get("input"), fallback_id=str(job.get("id", "job")), fetch=fetch)
@@ -61,7 +64,13 @@ def handle_job(
         clock = now
 
     try:
-        mesh = runtime.generate(spec.image, preset, spec.seed)
+        if spec.views:
+            mesh = runtime.generate(spec.image, preset, spec.seed, views=spec.views)
+            views_used = getattr(runtime, "views_used", len(spec.views))
+        else:
+            # Exactly as before views existed (and for runtimes that don't take them)
+            mesh = runtime.generate(spec.image, preset, spec.seed)
+            views_used = 0
         pipeline = getattr(runtime, "pipeline_used", None) or preset.pipeline_type
         lap("generate_s")
         raw, triangles = runtime.export(mesh, preset)
@@ -90,6 +99,8 @@ def handle_job(
         "triangles": triangles,
         # "512" for a final made with the preview's pipeline because the cascade ran out of GPU memory
         "pipeline": pipeline,
+        # Extra views of the object that helped make the model (0: the picture alone)
+        "views_used": views_used,
         "timings": timings,
         "credits": list(CREDITS),
     }
