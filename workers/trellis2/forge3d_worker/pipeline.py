@@ -10,11 +10,13 @@ from typing import Any, Optional
 
 from PIL import Image
 
-from . import normals, uv_raster
+from . import normals, projection, uv_raster
 from .inputs import InputError
 from .settings import Preset
 
 MODEL_DIR = os.environ.get("TRELLIS2_MODEL_DIR", "/models/TRELLIS.2-4B")
+# The background-removed picture (RGBA, full frame) travels from generate() to export() on the mesh
+CUTOUT = "forge3d_cutout"
 
 
 class WeightMismatchError(RuntimeError):
@@ -80,6 +82,25 @@ def _one_line(err: BaseException) -> str:
     return " ".join(str(err).split())
 
 
+class _KeepCutout:
+    """
+    Stands in for the background remover while preprocess_image runs and keeps what it returns: the
+    whole picture with its alpha, before upstream crops it and premultiplies it onto black.
+    """
+
+    def __init__(self, remover: Any) -> None:
+        self.remover = remover
+        self.cutout: Optional[Image.Image] = None
+
+    def __call__(self, image: Image.Image) -> Image.Image:
+        output = self.remover(image)
+        self.cutout = output.copy()
+        return output
+
+    def __getattr__(self, name: str) -> Any:  # to(), cpu() and the rest go to the real model
+        return getattr(self.remover, name)
+
+
 def is_out_of_memory(err: BaseException) -> bool:
     """A failed GPU allocation, which a run with the weights off the GPU can get past."""
     import torch
@@ -130,11 +151,11 @@ class Trellis2Runtime:
         self.pipeline_used = preset.pipeline_type
         try:
             # Background removal and cropping; fails when nothing stands out from the background
-            prepared = self.pipeline.preprocess_image(image)
+            prepared, cutout = self._preprocess(image)
         except ValueError as err:
             raise InputError("no object found in the image: use one object on a plain background") from err
         try:
-            return self._run(prepared, preset.pipeline_type, seed)
+            return self._run(prepared, preset.pipeline_type, seed, cutout)
         except Exception as err:
             if self.pipeline.low_vram or not is_out_of_memory(err):
                 raise
@@ -145,7 +166,7 @@ class Trellis2Runtime:
         try:
             self._offload()
             try:
-                return self._run(prepared, preset.pipeline_type, seed)
+                return self._run(prepared, preset.pipeline_type, seed, cutout)
             except Exception as err:
                 fallback = FALLBACK_PIPELINE.get(preset.pipeline_type)
                 if fallback is None or not is_out_of_memory(err):
@@ -157,7 +178,7 @@ class Trellis2Runtime:
                 # The retry's traceback holds its tensors the same way: drop them before the cheaper run
                 traceback.clear_frames(err.__traceback__)
             self._free_gpu_memory()
-            mesh = self._run(prepared, fallback, seed)
+            mesh = self._run(prepared, fallback, seed, cutout)
             self.pipeline_used = fallback
             return mesh
         except BaseException as err:
@@ -167,10 +188,34 @@ class Trellis2Runtime:
         finally:
             self._restore()
 
-    def _run(self, prepared: Image.Image, pipeline_type: str, seed: int) -> Any:
+    def _preprocess(self, image: Any) -> tuple[Image.Image, Optional[Image.Image]]:
+        """Upstream preprocess_image, plus the full-frame cutout it crops (what projection paints from)."""
+        remover = getattr(self.pipeline, "rembg_model", None)
+        keeper = _KeepCutout(remover) if remover is not None else None
+        if keeper is not None:
+            self.pipeline.rembg_model = keeper
+        try:
+            prepared = self.pipeline.preprocess_image(image)
+        finally:
+            if keeper is not None:
+                self.pipeline.rembg_model = remover
+        cutout = keeper.cutout if keeper is not None else None
+        if cutout is None and getattr(image, "mode", None) == "RGBA":
+            cutout = image  # upstream skips background removal when the picture has its own alpha
+        return prepared, cutout
+
+    def _run(
+        self, prepared: Image.Image, pipeline_type: str, seed: int, cutout: Optional[Image.Image] = None
+    ) -> Any:
         # Same seed, same sparse structure: the final keeps the shape of the preview the user approved.
         # Its texture is sampled afresh at the higher resolution, so details can differ
-        return self.pipeline.run(prepared, seed=seed, pipeline_type=pipeline_type, preprocess_image=False)[0]
+        mesh = self.pipeline.run(prepared, seed=seed, pipeline_type=pipeline_type, preprocess_image=False)[0]
+        if cutout is not None:
+            try:
+                setattr(mesh, CUTOUT, cutout)
+            except (AttributeError, TypeError):  # a mesh that takes no attributes is exported unprojected
+                pass
+        return mesh
 
     def _offload(self) -> None:
         """Switches to upstream's low-VRAM mode, which puts each model on the GPU only while it runs."""
@@ -200,7 +245,11 @@ class Trellis2Runtime:
         self.pipeline.cuda()
 
     def export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]:
-        """Mesh to GLB. Running out of GPU memory (remeshing a complex final) gets one retry the same way."""
+        """
+        Mesh to GLB. Running out of GPU memory (remeshing a complex final) gets one retry the same way.
+        ``last_projection`` then summarises the picture's projection (None when the preset has it off).
+        """
+        self.last_projection: Optional[dict] = None
         try:
             return self._export(mesh, preset)
         except Exception as err:
@@ -235,8 +284,21 @@ class Trellis2Runtime:
         material = glb.visual.material
         if getattr(material, "baseColorTexture", None) is not None:
             material.baseColorTexture = unpremultiply(material.baseColorTexture)
+            if preset.project_picture:
+                # Before the normals, which may split vertices: the projection works on to_glb's mesh
+                self.last_projection = self._project(glb, getattr(mesh, CUTOUT, None))
         glb = shade(glb, mesh.voxel_size)
         return glb.export(file_type="glb"), int(len(glb.faces))
+
+    def _project(self, glb: Any, cutout: Optional[Image.Image]) -> dict:
+        """Paints the picture onto the side of the model it shows (never raises); returns a summary."""
+        if cutout is None:
+            report = {"applied": False, "reason": "no picture came with the mesh"}
+        else:
+            _, report = projection.project_picture(glb, cutout)
+        summary = projection.summary(report)
+        print(f"[forge3d] projection: {json.dumps(summary)}")
+        return summary
 
 
 def shade(glb: Any, voxel_size: float) -> Any:

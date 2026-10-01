@@ -526,6 +526,8 @@ def run_pipeline(
             # Which TRELLIS.2 pipeline made it: a final that ran out of GPU memory is made with "512"
             if "pipeline" in result:
                 step["pipeline"] = result["pipeline"]
+            if result.get("projection"):  # finals: whether the picture was painted on, and why not
+                step["projection"] = result["projection"]
             return step
 
         return work

@@ -139,7 +139,7 @@ class FakeWorkers:
         if mode == "final" and self.fail_final:
             raise RuntimeError("container exited with code 137")
         seed = job["input"].get("seed", 42)
-        return {
+        result = {
             "seed": seed,
             "mode": mode,
             "glb": {"key": "k", "url": None, "base64": base64.b64encode(f"glb-{mode}".encode()).decode()},
@@ -147,6 +147,9 @@ class FakeWorkers:
             "pipeline": "512" if mode == "preview" else "1024_cascade",
             "timings": {"generate_s": 1.0},
         }
+        if mode == "final":  # the worker says whether it painted the picture onto the model
+            result["projection"] = {"applied": False, "reason": "the silhouettes don't match well enough"}
+        return result
 
 
 def run(folder, workers, **kwargs):
@@ -193,6 +196,8 @@ def test_prompt_run_saves_every_step(tmp_path):
     }
     assert saved["steps"]["final"]["triangles"] == 100_000
     assert saved["steps"]["final"]["pipeline"] == "1024_cascade" and saved["steps"]["preview"]["pipeline"] == "512"
+    assert saved["steps"]["final"]["projection"]["applied"] is False
+    assert "projection" not in saved["steps"]["preview"]
 
 
 def test_an_interrupted_run_continues_where_it_stopped(tmp_path):

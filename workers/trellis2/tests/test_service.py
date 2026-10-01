@@ -87,6 +87,27 @@ def test_the_result_names_the_pipeline_that_made_the_model():
     assert runtime.calls[1] == ("export", 100_000, 2048)
 
 
+def test_the_projection_summary_rides_along_when_the_runtime_has_one():
+    runtime = FakeRuntime()
+    out = handle_job({"id": "rp-3", "input": {"image_base64": b64(png_bytes())}}, runtime, FakeStorage(), pack)
+    assert "projection" not in out  # a runtime that doesn't project adds nothing
+    runtime.last_projection = {"applied": True, "reason": "applied", "iou": 0.97, "seconds": 2.1}
+    out = handle_job({"id": "rp-3", "input": {"image_base64": b64(png_bytes())}}, runtime, FakeStorage(), pack)
+    assert out["projection"] == runtime.last_projection
+    # ... and it isn't a timing, so the GPU seconds (the timings' sum) stay right
+    assert set(out["timings"]) == {"generate_s", "export_s", "compress_s", "upload_s"}
+    assert "refresh_worker" not in out
+
+
+def test_a_gpu_fault_while_projecting_keeps_the_model_but_restarts_the_worker():
+    runtime = FakeRuntime()
+    reason = "error: RuntimeError: CUDA error: an illegal memory access"
+    runtime.last_projection = {"applied": False, "reason": reason, "gpu_fault": True}
+    out = handle_job({"id": "rp-4", "input": {"image_base64": b64(png_bytes())}}, runtime, FakeStorage(), pack)
+    assert "error" not in out and out["glb"]["key"].endswith(".glb")
+    assert out["refresh_worker"] is True
+
+
 def test_preview_uses_the_cheap_preset_and_returns_its_seed():
     runtime = FakeRuntime()
     out = handle_job({"id": "rp-2", "input": {"image_base64": b64(png_bytes()), "mode": "preview"}}, runtime, FakeStorage(), pack)

@@ -259,3 +259,112 @@ def test_other_export_errors_are_not_retried():
     with pytest.raises(RuntimeError, match="illegal memory access"):
         runtime.export("mesh", PRESETS["final"])
     assert len(calls) == 1
+
+
+# --- The picture travels from generate() to export(), where it is painted on (final only) -----------
+
+
+class Remover(FakeModel):
+    """Upstream's BiRefNet wrapper reduced to what it returns: the picture with an alpha channel."""
+
+    def __call__(self, image):
+        image.putalpha(Image.new("L", image.size, 255))
+        return image
+
+
+class Mesh:
+    """Upstream's MeshWithVoxel takes attributes; a str (FakePipeline's mesh) doesn't."""
+
+
+class CroppingPipeline(FakePipeline):
+    """preprocess_image as upstream does it: the remover runs (unless the picture has alpha), then a crop."""
+
+    def preprocess_image(self, image):
+        if image.mode != "RGBA":
+            if self.low_vram:
+                self.rembg_model.to("cuda")
+            image = self.rembg_model(image.convert("RGB"))
+        return image.crop((8, 8, 40, 40)).convert("RGB")
+
+    def run(self, image, **options):
+        super().run(image, **options)
+        return [Mesh()]
+
+
+def test_generate_keeps_the_full_frame_cutout_on_the_mesh():
+    pipeline = CroppingPipeline(low_vram=True)
+    remover = pipeline.rembg_model = Remover()
+    picture = Image.new("RGB", (64, 48), (200, 30, 30))
+    mesh = runtime_around(pipeline).generate(picture, PRESETS["final"], seed=7)
+
+    cutout = mesh.forge3d_cutout
+    assert cutout.mode == "RGBA" and cutout.size == (64, 48)  # before the crop
+    assert pipeline.runs[0]["image"].size == (32, 32)  # the model still got the crop
+    assert pipeline.rembg_model is remover and remover.device == "cuda"  # put back; to() went through
+
+
+def test_a_picture_with_its_own_alpha_is_its_own_cutout():
+    pipeline = CroppingPipeline()
+    picture = cutout()  # RGBA, transparent around a red box: upstream skips background removal
+    mesh = runtime_around(pipeline).generate(picture, PRESETS["final"], seed=7)
+    assert mesh.forge3d_cutout is picture
+
+
+def test_meshes_that_take_no_attributes_still_generate():
+    pipeline = CroppingPipeline()
+    pipeline.rembg_model = Remover()
+    pipeline.run = lambda image, **options: ["mesh"]
+    assert runtime_around(pipeline).generate(Image.new("RGB", (64, 64)), PRESETS["final"], seed=7) == "mesh"
+
+
+def textured_glb():
+    import trimesh
+
+    material = trimesh.visual.material.PBRMaterial(baseColorTexture=Image.new("RGBA", (8, 8), (100, 100, 100, 128)))
+    box = trimesh.creation.box()
+    box.visual = trimesh.visual.TextureVisuals(uv=np.zeros((len(box.vertices), 2)), material=material)
+    return box
+
+
+@pytest.mark.parametrize("mode, projects", [("final", True), ("preview", False)])
+def test_export_paints_the_picture_on_finals(mode, projects, monkeypatch, capsys):
+    import types
+
+    from forge3d_worker import pipeline as pipeline_module
+
+    calls = []
+
+    report = {"applied": True, "reason": "applied", "iou": 0.97, "pose": {"azimuth": 10.0}, "timings": {"total_s": 1.5}}
+
+    def project_picture(glb, picture):
+        calls.append((glb, picture, glb.visual.material.baseColorTexture.mode))
+        return glb, report
+
+    monkeypatch.setattr(pipeline_module.projection, "project_picture", project_picture)
+    glb = textured_glb()
+    runtime = runtime_around(FakePipeline())
+    runtime._o_voxel = types.SimpleNamespace(postprocess=types.SimpleNamespace(to_glb=lambda **kwargs: glb))
+    mesh = types.SimpleNamespace(vertices=None, faces=None, attrs=None, coords=None, layout=None, voxel_size=None)
+    mesh.forge3d_cutout = cutout()
+
+    data, triangles = runtime.export(mesh, PRESETS[mode])
+    assert data[:4] == b"glTF" and triangles == 12
+    if projects:
+        # After unpremultiplying (RGB by then), with the picture generate() kept
+        assert calls == [(glb, mesh.forge3d_cutout, "RGB")]
+        summary = {"applied": True, "reason": "applied", "iou": 0.97, "pose": {"azimuth": 10.0}, "seconds": 1.5}
+        assert runtime.last_projection == summary
+        assert capsys.readouterr().out.startswith("[forge3d] projection: {")
+    else:
+        assert calls == [] and runtime.last_projection is None
+
+
+def test_export_without_a_picture_says_so():
+    import types
+
+    glb = textured_glb()
+    runtime = runtime_around(FakePipeline())
+    runtime._o_voxel = types.SimpleNamespace(postprocess=types.SimpleNamespace(to_glb=lambda **kwargs: glb))
+    mesh = types.SimpleNamespace(vertices=None, faces=None, attrs=None, coords=None, layout=None, voxel_size=None)
+    runtime.export(mesh, PRESETS["final"])
+    assert runtime.last_projection == {"applied": False, "reason": "no picture came with the mesh"}
