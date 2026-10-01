@@ -47,7 +47,8 @@ def handle_job(job: dict, generate: Generator, storage: Storage, fetch: Optional
 
     Output: ``{"request_id", "seed", "views": [{"azimuth", "elevation", "key", "url" | "base64"}, ...],
     "camera", "seconds", "timings"}``: six RGBA PNG cutouts at the azimuths in cameras.AZIMUTHS,
-    where 0 is the picture's own view, and the orthographic camera they share (cameras.py).
+    where 0 looks level at the front of the object in the picture, and the orthographic camera
+    they share (cameras.py).
     """
     try:
         spec = parse_job(job.get("input"), fallback_id=str(job.get("id", "job")), fetch=fetch)

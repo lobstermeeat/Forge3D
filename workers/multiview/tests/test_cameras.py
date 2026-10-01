@@ -14,24 +14,24 @@ WORKER = pathlib.Path(__file__).parent.parent
 FRONT, RIGHT, BACK, LEFT, TOP = (0, -0.5, 0), (0.5, 0, 0), (0, 0.5, 0), (-0.5, 0, 0), (0, 0, 0.5)
 
 
-def test_azimuth_zero_is_the_pictures_view_from_minus_y():
+def test_azimuth_zero_looks_at_the_front_from_minus_y():
     matrix = camera_to_world(0)
     np.testing.assert_allclose(matrix[:3, 3], [0, -1.8, 0], atol=1e-9)
     np.testing.assert_allclose(matrix[:3, 0], [1, 0, 0], atol=1e-9)  # image right: +X
     np.testing.assert_allclose(matrix[:3, 1], [0, 0, 1], atol=1e-9)  # image up: +Z
-    # The picture's right-hand side is on the image's right; the top is up
+    # The object's right-hand side (+X) is on the image's right; the top is up
     x_right, _ = project(np.array([RIGHT]), 0)[0]
     _, y_top = project(np.array([TOP]), 0)[0]
     assert x_right > IMAGE_SIZE / 2 and y_top < IMAGE_SIZE / 2
 
 
-def test_positive_azimuth_turns_the_camera_towards_the_pictures_right():
-    # 90: the camera stands on the picture's right-hand side (+X) and sees the front at image-left
+def test_positive_azimuth_turns_the_camera_towards_the_right_of_the_front_view():
+    # 90: the camera stands on the side that is on the right of the 0 view (+X) and sees the front at image-left
     np.testing.assert_allclose(camera_to_world(90)[:3, 3], [1.8, 0, 0], atol=1e-9)
     front_x, _ = project(np.array([FRONT]), 90)[0]
     back_x, _ = project(np.array([BACK]), 90)[0]
     assert front_x < IMAGE_SIZE / 2 < back_x
-    # 180 sees the back with left and right swapped; 270 stands on the picture's left
+    # 180 sees the back with left and right swapped; 270 stands on the left
     np.testing.assert_allclose(camera_to_world(180)[:3, 3], [0, 1.8, 0], atol=1e-9)
     assert project(np.array([RIGHT]), 180)[0][0] < IMAGE_SIZE / 2
     np.testing.assert_allclose(camera_to_world(270)[:3, 3], [-1.8, 0, 0], atol=1e-9)
@@ -59,7 +59,7 @@ def test_camera_info_is_plain_json():
     info = json.loads(json.dumps(camera_info()))
     assert info["type"] == "orthographic" and info["half_extent"] == 0.55 and info["elevation"] == 0
     assert info["pixels_per_unit"] == pytest.approx(698.182, abs=1e-3)
-    assert info["up"] == [0, 0, 1] and info["picture_camera"] == [0, -1, 0]
+    assert info["up"] == [0, 0, 1] and info["front"] == [0, -1, 0]
 
 
 def test_matches_mv_adapters_own_cameras():

@@ -7,10 +7,12 @@ work. There are no third-party AI APIs involved.
 | ------------------------------- | ----------------------------- | ------------------------ | ------------------------------------------------ |
 | [`trellis2/`](trellis2)         | TRELLIS.2-4B (MIT)            | image to textured GLB    | 24 GB+ Ampere/Ada/Hopper (L40S, RTX 4090, A100…) |
 | [`flux-schnell/`](flux-schnell) | FLUX.1 [schnell] (Apache-2.0) | text to reference images | 48 GB (L40S, A6000, A40)                         |
+| [`multiview/`](multiview)       | MV-Adapter on SDXL 1.0        | picture to six views     | 24 GB (A10G)                                     |
 
 They run on [Modal](https://modal.com) (`modal_app.py`, the simplest way to start) or on
-RunPod serverless (the Dockerfiles). Both hosts speak the same job protocol, so the server talks
-to either through `apps/server/src/services/ai` (`SelfHostedProvider`).
+RunPod serverless (the Dockerfiles; the multiview worker has none yet). Both hosts speak the same
+job protocol, so the server talks to either through `apps/server/src/services/ai`
+(`SelfHostedProvider`).
 
 ## The flow: spend GPU time only on results people keep
 
@@ -97,6 +99,56 @@ time is part of `export_s`.
 `flux-schnell` input: `{ "prompt": "a brass pocket watch", "count": 4, "seed": 5, "request_id": "gen_42" }`.
 Output: `{ "images": [{ "key", "url", "seed" }, …], "prompt", "seconds" }`.
 
+`multiview` input: `{ "image_url" | "image_base64", "seed"?, "prompt"?, "request_id"? }`, the picked
+picture (as for `trellis2`; a picture with transparency keeps its own cutout). `prompt` is an optional
+short description of the object ("a retro arcade machine"); without it the model gets MV-Adapter's
+default caption, "high quality". Output:
+
+```json
+{
+  "request_id": "gen_42",
+  "seed": 1234,
+  "views": [
+    { "azimuth": 0, "elevation": 0, "key": "ai/gen_42/view-1234-0.png", "url": "https://assets…/ai/gen_42/view-1234-0.png" },
+    { "azimuth": 45, "elevation": 0, "key": "ai/gen_42/view-1234-45.png", "url": "…" }
+  ],
+  "camera": { "type": "orthographic", "image_size": 768, "half_extent": 0.55, "pixels_per_unit": 698.182, "up": [0, 0, 1], "front": [0, -1, 0], "…": "…" },
+  "seconds": 74.7,
+  "timings": { "cutout_s": 0.4, "views_s": 71.0, "view_cutouts_s": 1.9, "upload_s": 0.6 }
+}
+```
+
+with six views, at azimuths 0, 45, 90, 180, 270 and 315. Each is a 768 x 768 RGBA PNG: MV-Adapter
+draws the views on flat mid-gray (127, the background it was trained on), and BiRefNet's mask of each
+view becomes its alpha; the RGB is left as drawn, lighting included.
+
+### The views' cameras
+
+`multiview/multiview_worker/cameras.py` has these in code (`camera_to_world`, `project`); they are
+MV-Adapter's own cameras (`get_orthogonal_camera` as its inference script calls it), and the tests hold
+them to its code.
+
+- **World**: right-handed, **+Z up**, the object at the origin, its front facing **-Y**.
+- **Azimuth 0 looks level at the front of the object in the picture.** The model was trained to draw
+  fixed views of an object from a reference taken from anywhere, so it turns the object to face the 0°
+  camera and draws it level. A head-on picture matches its 0° view; a three-quarter picture does not
+  (Phase 2's arcade machine came out turned about 20°), and pictures that look down (FLUX's are taken
+  "from slightly above") are redrawn at elevation 0. The picture is not one of the six cameras: give
+  the 3D step the views with their poses, and find the picture's own camera by silhouette search (as
+  the projection does) rather than placing it at azimuth 0.
+- **Positive azimuth moves the camera counter-clockwise seen from above**: the 90° view shows the side
+  that is on the right of the 0° view, with the front facing image-left; 180° shows the back, 270° the
+  left side. The camera at azimuth a is at 1.8 · (sin a, -cos a, 0), looking at the origin, with image
+  right along (cos a, sin a, 0) and image up along +Z (no roll). In glTF terms (+Y up, front +Z) a
+  point (x, y, z) here is (x, z, -y) there, and the camera is at 1.8 · (sin a, 0, cos a).
+- **Every view is orthographic at the same scale**: 768 px span [-0.55, 0.55] world units both ways,
+  698.2 px per unit, with the origin at the image centre: pixel x = 384 · (1 + r / 0.55),
+  y = 384 · (1 - u / 0.55) for a point's offsets r and u along the camera's right and up.
+- **Framing**: the picture's object is centred with its longer side at 90% of the frame (691 px,
+  0.99 units), as MV-Adapter's inference script prepares it, and the 0° view keeps that framing
+  (measured 685-700 px). The other views share its scale, so a wide object can overflow the frame at
+  45° and 315° (a stack of books did).
+
 Invalid input (including an image where no object stands out from the background) comes back
 as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`. After
 a GPU fault the worker also replaces its container (RunPod: `refresh_worker`; Modal: the
@@ -108,10 +160,10 @@ server passes them around as `data:` URLs. That is fine for trying things out.
 ## Deploying on Modal
 
 Modal bills GPUs by the second and includes $30 of free compute a month on its Starter plan.
-`modal_app.py` defines both workers, a volume for the weights and a small job API
+`modal_app.py` defines the workers, a volume for the weights and a small job API
 (`job_api.py`) with the same routes as a RunPod endpoint (`/run`, `/runsync`, `/status/{id}`,
-`/cancel/{id}`), under `/trellis2` and `/reference`, plus `/warm`, which starts a worker's
-container ahead of a job without waiting for it.
+`/cancel/{id}`), under `/trellis2`, `/reference` and `/multiview`, plus `/warm`, which starts a
+worker's container ahead of a job without waiting for it.
 
 1. On Hugging Face, request access to
    [DINOv3](https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m) (Meta approves it
@@ -156,7 +208,7 @@ container ahead of a job without waiting for it.
    modal run --detach workers/modal_app.py::make --prompt "a brass pocket watch" --final
    ```
 
-   The first run downloads the weights (about 50 GB, 10–30 minutes) into the `orainge-models`
+   The first run downloads the weights (about 60 GB, 10–30 minutes) into the `orainge-models`
    volume; later runs start within a couple of minutes. Each step is saved in the
    `orainge-outputs` volume under the run's name: the reference images, `preview-<seed>.glb`,
    `final-<seed>.glb` and `progress.json`. If you are still connected at the end, they are also
@@ -205,7 +257,8 @@ zoom, wireframe) for each final. It needs `pnpm install` and Playwright's Chromi
 
 **Settings** (in `modal_app.py`): both workers run on an L40S (48 GB), scale to zero, stay warm
 for 60 s after their last job (idle time is billed; a cold start takes about a minute) and are
-capped at 2 TRELLIS.2 containers and 1 FLUX container to bound spending. `TRELLIS2_GPU = "A10"`
+capped at 2 TRELLIS.2 containers and 1 FLUX container to bound spending. The multiview worker
+runs on an A10G (24 GB; it peaks at 19 GiB) with 1 container. `TRELLIS2_GPU = "A10"`
 costs about half as much per second but is slower and has only 24 GB; set
 `TRELLIS2_LOW_VRAM = "1"` with it. Compiled GPU kernels and FlexGEMM's kernel tuning are kept
 in the `orainge-cache` volume, so only the first containers spend time compiling and
@@ -302,6 +355,7 @@ GiB-hour of memory, so about $2.30/h per worker container as configured.
 | Preview                                           | 20–40 s         | ~$0.01–0.03 |
 | Final                                             | 1–2 min         | ~$0.04–0.08 |
 | Cold start and 60 s idle, per container scaled up | ~2 min          | ~$0.08      |
+| Six views (multiview, A10G at ~$1.30/h all-in)    | 74 s            | ~$0.03      |
 
 The GPU work in a prompt-to-final run comes to about $0.06–0.12. At low traffic each run also
 pays for its cold starts: one FLUX and one TRELLIS.2 container, plus a second TRELLIS.2 start if
@@ -323,6 +377,11 @@ models). Excluded on purpose: nvdiffrast/nvdiffrec (research-only; replaced by
 `trellis2/forge3d_worker/uv_raster.py`), RMBG-2.0 (non-commercial; replaced by BiRefNet),
 FLUX.1 [dev] (non-commercial) and Hunyuan3D 2.1 (not licensed in South Korea, the EU or the UK).
 
+The multiview worker ([`multiview/NOTICE.md`](multiview/NOTICE.md)) runs MV-Adapter (Apache-2.0; its
+pipeline code is vendored in `multiview/mvadapter/` without the nvdiffrast-based mesh tools) on Stable
+Diffusion XL 1.0, whose CreativeML Open RAIL++-M license has use-based restrictions that Orainge's terms
+of service must pass on to users before the worker serves them.
+
 ## Tests
 
 ```sh
@@ -330,9 +389,10 @@ pip install -r workers/requirements-dev.txt
 python -m pytest workers/tests                 # the job API and modal_app.py
 python -m pytest workers/trellis2/tests        # CPU only; set GLTFPACK_BIN to include gltfpack
 python -m pytest workers/flux-schnell/tests
+python -m pytest workers/multiview/tests       # torch for the camera checks; no GPU or weights
 ```
 
-Run the three folders separately: they share test file names.
+Run the four folders separately: they share test file names.
 
 The tests cover input validation, job handling, the out-of-memory retry and fallback, shading
 normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API, the
