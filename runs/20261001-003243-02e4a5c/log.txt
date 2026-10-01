@@ -1,0 +1,62 @@
+== Deploy: restarted runs carry on, and exports get the memory retry
+✓ App deployed in 2.311s! 🎉
+
+View Deployment: https://modal.com/apps/lobstermeeat/main/deployed/orainge-ai
+
+== Finish the Phase 4 runs that stopped (the finished ones are skipped)
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-frULFDJ69wR49TB1yyTJqv
+✓ Created objects.
+20 runs in phase2
+Starting 40 runs
+phase2b-01-cute-low-poly-fox-sitting-down: preview-783047822.glb, final-783047822.glb, input-cute-low-poly-fox-sitting-down.png
+phase2b-02-red-high-top-sneaker: preview-1459276374.glb, final-1459276374.glb, input-red-high-top-sneaker.png
+phase2b-03-gaming-chair-black-and-purple: preview-1971291685.glb, final-1971291685.glb, input-gaming-chair-black-and-purple.png
+phase2b-04-retro-arcade-machine: preview-949054593.glb, final-949054593.glb, input-retro-arcade-machine.png
+phase2b-05-sci-fi-laser-pistol-white: preview-1127065796.glb, final-1127065796.glb, input-sci-fi-laser-pistol-white.png
+phase2b-06-wooden-shield-with-a-lion: preview-1654818878.glb, final-1654818878.glb, input-wooden-shield-with-a-lion.png
+phase2b-07-chibi-knight-with-a-big-helmet: preview-25018956.glb, final-25018956.glb, input-chibi-knight-with-a-big-helmet.png
+phase2b-08-vintage-film-camera: preview-849334850.glb, final-849334850.glb, input-vintage-film-camera.png
+phase2b-09-donut-with-pink-frosting: preview-591143680.glb, final-591143680.glb, input-donut-with-pink-frosting.png
+phase2b-10-astronaut-helmet: preview-806417096.glb, final-806417096.glb, input-astronaut-helmet.png
+phase2b-11-stack-of-old-books-with-a-candle: failed (RuntimeError: generation failed: RuntimeError: CUDA error: out of memory)
+phase2b-12-skateboard-with-graffiti-art: preview-821889765.glb, final-821889765.glb, input-skateboard-with-graffiti-art.png
+phase2b-13-cute-cartoon-car-bright-blue: preview-207648777.glb, final-207648777.glb, input-cute-cartoon-car-bright-blue.png
+phase2b-14-bubble-tea-with-tapioca-pearls: preview-1688237652.glb, final-1688237652.glb, input-bubble-tea-with-tapioca-pearls.png
+phase2b-15-health-potion-in-a-round-glass: preview-914790488.glb, final-914790488.glb, input-health-potion-in-a-round-glass.png
+phase2b-16-green-dragon-sitting-cartoon: preview-2113616975.glb, final-2113616975.glb, input-green-dragon-sitting-cartoon.png
+phase2b-17-bowl-of-ramen-with-an-egg: preview-136916256.glb, final-136916256.glb, input-bowl-of-ramen-with-an-egg.png
+phase2b-18-electric-guitar: preview-1903607997.glb, final-1903607997.glb, input-electric-guitar.png
+phase2b-19-small-cabin-in-a-snowy-forest: preview-1435273127.glb, final-1435273127.glb, input-small-cabin-in-a-snowy-forest.png
+phase2b-20-hot-air-balloon: preview-1521877271.glb, final-1521877271.glb, input-hot-air-balloon.png
+phase2c-01-cute-low-poly-fox-sitting-down: preview-783047823.glb, final-783047823.glb, input-cute-low-poly-fox-sitting-down.png
+phase2c-02-red-high-top-sneaker: preview-1459276375.glb, final-1459276375.glb, input-red-high-top-sneaker.png
+phase2c-03-gaming-chair-black-and-purple: preview-1971291686.glb, final-1971291686.glb, input-gaming-chair-black-and-purple.png
+phase2c-04-retro-arcade-machine: preview-949054594.glb, final-949054594.glb, input-retro-arcade-machine.png
+phase2c-05-sci-fi-laser-pistol-white: preview-1127065797.glb, final-1127065797.glb, input-sci-fi-laser-pistol-white.png
+phase2c-06-wooden-shield-with-a-lion: preview-1654818879.glb, final-1654818879.glb, input-wooden-shield-with-a-lion.png
+phase2c-07-chibi-knight-with-a-big-helmet: preview-25018957.glb, final-25018957.glb, input-chibi-knight-with-a-big-helmet.png
+phase2c-08-vintage-film-camera: preview-849334851.glb, final-849334851.glb, input-vintage-film-camera.png
+phase2c-09-donut-with-pink-frosting: preview-591143681.glb, final-591143681.glb, input-donut-with-pink-frosting.png
+phase2c-10-astronaut-helmet: preview-806417097.glb, final-806417097.glb, input-astronaut-helmet.png
+phase2c-11-stack-of-old-books-with-a-candle: preview-8026099.glb, final-8026099.glb, input-stack-of-old-books-with-a-candle.png
+phase2c-12-skateboard-with-graffiti-art: preview-821889766.glb, final-821889766.glb, input-skateboard-with-graffiti-art.png
+phase2c-13-cute-cartoon-car-bright-blue: preview-207648778.glb, final-207648778.glb, input-cute-cartoon-car-bright-blue.png
+phase2c-14-bubble-tea-with-tapioca-pearls: preview-1688237653.glb, final-1688237653.glb, input-bubble-tea-with-tapioca-pearls.png
+phase2c-15-health-potion-in-a-round-glass: preview-914790489.glb, final-914790489.glb, input-health-potion-in-a-round-glass.png
+phase2c-16-green-dragon-sitting-cartoon: preview-2113616976.glb, final-2113616976.glb, input-green-dragon-sitting-cartoon.png
+phase2c-17-bowl-of-ramen-with-an-egg: preview-136916257.glb, final-136916257.glb, input-bowl-of-ramen-with-an-egg.png
+phase2c-18-electric-guitar: preview-1903607998.glb, final-1903607998.glb, input-electric-guitar.png
+phase2c-19-small-cabin-in-a-snowy-forest: preview-1435273128.glb, final-1435273128.glb, input-small-cabin-in-a-snowy-forest.png
+phase2c-20-hot-air-balloon: preview-1521877272.glb, final-1521877272.glb, input-hot-air-balloon.png
+Done: 39 of 40 runs finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-frULFDJ69wR49TB1yyTJqv
+14M	ops-out/private/finished
+
+== The worker's memory retries in the last hour
+[forge3d] out of GPU memory in 1024_cascade, retrying in low-VRAM mode: [CuMesh] CUDA error: File: /tmp/CuMesh/src/utils.h Line: 43 Error code: 2 Error text: out of memory
+[forge3d] out of GPU memory in 1024_cascade, retrying in low-VRAM mode: [CuMesh] CUDA error: File: /tmp/CuMesh/src/utils.h Line: 43 Error code: 2 Error text: out of memory
+[forge3d] out of GPU memory in 1024_cascade, retrying in low-VRAM mode: [CuMesh] CUDA error: File: /tmp/CuMesh/src/utils.h Line: 43 Error code: 2 Error text: out of memory
+exit status: 0
