@@ -418,7 +418,10 @@ def run_pipeline(
     if progress_file.exists():
         # A continued run keeps its prompt, image and seed; it can only add the final step
         state: dict = json.loads(progress_file.read_text())
-        if (prompt and prompt != state.get("prompt")) or image is not None or (
+        # Modal runs an input again when its container is replaced mid-run, with the same image: carry on
+        saved = folder / state["input"] if state.get("input") else None
+        same_image = image is not None and saved is not None and saved.exists() and saved.read_bytes() == image
+        if (prompt and prompt != state.get("prompt")) or (image is not None and not same_image) or (
             seed is not None and seed != state.get("seed")
         ):
             raise ValueError(f"{run} already exists; start a new run to change its prompt, image or seed")

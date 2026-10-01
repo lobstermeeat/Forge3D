@@ -157,6 +157,24 @@ class Trellis2Runtime:
         self.pipeline.cuda()
 
     def export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]:
+        """Mesh to GLB. Running out of GPU memory (remeshing a complex final) gets one retry the same way."""
+        try:
+            return self._export(mesh, preset)
+        except Exception as err:
+            if self.pipeline.low_vram or not is_out_of_memory(err):
+                raise
+            reason = " ".join(str(err).split())
+            print(f"[forge3d] out of GPU memory exporting, retrying with the models off the GPU: {reason}")
+        try:
+            self._offload()
+            return self._export(mesh, preset)
+        except BaseException as err:
+            traceback.clear_frames(err.__traceback__)
+            raise
+        finally:
+            self._restore()
+
+    def _export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]:
         glb = self._o_voxel.postprocess.to_glb(
             vertices=mesh.vertices,
             faces=mesh.faces,
