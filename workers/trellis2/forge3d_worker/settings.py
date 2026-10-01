@@ -18,13 +18,17 @@ class Preset:
     texture_size: int
     # Use TRELLIS.2's narrow-band remesh (cleaner, watertight topology)
     remesh: bool
+    # Paint the input picture onto the side of the model it shows (forge3d_worker.projection)
+    project_picture: bool = False
 
 
 PRESETS: dict[str, Preset] = {
     # Shown while the user decides; small enough to stream instantly
     "preview": Preset(pipeline_type="512", max_faces=30_000, texture_size=1024, remesh=True),
     # What gets published: detailed, but still light enough for phones
-    "final": Preset(pipeline_type="1024_cascade", max_faces=100_000, texture_size=2048, remesh=True),
+    "final": Preset(
+        pipeline_type="1024_cascade", max_faces=100_000, texture_size=2048, remesh=True, project_picture=True
+    ),
 }
 
 # Attribution the DINOv3 license requires wherever generated assets are offered

@@ -27,8 +27,30 @@ to either through `apps/server/src/services/ai` (`SelfHostedProvider`).
    `AssetLoader` decodes them; the decoders are served from `/decoders/` by the client's Vite
    config. (ETC1S, Basis' smaller format, turned neighbouring UV charts into grime and specks
    at the mip levels a model shows at normal viewing distance.)
+5. Before packing, each pass gets its own shading normals (`trellis2/forge3d_worker/normals.py`;
+   positions don't move). TRELLIS.2 often draws round things as wide flat facets: a potion's bulb
+   came out as a 32-sided polygon, 11° from facet to facet, which a glossy material mirrors as a
+   grid of blocks. A bilateral filter over the face normals smooths differences up to about 10°
+   across 32 voxels of the pass's grid and keeps larger ones, so low-poly facets and panel lines
+   stay, and edges sharper than 60° stay crisp (their vertices are split). gltfpack keeps the
+   normals as 8-bit octahedral vectors (within 1.2°).
 
 Uploaded images can skip step 1. Images with transparency skip background removal.
+
+**Finals get the picture painted on** (`trellis2/forge3d_worker/projection.py`, `Preset.project_picture`).
+TRELLIS.2 bakes colour from a coarse voxel field, so painted detail (a lion on a shield, graffiti)
+comes out smeared. After `to_glb`, the worker finds the camera the picture was taken from (a search
+over views scored by how well the model's silhouette matches the picture's, with the model's own
+colours to tell symmetric views apart), takes the picture's lighting out (its exposure and its
+shading, fitted against the texture where both show the same paint), then blends it into the
+base-colour texture where the surface faces that camera and is visible to it: fading out at grazing
+angles, near outlines, depth edges and misfits, and at specular highlights on glossy surfaces. Where
+the texture got a paint's colour wrong (a near-black "cola" milk tea, a red fox pictured orange), that
+paint takes the picture's colour, fading round the sides instead of ending in a seam. It never fails
+a job: when the silhouettes don't match closely (IoU under 0.93), another camera fits as well but
+would paint a different shape, or too little would change, the texture is left as TRELLIS.2 made it,
+and the result's optional `projection` field says why (`applied`, `reason`, `iou`, `colour`, `pose`,
+`seconds`). Previews skip it: it adds a few seconds and the preview is only for choosing.
 
 ## Job contracts
 
@@ -55,10 +77,22 @@ stale one. Output:
   "bytes": 812345,
   "raw_bytes": 3012345,
   "triangles": 30000,
+  "pipeline": "512",
   "timings": { "generate_s": 9.8, "export_s": 4.1, "compress_s": 2.2, "upload_s": 0.3 },
   "credits": ["Built with DINOv3", "3D generation: TRELLIS.2 (Microsoft, MIT)"]
 }
 ```
+
+`pipeline` is the TRELLIS.2 pipeline that made the model: `"512"` for previews, `"1024_cascade"` for
+finals. A job that runs out of GPU memory is retried once in low-VRAM mode (the models visit the GPU
+one at a time). A final that runs out even then is made once more, still in low-VRAM mode, with the
+preview's `"512"` pipeline and exported with the final's settings, and reports `"pipeline": "512"`. The
+same seed gives that pipeline the shape the user approved in the preview, and its memory use is known to
+fit, while TRELLIS.2's cascade has no cheaper setting for a 1024³ final (see `FALLBACK_PIPELINE` in
+`trellis2/forge3d_worker/pipeline.py`).
+
+Finals also carry `projection`, whether the picture was painted onto the model (see above); its
+time is part of `export_s`.
 
 `flux-schnell` input: `{ "prompt": "a brass pocket watch", "count": 4, "seed": 5, "request_id": "gen_42" }`.
 Output: `{ "images": [{ "key", "url", "seed" }, …], "prompt", "seconds" }`.
@@ -300,8 +334,11 @@ python -m pytest workers/flux-schnell/tests
 
 Run the three folders separately: they share test file names.
 
-The tests cover input validation, job handling, the checkpoint check, the job API and the
-nvdiffrast stand-in (against a brute-force rasterizer and analytic results). Before the first
+The tests cover input validation, job handling, the out-of-memory retry and fallback, shading
+normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API, the
+nvdiffrast stand-in (against a brute-force rasterizer and analytic results) and the picture
+projection (synthetic models pictured from known cameras: the camera found, the colours painted,
+the fall-backs). Before the first
 production deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine
 that has nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real
 hardware.
