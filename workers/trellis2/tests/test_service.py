@@ -67,6 +67,26 @@ def test_final_job_runs_every_stage_and_reports_credits():
     assert storage.saved["ai/gen_42/final-1234.glb"][1] == "model/gltf-binary"
 
 
+def test_the_result_names_the_pipeline_that_made_the_model():
+    image = {"image_base64": b64(png_bytes()), "seed": 5}
+    # A runtime that doesn't say (like an older one) gets its preset's pipeline reported
+    out = handle_job({"id": "a", "input": image}, FakeRuntime(), FakeStorage(), pack)
+    assert out["pipeline"] == "1024_cascade"
+    out = handle_job({"id": "b", "input": {**image, "mode": "preview"}}, FakeRuntime(), FakeStorage(), pack)
+    assert out["pipeline"] == "512"
+
+    class FellBack(FakeRuntime):
+        def generate(self, image, preset, seed):
+            self.pipeline_used = "512"  # the cascade ran out of GPU memory even in low-VRAM mode
+            return super().generate(image, preset, seed)
+
+    runtime = FellBack()
+    out = handle_job({"id": "c", "input": image}, runtime, FakeStorage(), pack)
+    assert out["mode"] == "final" and out["pipeline"] == "512" and out["triangles"] == 100_000
+    # Exported with the final's settings all the same
+    assert runtime.calls[1] == ("export", 100_000, 2048)
+
+
 def test_preview_uses_the_cheap_preset_and_returns_its_seed():
     runtime = FakeRuntime()
     out = handle_job({"id": "rp-2", "input": {"image_base64": b64(png_bytes()), "mode": "preview"}}, runtime, FakeStorage(), pack)

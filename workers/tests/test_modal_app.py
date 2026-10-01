@@ -144,6 +144,7 @@ class FakeWorkers:
             "mode": mode,
             "glb": {"key": "k", "url": None, "base64": base64.b64encode(f"glb-{mode}".encode()).decode()},
             "triangles": 30_000 if mode == "preview" else 100_000,
+            "pipeline": "512" if mode == "preview" else "1024_cascade",
             "timings": {"generate_s": 1.0},
         }
 
@@ -191,6 +192,7 @@ def test_prompt_run_saves_every_step(tmp_path):
         "final": "done",
     }
     assert saved["steps"]["final"]["triangles"] == 100_000
+    assert saved["steps"]["final"]["pipeline"] == "1024_cascade" and saved["steps"]["preview"]["pipeline"] == "512"
 
 
 def test_an_interrupted_run_continues_where_it_stopped(tmp_path):
