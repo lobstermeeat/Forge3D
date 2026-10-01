@@ -101,8 +101,12 @@ Output: `{ "images": [{ "key", "url", "seed" }, …], "prompt", "seconds" }`.
 
 `multiview` input: `{ "image_url" | "image_base64", "seed"?, "prompt"?, "request_id"? }`, the picked
 picture (as for `trellis2`; a picture with transparency keeps its own cutout). `prompt` is an optional
-short description of the object ("a retro arcade machine"); without it the model gets MV-Adapter's
-default caption, "high quality". Output:
+short description of the object; without it the model gets MV-Adapter's default caption, "high
+quality". **Send the user's prompt**: on the Phase 2 test set a caption that names the object kept its
+colours and details in the oblique views, and the hidden side is otherwise a lottery of the seed. A
+caption that also says what the back looks like ("a retro arcade machine, a plain flat back panel")
+was the only setting that reliably drew a plain back; nothing drew a correct back for a camera.
+Output:
 
 ```json
 {
@@ -113,14 +117,16 @@ default caption, "high quality". Output:
     { "azimuth": 45, "elevation": 0, "key": "ai/gen_42/view-1234-45.png", "url": "…" }
   ],
   "camera": { "type": "orthographic", "image_size": 768, "half_extent": 0.55, "pixels_per_unit": 698.182, "up": [0, 0, 1], "front": [0, -1, 0], "…": "…" },
-  "seconds": 74.7,
-  "timings": { "cutout_s": 0.4, "views_s": 71.0, "view_cutouts_s": 1.9, "upload_s": 0.6 }
+  "seconds": 46.1,
+  "timings": { "cutout_s": 0.4, "views_s": 43.2, "view_cutouts_s": 1.9, "upload_s": 0.6 }
 }
 ```
 
 with six views, at azimuths 0, 45, 90, 180, 270 and 315. Each is a 768 x 768 RGBA PNG: MV-Adapter
 draws the views on flat mid-gray (127, the background it was trained on), and BiRefNet's mask of each
-view becomes its alpha; the RGB is left as drawn, lighting included.
+view becomes its alpha; the RGB is left as drawn, lighting included (and not consistent between views).
+Settings: 30 steps (the same views as MV-Adapter's 50 in 62% of the time), guidance 3, the reference
+at 90% of the frame; 46 s per picture on an A10G, 19 GiB of GPU memory at the peak.
 
 ### The views' cameras
 
@@ -129,13 +135,15 @@ MV-Adapter's own cameras (`get_orthogonal_camera` as its inference script calls 
 them to its code.
 
 - **World**: right-handed, **+Z up**, the object at the origin, its front facing **-Y**.
-- **Azimuth 0 looks level at the front of the object in the picture.** The model was trained to draw
-  fixed views of an object from a reference taken from anywhere, so it turns the object to face the 0°
-  camera and draws it level. A head-on picture matches its 0° view; a three-quarter picture does not
-  (Phase 2's arcade machine came out turned about 20°), and pictures that look down (FLUX's are taken
-  "from slightly above") are redrawn at elevation 0. The picture is not one of the six cameras: give
-  the 3D step the views with their poses, and find the picture's own camera by silhouette search (as
-  the projection does) rather than placing it at azimuth 0.
+- **Azimuth 0 is the picture's view, made level and squared up.** The model was trained to draw fixed
+  views of an object from a reference taken from anywhere, so it keeps the side the picture mostly
+  shows and turns it to face the 0° camera. A head-on picture matches its 0° view; a three-quarter
+  picture comes out straight-on (Phase 2's arcade machine was about 20° off, its car about 35°), so
+  the picture sits between two views; a profile picture keeps the profile at 0° (Phase 2's dragon,
+  whose face is then at 270°); pictures that look down (FLUX's are taken "from slightly above") are
+  redrawn at elevation 0. The picture is not one of the six cameras: give the 3D step the views with
+  their poses, and find the picture's own camera by silhouette search (as the projection does) rather
+  than placing it at azimuth 0.
 - **Positive azimuth moves the camera counter-clockwise seen from above**: the 90° view shows the side
   that is on the right of the 0° view, with the front facing image-left; 180° shows the back, 270° the
   left side. The camera at azimuth a is at 1.8 · (sin a, -cos a, 0), looking at the origin, with image
@@ -145,9 +153,11 @@ them to its code.
   698.2 px per unit, with the origin at the image centre: pixel x = 384 · (1 + r / 0.55),
   y = 384 · (1 - u / 0.55) for a point's offsets r and u along the camera's right and up.
 - **Framing**: the picture's object is centred with its longer side at 90% of the frame (691 px,
-  0.99 units), as MV-Adapter's inference script prepares it, and the 0° view keeps that framing
-  (measured 685-700 px). The other views share its scale, so a wide object can overflow the frame at
-  45° and 315° (a stack of books did).
+  0.99 units), as MV-Adapter's inference script prepares it, and the 0° view comes out at that size
+  (measured 685-700 px) whatever the reference's framing: the scale is the model's, not the input's.
+  The other views share it, so an object that is deeper than it is wide overflows the frame in the
+  views that show its long axis (a stack of books at 45° and 315°; a car in all four side views, wheels
+  cut). A view's cutout touching the frame edge means "unknown beyond here", not the object's edge.
 
 Invalid input (including an image where no object stands out from the background) comes back
 as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`. After
@@ -355,7 +365,7 @@ GiB-hour of memory, so about $2.30/h per worker container as configured.
 | Preview                                           | 20–40 s         | ~$0.01–0.03 |
 | Final                                             | 1–2 min         | ~$0.04–0.08 |
 | Cold start and 60 s idle, per container scaled up | ~2 min          | ~$0.08      |
-| Six views (multiview, A10G at ~$1.30/h all-in)    | 74 s            | ~$0.03      |
+| Six views (multiview, A10G at ~$1.30/h all-in)    | 46 s            | ~$0.02      |
 
 The GPU work in a prompt-to-final run comes to about $0.06–0.12. At low traffic each run also
 pays for its cold starts: one FLUX and one TRELLIS.2 container, plus a second TRELLIS.2 start if

@@ -9,8 +9,17 @@ every model loaded from local folders (scripts/download_weights.py):
 2. Crop to the cutout's box, scale its longer side to 90% of 768 px, centre it on a 768 x 768
    canvas and flatten it onto mid-gray (0.5), the background of MV-Adapter's training renders.
 3. Draw the six views (azimuths 0, 45, 90, 180, 270 and 315 at elevation 0; see cameras.py) with
-   SDXL and the adapter: 50 steps, guidance 3, the caption "high quality" unless the job describes
+   SDXL and the adapter: 30 steps, guidance 3, the caption "high quality" unless the job describes
    the object. The views come out on the same mid-gray.
+
+   Settings checked on the twenty Phase 2 test pictures (Phase 6 notes): 30 steps draw the same
+   views as MV-Adapter's default 50 at 62% of the time (46 s instead of 74 s on an A10G); guidance
+   5 and a smaller reference changed nothing for the better; the model
+   draws the object at its own scale and from its own elevation whatever the reference's framing or
+   the camera maps say. What the hidden side looks like is decided by the seed and the caption: a
+   caption that names the object ("a wooden shield with a lion") keeps its colours and details in the
+   oblique views, and one that also says what the back looks like ("..., a plain flat back panel")
+   is the only thing that reliably gave a plain back, so send the user's prompt as `prompt`.
 4. Cut each view out of its gray background with BiRefNet, so the views are RGBA cutouts.
 
 Everything but the GPU part (the cutout and reference preparation) runs on a CPU, for tests.
@@ -29,7 +38,7 @@ from .cameras import AZIMUTH_OFFSET, AZIMUTHS, DISTANCE, ELEVATION, FILL, HALF_E
 from .inputs import DEFAULT_PROMPT, InputError
 
 NEGATIVE_PROMPT = "watermark, ugly, deformed, noisy, blurry, low contrast"
-STEPS = 50
+STEPS = 30  # MV-Adapter's scripts use 50; 30 drew the same views in 62% of the time
 GUIDANCE = 3.0
 REFERENCE_SCALE = 1.0
 SHIFT_SCALE = 8.0  # the noise-schedule shift MV-Adapter was trained with ("interpolated" ShiftSNR)

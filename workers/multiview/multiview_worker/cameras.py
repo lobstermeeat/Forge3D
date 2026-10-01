@@ -5,11 +5,13 @@ MV-Adapter's image-to-multiview model draws one object from six fixed orthograph
 (`get_orthogonal_camera` as upstream's scripts/inference_i2mv_sdxl.py calls it, with the
 azimuths shifted by -90°). Its world is right-handed with +Z up and the object at the origin:
 
-- **Azimuth 0 looks at the front of the object in the picture, level** (elevation 0). The model was
-  trained to draw fixed views of an object from a picture taken from anywhere, so it turns the
-  object to face the 0° camera: a head-on picture matches its 0° view, but a three-quarter picture
-  sits between views (Phase 2's arcade machine, about 20° to the left of 0°), and pictures that
-  look down are redrawn level. The picture is not one of the six cameras.
+- **Azimuth 0 is the picture's view, made level (elevation 0) and squared up.** The model was
+  trained to draw fixed views of an object from a picture taken from anywhere, so it keeps the side
+  the picture mostly shows and turns it to face the 0° camera: a head-on picture matches its 0°
+  view; a three-quarter picture comes out straight-on, so the picture sits between views (Phase 2's
+  arcade machine, about 20° to the left of 0°; its car, about 35°); a profile picture keeps the
+  profile at 0° (Phase 2's dragon, whose face is then at 270°); pictures that look down are
+  redrawn level. The picture is not one of the six cameras.
 - **Positive azimuth moves the camera counter-clockwise seen from above**, towards the side that
   is on the right of the 0° view: the 90° view shows that side, with the front facing image-left;
   180° shows the back, 270° the left side. From view to view the object turns clockwise.
@@ -84,10 +86,10 @@ def camera_info() -> dict:
         "front": [0, -1, 0],
         "fill": FILL,
         "azimuth": (
-            "degrees; 0 looks level at the front of the object in the picture (a three-quarter or "
-            "downward picture is not itself one of the views); positive azimuth moves the camera "
-            "counter-clockwise seen from above (up = +Z): 90 shows the side on the right of the 0 "
-            "view, 180 the back, 270 the left side"
+            "degrees; 0 is the picture's view made level and squared up to the side it mostly shows "
+            "(a three-quarter or downward picture is not itself one of the views); positive azimuth "
+            "moves the camera counter-clockwise seen from above (up = +Z): 90 shows the side on the "
+            "right of the 0 view, 180 the back, 270 the left side"
         ),
         "position": "distance * (cos(elevation) sin(azimuth), -cos(elevation) cos(azimuth), sin(elevation))",
         "pixel": (
