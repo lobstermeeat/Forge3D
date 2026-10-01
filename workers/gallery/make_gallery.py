@@ -250,7 +250,9 @@ def _share(runs: list[Run]) -> str:
     return f"{passed} of {len(runs)} ({passed / len(runs):.0%})"
 
 
-def page(runs: list[Run], title: str, subtitle: str, three_version: Optional[str] = None) -> str:
+def page(
+    runs: list[Run], title: str, subtitle: str, three_version: Optional[str] = None, overall: bool = True
+) -> str:
     e = html.escape
     finals = [m for r in runs for m in r.models if m.mode == "final"]
     previews = [m for r in runs for m in r.models if m.mode == "preview"]
@@ -258,10 +260,10 @@ def page(runs: list[Run], title: str, subtitle: str, three_version: Optional[str
     costs = [r.cost for r in runs if r.models]
     judged = [r for r in runs if r.verdict]
     verdicts: list[tuple[str, str]] = []
-    if judged:
+    if judged and overall:
         verdicts.append((f"Publishable (bar {BAR:.0%})", _share(judged)))
-        for group in dict.fromkeys(r.group for r in judged if r.group):
-            verdicts.append((group, _share([r for r in judged if r.group == group])))
+    for group in dict.fromkeys(r.group for r in judged if r.group):
+        verdicts.append((group, _share([r for r in judged if r.group == group])))
     summary = verdicts + [
         ("Runs", str(len(runs))),
         ("Finals", str(len(finals))),
@@ -610,6 +612,11 @@ def main() -> None:
         "--glb-as-text", action="store_true", help="copy the GLBs as base64 .txt, for hosts that don't serve .glb"
     )
     parser.add_argument("--verdicts", type=pathlib.Path, help="a reviewer's verdicts as JSON (see above)")
+    parser.add_argument(
+        "--per-group",
+        action="store_true",
+        help="count verdicts per group only, e.g. when each group is a round of the same prompts",
+    )
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     runs = load_runs(args.runs, args.out)
@@ -619,7 +626,10 @@ def main() -> None:
         apply_verdicts([run for run, _ in runs], json.loads(args.verdicts.read_text()))
     render_models(runs, args.runs, args.out)
     three_version = None if args.no_3d else copy_models(runs, args.runs, args.out, args.glb_as_text)
-    (args.out / "index.html").write_text(page([run for run, _ in runs], args.title, args.subtitle, three_version))
+    board = [run for run, _ in runs]
+    (args.out / "index.html").write_text(
+        page(board, args.title, args.subtitle, three_version, overall=not args.per_group)
+    )
     print(f"Wrote {args.out / 'index.html'} with {len(runs)} runs")
 
 

@@ -1,0 +1,202 @@
+{
+ "phase2b-01-cute-low-poly-fox-sitting-down": {
+  "verdict": "publish",
+  "note": "A cute faceted fox sitting neatly with a curled tail, clean from every angle, just redder than the orange reference.",
+  "group": "Phase 4"
+ },
+ "phase2b-02-red-high-top-sneaker": {
+  "verdict": "publish",
+  "note": "Convincing red canvas high-top with laces, eyelets, toe cap and striped sole intact from every angle.",
+  "group": "Phase 4"
+ },
+ "phase2b-03-gaming-chair-black-and-purple": {
+  "verdict": "publish",
+  "note": "Convincing black gaming chair with purple trim, armrests and a full caster base, clean and complete from every angle.",
+  "group": "Phase 4"
+ },
+ "phase2b-04-retro-arcade-machine": {
+  "verdict": "edits",
+  "note": "Front matches the red cabinet well, but the back panel is a dark streaky smear with a ghost of the front.",
+  "group": "Phase 4"
+ },
+ "phase2b-05-sci-fi-laser-pistol-white": {
+  "verdict": "publish",
+  "note": "Crisp white-and-orange sci-fi pistol with gold barrel and vent details, clean and consistent from every angle including both grip sides.",
+  "group": "Phase 4"
+ },
+ "phase2b-06-wooden-shield-with-a-lion": {
+  "verdict": "edits",
+  "note": "Shield shape, planks and rivets look good, but the lion is a smeared, distorted scribble that repeats on the back.",
+  "group": "Phase 4"
+ },
+ "phase2b-07-chibi-knight-with-a-big-helmet": {
+  "verdict": "publish",
+  "note": "Charming chibi knight with an oversized helmet, armor and red cape, clean and complete from every angle.",
+  "group": "Phase 4"
+ },
+ "phase2b-08-vintage-film-camera": {
+  "verdict": "reject",
+  "note": "Front reads as a convincing silver film camera, but the back half is melted into a dark lumpy blob with a hole.",
+  "group": "Phase 4"
+ },
+ "phase2b-09-donut-with-pink-frosting": {
+  "verdict": "publish",
+  "note": "Appetizing pink-frosted donut with crisp sprinkles and golden dough, consistent and clean from every angle.",
+  "group": "Phase 4"
+ },
+ "phase2b-10-astronaut-helmet": {
+  "verdict": "publish",
+  "note": "Clean white helmet with dark visor, side rings and red neck seal; looks finished and tidy from every angle.",
+  "group": "Phase 4"
+ },
+ "phase2b-11-stack-of-old-books-with-a-candle": {
+  "verdict": "reject",
+  "note": "No final: this seed still runs out of GPU memory, even after the new low-memory retry. The next seed worked.",
+  "group": "Phase 4"
+ },
+ "phase2b-12-skateboard-with-graffiti-art": {
+  "verdict": "edits",
+  "note": "Clearly a skateboard with wheels and trucks, but the deck has an odd pinched peanut shape and the graffiti is an unreadable blur.",
+  "group": "Phase 4"
+ },
+ "phase2b-13-cute-cartoon-car-bright-blue": {
+  "verdict": "publish",
+  "note": "Charming blue cartoon car with chrome bumpers, clean and complete all around, though the windows are flat opaque white instead of glass.",
+  "group": "Phase 4"
+ },
+ "phase2b-14-bubble-tea-with-tapioca-pearls": {
+  "verdict": "reject",
+  "note": "Reads as a glass of cola, not milk tea: sides are near-black with white smears and no visible tapioca pearls.",
+  "group": "Phase 4"
+ },
+ "phase2b-15-health-potion-in-a-round-glass": {
+  "verdict": "edits",
+  "note": "Reads clearly as a round orange potion bottle, but blocky checkered texture artifacts cover the upper half of the bulb.",
+  "group": "Phase 4"
+ },
+ "phase2b-16-green-dragon-sitting-cartoon": {
+  "verdict": "edits",
+  "note": "Charming sitting cartoon dragon with a clean face, wings and claws, but the tail-tip fin floats detached beside the tail.",
+  "group": "Phase 4"
+ },
+ "phase2b-17-bowl-of-ramen-with-an-egg": {
+  "verdict": "publish",
+  "note": "Appetizing, complete ramen bowl with egg, noodles, greens, meat and both chopsticks, clean from every angle.",
+  "group": "Phase 4"
+ },
+ "phase2b-18-electric-guitar": {
+  "verdict": "reject",
+  "note": "Recognizable guitar from the front, but the body is warped into a curled shell, the fretboard is noisy, and the back is smeared.",
+  "group": "Phase 4"
+ },
+ "phase2b-19-small-cabin-in-a-snowy-forest": {
+  "verdict": "publish",
+  "note": "Clean snow-roofed log cabin with door, windows, steps and a snowy deck; it comes without the forest trees.",
+  "group": "Phase 4"
+ },
+ "phase2b-20-hot-air-balloon": {
+  "verdict": "publish",
+  "note": "Smooth ribbed cream envelope reads instantly as a hot air balloon; only the tiny basket and skirt get rough up close.",
+  "group": "Phase 4"
+ },
+ "phase2c-01-cute-low-poly-fox-sitting-down": {
+  "verdict": "publish",
+  "note": "Clean, cute low-poly fox that reads well from every angle, with ears, eyes, white chest and tail all intact.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-02-red-high-top-sneaker": {
+  "verdict": "edits",
+  "note": "Convincing canvas high-top with laces and eyelets, but the color leans magenta-pink rather than red, plus a faint yellow smudge on one side.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-03-gaming-chair-black-and-purple": {
+  "verdict": "edits",
+  "note": "Good black-and-purple gaming chair from the front, but the back is lumpy with ragged edges and an armrest pad shows white from behind.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-04-retro-arcade-machine": {
+  "verdict": "edits",
+  "note": "Front reads well with screen, joystick and coin door, but both side panels carry dark smudged blotches and white scuff streaks.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-05-sci-fi-laser-pistol-white": {
+  "verdict": "publish",
+  "note": "Clean white-and-orange pistol with crisp vents, grip panels and muzzle tip, coherent from every angle.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-06-wooden-shield-with-a-lion": {
+  "verdict": "edits",
+  "note": "Shield shape, planks and riveted rim look great, but the lion is a smeared, barely recognizable sketch, repeated on the back face.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-07-chibi-knight-with-a-big-helmet": {
+  "verdict": "publish",
+  "note": "Charming chibi knight with oversized helmet, readable face, armor and red cape, complete and clean from every angle.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-08-vintage-film-camera": {
+  "verdict": "edits",
+  "note": "Convincing silver camera from the front, but the back is a lumpy invented mess of protruding rolls, and silver surfaces look warped.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-09-donut-with-pink-frosting": {
+  "verdict": "publish",
+  "note": "Appetizing pink-frosted donut with crisp sprinkles, consistent from every angle, though the center hole reads slightly shallow.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-10-astronaut-helmet": {
+  "verdict": "publish",
+  "note": "Convincing white astronaut helmet with black visor, side ports and red neck ring, clean and complete from every angle.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-11-stack-of-old-books-with-a-candle": {
+  "verdict": "edits",
+  "note": "Nice candle on stacked books from the front, but the back has a blue-white smear and a half-green, half-red bottom cover.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-12-skateboard-with-graffiti-art": {
+  "verdict": "edits",
+  "note": "Clearly a skateboard, but the graffiti is a blurry, unreadable smear and the deck pinches into an odd peanut shape.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-13-cute-cartoon-car-bright-blue": {
+  "verdict": "publish",
+  "note": "A clean, cute bright-blue cartoon car, complete from every angle; solid white windows suit the style.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-14-bubble-tea-with-tapioca-pearls": {
+  "verdict": "reject",
+  "note": "Right cup shape, but the drink is murky gray with dark stripes and smudged pearls, so it doesn't read as milk tea.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-15-health-potion-in-a-round-glass": {
+  "verdict": "reject",
+  "note": "Good round-bottle shape, but it's covered in blotchy chrome and copper patches, so it reads as a metal vase, not a potion.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-16-green-dragon-sitting-cartoon": {
+  "verdict": "publish",
+  "note": "A clean, cute green cartoon dragon sitting, with horns, wings, claws and a tidy back side.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-17-bowl-of-ramen-with-an-egg": {
+  "verdict": "publish",
+  "note": "A clean ramen bowl with noodles, egg, greens, meat and both chopsticks intact from every angle.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-18-electric-guitar": {
+  "verdict": "edits",
+  "note": "Clearly a Strat-style guitar, but the body is speckled and the pickguard's pickups and knobs are smudges.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-19-small-cabin-in-a-snowy-forest": {
+  "verdict": "publish",
+  "note": "A clean snow-roofed log cabin, complete from every angle; the forest is left out, leaving just a snowy base.",
+  "group": "Phase 4, next seed"
+ },
+ "phase2c-20-hot-air-balloon": {
+  "verdict": "publish",
+  "note": "Clean, recognizable hot air balloon with ropes and basket; the envelope came out plain white with soft grey shading instead of cream.",
+  "group": "Phase 4, next seed"
+ }
+}
