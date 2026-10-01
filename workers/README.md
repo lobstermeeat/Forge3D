@@ -55,10 +55,19 @@ stale one. Output:
   "bytes": 812345,
   "raw_bytes": 3012345,
   "triangles": 30000,
+  "pipeline": "512",
   "timings": { "generate_s": 9.8, "export_s": 4.1, "compress_s": 2.2, "upload_s": 0.3 },
   "credits": ["Built with DINOv3", "3D generation: TRELLIS.2 (Microsoft, MIT)"]
 }
 ```
+
+`pipeline` is the TRELLIS.2 pipeline that made the model: `"512"` for previews, `"1024_cascade"` for
+finals. A job that runs out of GPU memory is retried once in low-VRAM mode (the models visit the GPU
+one at a time). A final that runs out even then is made once more, still in low-VRAM mode, with the
+preview's `"512"` pipeline and exported with the final's settings, and reports `"pipeline": "512"`. The
+same seed gives that pipeline the shape the user approved in the preview, and its memory use is known to
+fit, while TRELLIS.2's cascade has no cheaper setting for a 1024³ final (see `FALLBACK_PIPELINE` in
+`trellis2/forge3d_worker/pipeline.py`).
 
 `flux-schnell` input: `{ "prompt": "a brass pocket watch", "count": 4, "seed": 5, "request_id": "gen_42" }`.
 Output: `{ "images": [{ "key", "url", "seed" }, …], "prompt", "seconds" }`.

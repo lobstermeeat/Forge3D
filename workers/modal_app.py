@@ -516,13 +516,17 @@ def run_pipeline(
             state["seed"] = result["seed"]
             name = f"{mode}-{result['seed']}.glb"
             (folder / name).write_bytes(fetch(result["glb"]))
-            return {
+            step = {
                 "files": [name],
                 "triangles": result["triangles"],
                 "bytes": result.get("bytes"),
                 "timings": result["timings"],
                 "gpu_seconds": round(sum(result["timings"].values()), 1),
             }
+            # Which TRELLIS.2 pipeline made it: a final that ran out of GPU memory is made with "512"
+            if "pipeline" in result:
+                step["pipeline"] = result["pipeline"]
+            return step
 
         return work
 

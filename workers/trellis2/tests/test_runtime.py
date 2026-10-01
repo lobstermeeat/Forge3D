@@ -131,17 +131,77 @@ def test_out_of_memory_is_retried_once_in_low_vram_mode_then_restored(kind, monk
     assert log.count("\n") == 1 and log.endswith("(run 1)\n")
 
 
-@pytest.mark.parametrize("kind", ["oom", "bug"])
-def test_a_failed_retry_is_raised_after_restoring(kind, capsys):
-    pipeline = FakePipeline(outcomes=["oom", kind])
-    with pytest.raises((torch.cuda.OutOfMemoryError, ValueError), match=r"\(run 2\)$") as raised:
-        runtime_around(pipeline).generate(cutout(), PRESETS["final"], seed=7)
+@pytest.mark.parametrize(
+    "mode, outcomes",
+    [
+        ("final", ["oom", "bug"]),  # not running out of memory again: nothing to fall back for
+        ("final", ["cumesh-oom", "cuda-error"]),
+        ("preview", ["oom", "oom", "mesh"]),  # the preview has nothing cheaper to fall back to
+        ("preview", ["cumesh-oom", "cumesh-oom", "mesh"]),
+    ],
+)
+def test_a_failed_retry_is_raised_after_restoring(mode, outcomes, capsys):
+    pipeline = FakePipeline(outcomes=outcomes)
+    with pytest.raises((torch.cuda.OutOfMemoryError, RuntimeError, ValueError), match=r"\(run 2\)$") as raised:
+        runtime_around(pipeline).generate(cutout(), PRESETS[mode], seed=7)
 
     assert len(pipeline.runs) == 2 and raised.traceback[-1].name == "run"
     assert pipeline.low_vram is False and pipeline.weights() == {"cuda"}
     # The retry's tensors were let go before the weights went back onto the GPU
     assert pipeline.live_at_cuda == [0, 0]
     assert capsys.readouterr().out.count("\n") == 1
+
+
+@pytest.mark.parametrize("first, second", [("oom", "oom"), ("cumesh-oom", "cumesh-oom"), ("oom", "cumesh-oom")])
+def test_a_final_still_out_of_memory_in_low_vram_mode_falls_back_to_the_preview_pipeline(first, second, monkeypatch, capsys):
+    pipeline = FakePipeline(outcomes=[first, second, "mesh"])
+    emptied = []  # where the weights were, and how many runs' tensors were alive, at each emptying
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: emptied.append((pipeline.weights(), pipeline.live_runs())))
+    runtime = runtime_around(pipeline)
+
+    assert runtime.generate(cutout(), PRESETS["final"], seed=7) == "mesh"
+
+    initial, retry, fallback = pipeline.runs
+    assert [run["pipeline_type"] for run in pipeline.runs] == ["1024_cascade", "1024_cascade", "512"]
+    # Still in low-VRAM mode, on the same picture with the same seed: the shape the preview showed
+    assert fallback["low_vram"] is True and fallback["weights"] == {"cpu"} and fallback["device"] == "cuda"
+    assert fallback["image"] is initial["image"] and fallback["seed"] == 7 and fallback["preprocess_image"] is False
+    # Neither failed run's tensors were alive when it started, and the cache went back to CUDA after the
+    # retry's were freed
+    assert fallback["live_runs"] == 0 and emptied == [({"cpu"}, 0), ({"cpu"}, 0)]
+    assert runtime.pipeline_used == "512"
+    # Then everything is back on the GPU, the way __init__ left it
+    assert pipeline.low_vram is False and pipeline.weights() == {"cuda"} and pipeline.live_at_cuda == [0, 0]
+    log = capsys.readouterr().out.splitlines()
+    assert len(log) == 2 and log[0].startswith("[forge3d] out of GPU memory in 1024_cascade, retrying in low-VRAM mode: ")
+    assert log[1].startswith("[forge3d] out of GPU memory in 1024_cascade even in low-VRAM mode, falling back to 512: ")
+    assert log[1].endswith("(run 2)")
+
+
+@pytest.mark.parametrize("kind", ["oom", "bug"])
+def test_a_failed_fallback_is_raised_after_restoring(kind, capsys):
+    pipeline = FakePipeline(outcomes=["oom", "oom", kind])
+    runtime = runtime_around(pipeline)
+    with pytest.raises((torch.cuda.OutOfMemoryError, ValueError), match=r"\(run 3\)$") as raised:
+        runtime.generate(cutout(), PRESETS["final"], seed=7)
+
+    assert len(pipeline.runs) == 3 and raised.traceback[-1].name == "run"
+    assert pipeline.runs[2]["pipeline_type"] == "512"
+    # Its tensors were let go before the weights went back onto the GPU, and nothing tries a fourth time
+    assert pipeline.low_vram is False and pipeline.weights() == {"cuda"} and pipeline.live_at_cuda == [0, 0]
+    assert capsys.readouterr().out.count("\n") == 2
+
+
+def test_each_job_reports_the_pipeline_that_made_its_mesh():
+    pipeline = FakePipeline(outcomes=["oom", "oom", "mesh", "mesh", "mesh"])
+    runtime = runtime_around(pipeline)
+    runtime.generate(cutout(), PRESETS["final"], seed=7)
+    assert runtime.pipeline_used == "512"
+    # A fallback doesn't stick to the worker: the next jobs run, and report, their own pipelines
+    runtime.generate(cutout(), PRESETS["final"], seed=8)
+    assert runtime.pipeline_used == "1024_cascade" and pipeline.runs[-1]["pipeline_type"] == "1024_cascade"
+    runtime.generate(cutout(), PRESETS["preview"], seed=9)
+    assert runtime.pipeline_used == "512"
 
 
 @pytest.mark.parametrize("kind", ["cuda-error", "bug"])
