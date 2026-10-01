@@ -7,10 +7,8 @@
 # `modal deploy workers/modal_app.py`, which would replace the production app orainge-ai.
 set -euo pipefail
 
-echo "== Second round of variants (all 20 canonical sets are done)"
-# back: prompts that describe the hidden side; cap1/cap2: the Phase 2 prompt with other seeds;
-# zoom70: a wider orthographic frame for objects that overflow at 45/315 (car, books, cabin);
-# elev20: cameras 20 degrees up, for top faces (donut, ramen); s30: 30 steps on two controls.
+echo "== All twenty with the worker's chosen defaults (30 steps) and the Phase 2 prompt as the caption;"
+echo "== plus hidden-side hints (BACK_PROMPTS) on the three they helped"
 modal run ops/exp_mv.py::views --only all \
-  --variants "back:prompt=back,runs=04+06+08+11+16+18;cap1:prompt=caption,seed=1,runs=04+06+08;cap2:prompt=caption,seed=2,runs=04+06+08;zoom70:extent=0.7,runs=13+11+19;elev20:elevation=20,runs=09+17+04;s30:steps=30,runs=13+01"
+  --variants "caption30:prompt=caption;back30:prompt=back,runs=04+06+18"
 du -sh ops-out/private/views || true
