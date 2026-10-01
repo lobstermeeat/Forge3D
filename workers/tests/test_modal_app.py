@@ -244,6 +244,21 @@ def test_a_continued_run_keeps_its_inputs(tmp_path):
         run(tmp_path / "run-6", workers)
 
 
+def test_an_image_run_started_again_with_the_same_image_carries_on(tmp_path):
+    # Modal runs an input again when its container is replaced mid-run
+    workers = FakeWorkers()
+    workers.fail_final = True
+    folder = tmp_path / "run-10"
+    with pytest.raises(RuntimeError, match="code 137"):
+        run(folder, workers, image=b"jpeg-bytes", image_name="cat.jpg", seed=7, final=True)
+    workers.fail_final = False
+    workers.calls.clear()
+    run(folder, workers, image=b"jpeg-bytes", image_name="cat.jpg", seed=7, final=True)
+    assert [job["input"]["mode"] for name, job in workers.calls if name == "trellis"] == ["final"]
+    with pytest.raises(ValueError, match="start a new run"):
+        run(folder, workers, image=b"other-bytes", image_name="cat.jpg", seed=7)
+
+
 def test_pictures_first_then_the_picked_one_becomes_3d(tmp_path):
     workers = FakeWorkers()
     folder = tmp_path / "run-7"

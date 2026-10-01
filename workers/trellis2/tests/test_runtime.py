@@ -162,3 +162,40 @@ def test_out_of_memory_in_low_vram_mode_is_not_retried(capsys):
 
     assert len(pipeline.runs) == 1 and pipeline.low_vram is True and pipeline.weights() == {"cpu"}
     assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("kind", ["oom", "cumesh-oom"])
+def test_running_out_of_memory_while_exporting_is_retried_with_the_models_off_the_gpu(kind, capsys):
+    pipeline = FakePipeline()
+    runtime = runtime_around(pipeline)
+    attempts = []
+
+    def export(mesh, preset):
+        attempts.append({"low_vram": pipeline.low_vram, "weights": pipeline.weights()})
+        if len(attempts) == 1:
+            raise failure(kind, 1)
+        return b"glb", 12
+
+    runtime._export = export
+    assert runtime.export("mesh", PRESETS["final"]) == (b"glb", 12)
+    assert attempts == [
+        {"low_vram": False, "weights": {"cuda"}},
+        {"low_vram": True, "weights": {"cpu"}},
+    ]
+    # Back the way __init__ left it
+    assert pipeline.low_vram is False and pipeline.weights() == {"cuda"}
+    assert "retrying with the models off the GPU" in capsys.readouterr().out
+
+
+def test_other_export_errors_are_not_retried():
+    runtime = runtime_around(FakePipeline())
+    calls = []
+
+    def export(mesh, preset):
+        calls.append(1)
+        raise failure("cuda-error", 1)
+
+    runtime._export = export
+    with pytest.raises(RuntimeError, match="illegal memory access"):
+        runtime.export("mesh", PRESETS["final"])
+    assert len(calls) == 1
