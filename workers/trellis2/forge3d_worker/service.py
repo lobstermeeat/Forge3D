@@ -12,6 +12,12 @@ from .storage import Storage
 
 
 class Runtime(Protocol):
+    """
+    The GPU side. After generate() it may set ``pipeline_used`` to the TRELLIS.2 pipeline that actually
+    made the mesh (a final that runs out of GPU memory falls back to the preview's); without it, the
+    preset's pipeline is reported.
+    """
+
     def generate(self, image: Any, preset: Preset, seed: int) -> Any: ...
 
     def export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]: ...
@@ -56,6 +62,7 @@ def handle_job(
 
     try:
         mesh = runtime.generate(spec.image, preset, spec.seed)
+        pipeline = getattr(runtime, "pipeline_used", None) or preset.pipeline_type
         lap("generate_s")
         raw, triangles = runtime.export(mesh, preset)
         lap("export_s")
@@ -73,7 +80,7 @@ def handle_job(
             result["refresh_worker"] = True
         return result
 
-    return {
+    result = {
         "request_id": spec.request_id,
         "mode": spec.mode,
         "seed": spec.seed,
@@ -81,6 +88,15 @@ def handle_job(
         "bytes": len(packed),
         "raw_bytes": len(raw),
         "triangles": triangles,
+        # "512" for a final made with the preview's pipeline because the cascade ran out of GPU memory
+        "pipeline": pipeline,
         "timings": timings,
         "credits": list(CREDITS),
     }
+    # Optional: whether the picture was painted onto the model, and why not (Trellis2Runtime)
+    projection = getattr(runtime, "last_projection", None)
+    if isinstance(projection, dict) and projection:
+        result["projection"] = projection
+        if projection.get("gpu_fault"):
+            result["refresh_worker"] = True  # the model went out unprojected; CUDA may not be usable
+    return result

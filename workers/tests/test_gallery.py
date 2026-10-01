@@ -44,3 +44,19 @@ def test_verdicts_must_name_real_runs_and_known_verdicts():
         make_gallery.apply_verdicts(runs(), {"s-09": {"verdict": "publish"}})
     with pytest.raises(SystemExit, match="verdict must be one of"):
         make_gallery.apply_verdicts(runs(), {"s-01": {"verdict": "great"}})
+
+
+def test_rounds_of_the_same_prompts_can_be_counted_per_group_only():
+    board = runs()
+    make_gallery.apply_verdicts(
+        board,
+        {
+            "s-01": {"verdict": "publish", "group": "Round 1"},
+            "s-02": {"verdict": "edits", "group": "Round 1"},
+            "s-03": {"verdict": "publish", "group": "Round 2"},
+            "s-04": {"verdict": "publish", "group": "Round 2"},
+        },
+    )
+    html = make_gallery.page(board, "Set", "Sub", overall=False)
+    assert "Publishable (bar" not in html
+    assert "<dt>Round 1</dt><dd>1 of 2 (50%)</dd>" in html and "<dt>Round 2</dt><dd>2 of 2 (100%)</dd>" in html
