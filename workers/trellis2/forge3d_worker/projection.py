@@ -100,30 +100,8 @@ MIN_COVERAGE = 0.02
 # --- Projection ---------------------------------------------------------------------------------------
 # Detail weight: smoothstep of the cosine between normal and view direction
 FACING = (0.15, 0.55)
-# Texels this squarely seen set the broad colour change
+# Texels this squarely seen say what colour each paint is in the picture
 FACING_DATA = (0.3, 0.7)
-# The broad colour change fades out past the outline, where the surface turns away
-FACING_BROAD = (-0.5, 0.3)
-# ... and with distance from where the picture was seen: 3D smoothing on a grid over the bounding cube
-# (sigma 4 of 32 voxels: a quarter of the bounding radius, so the fade reaches 40-50 degrees round a
-# cup past where the picture saw it well), down to SUPPORT_FADE of nearby surface seen
-FIELD_GRID = 32
-FIELD_SIGMA = 4.0  # voxels
-SUPPORT_FADE = (0.02, 0.4)
-# ... to the same paint: the texture's colours are clustered (k-means over the colours it uses, each
-# about equally, so a dragon's few grey claws aren't lumped in with its salmon belly; by hue more than
-# lightness, so shading baked into the texture doesn't split a paint), and each paint's change spreads
-# over that paint (a car's windows, darkened in the picture, don't darken its roof; a fox's orange fur
-# turns its other red facets orange, not its white chest). Membership is soft: paints within about 0.2
-# of each other blend
-PAINTS = 8
-PAINT_SPREAD = 0.1
-# ... where that paint's changes nearby agree: one colour change (CONSISTENT: the smoothed change's
-# power over the smoothed power of the changes; a "cola" milk tea that should be orange all round) or
-# hardly any (SPREAD: their standard deviation, linear RGB; a car's blue body). Stripes painted over
-# one colour agree in neither way and don't spread
-CONSISTENT = (0.4, 0.7)
-SPREAD = (0.08, 0.2)
 # Fade-outs near the picture's outline and near depth edges, as a share of the object's size in the
 # picture
 OUTLINE_FADE = 0.015
@@ -159,6 +137,70 @@ GLOSSY = (0.3, 0.5)  # roughness: fully glossy below, matte above
 METALLIC = (0.5, 0.9)
 # The picture works at this size at most (BiRefNet's cutout is no larger)
 MAX_PICTURE = 1024
+
+# --- Paints: what changes all round -------------------------------------------------------------------
+# The texture's colours are clustered into paints: k-means over the colours it uses, each about equally
+# (so a dragon's few grey claws aren't lumped in with its salmon belly), by hue more than lightness (so
+# shading baked into the texture doesn't split a paint); centres closer than PAINT_MERGE are one paint.
+# Membership is soft: paints within about 0.2 of each other blend
+PAINTS = 8
+PAINT_SPREAD = 0.1
+PAINT_MERGE = 0.06
+# A paint's colour in the picture is read where the picture saw it squarely, outside the picture's
+# decals (below: a design on a paint isn't the paint) and where it is the texture's paint all around
+# (PURITY: its share of the texels within PURITY_RADIUS of the object's size). A texture's sprinkles,
+# scrawls and specks rarely line up with the picture's, which would read them as the paint around them
+PURITY_RADIUS = 0.02
+PURITY = (0.5, 0.8)
+# Colours are compared as CIELAB a*b* at one brightness: a paint's hue and saturation, whatever the light
+# on it. A paint takes the picture's colour all round (the texture's own variation kept) when
+# - enough of it was seen: RECOLOUR_SEEN of its texels and RECOLOUR_COUNT texels;
+# - the picture shows it as one colour: RECOLOUR_ONE of what was seen lies within RECOLOUR_TOLERANCE
+#   (delta E) of the median (a potion's chrome in the texture, orange liquid in the picture's body and
+#   clear glass in its neck, is not one colour);
+# - that colour differs: RECOLOUR_CHANGE (delta E; on the Phase 4 finals a fox's red against the
+#   picture's orange 15-37, a cola cup's black against milk tea 37-44, a cabin's logs 9-10, a car's
+#   blue 5-8);
+# - and isn't only darker, as in shadow: RECOLOUR_DARKER (brightness ratio; a knight's cape lining in
+#   the cape's shadow, 0.18), unless the paint is near black (RECOLOUR_DARK, linear brightness).
+# Each is a ramp and the paint changes by their product, in full (both at their medians) where all hold
+RECOLOUR_SEEN = (0.003, 0.01)
+RECOLOUR_COUNT = (300.0, 1000.0)
+RECOLOUR_TOLERANCE = 20.0
+RECOLOUR_BRIGHTNESS = 2.5
+RECOLOUR_ONE = (0.7, 0.85)
+RECOLOUR_CHANGE = (10.0, 16.0)
+RECOLOUR_DARKER = (0.35, 0.5)
+RECOLOUR_DARK = 0.02
+# The change is a gain per channel on (texture + RECOLOUR_EPS): shades of the paint stay shades of it
+RECOLOUR_EPS = 0.02
+
+# --- Detail: what the picture adds where it sees it ---------------------------------------------------
+# The picture's difference from the (recoloured) texture is split, in the picture, into what changes
+# within DETAIL_SIGMA of the object's size (detail: lines, lettering, texture; kept) and the rest (light,
+# glow, a paint's colour on one side only; left out). The smoothing stays within regions of one of the
+# picture's colours (DETAIL_CLASSES k-means clusters in CIELAB, soft over CLASS_SOFTNESS delta E), so a
+# region's edge leaves no halo
+DETAIL_SIGMA = 0.02
+DETAIL_CLASSES = 16
+CLASS_SOFTNESS = 6.0
+# Decals: regions of one colour that lie inside what the picture shows (DECAL_MARGIN pixels clear of its
+# outline, depth edges and misfits), stand out from what is round them (DECAL_CONTRAST, delta E, with an
+# edge at least DECAL_SHARPNESS of that), are seen well (DECAL_SEEN: their mean detail weight) and cover
+# at most DECAL_AREA of the object: a lion on a shield, letters, a camera's lens. They are painted on
+# whole, colour and all, except where the difference is only light (LIGHT_ONLY delta E in a*b* and a
+# brightness ratio within LIGHT_RATIO either way: a face in a helmet's shadow), or where decals that
+# change the colour (DECAL_CHANGE, delta E) would cover over DECAL_TAKEOVER of a paint (a car's windows,
+# white in the texture, show the seats through the glass in the picture: no design on the paint)
+DECAL_MARGIN = 2
+DECAL_CONTRAST = 12.0
+DECAL_SHARPNESS = 0.3
+DECAL_SEEN = (0.25, 0.5)
+DECAL_AREA = 0.1
+LIGHT_RATIO = 3.0
+LIGHT_FIT = 0.25
+DECAL_GARBLED = 2.0
+FACING_DECAL = (0.05, 0.3)
 
 
 @dataclass(frozen=True)
@@ -300,28 +342,18 @@ def _smoothstep(lo: float, hi: float, x: torch.Tensor) -> torch.Tensor:
 EDGE_EPS = 1e-4
 
 
-def rasterize_depth(
-    xy: torch.Tensor,
-    depth: torch.Tensor,
-    s: torch.Tensor,
-    faces: torch.Tensor,
-    height: int,
-    width: int,
-    max_candidates: int = 1 << 22,
-) -> torch.Tensor:
+def _fragments(
+    xy: torch.Tensor, depth: torch.Tensor, s: torch.Tensor, faces: torch.Tensor, height: int, width: int, max_candidates: int
+):
     """
-    Nearest depth at each pixel centre of an (height, width) image, +inf where nothing is.
-
-    ``xy`` (V, 2) are pixel coordinates (x to the right, y down; pixel (r, c) has its centre at
-    (c + 0.5, r + 0.5)), ``depth`` (V,) the depth to compare and ``s`` (V,) the perspective factor, which
-    is affine in screen space: depth is interpolated perspective-correctly as sum(b s depth) / sum(b s).
-    Triangles are enumerated over their pixel bounding boxes in batches of at most ``max_candidates``.
+    The pixels each triangle covers, in batches: (pixel index, depth, face, barycentrics (perspective
+    correct, (B, 3))). Triangles are enumerated over their pixel bounding boxes, at most
+    ``max_candidates`` pixels at a time.
     """
     device = xy.device
-    zbuf = torch.full((height * width,), float("inf"), device=device)
     faces = faces.long()
     if faces.shape[0] == 0 or height <= 0 or width <= 0:
-        return zbuf.view(height, width)
+        return
     px, py = xy[:, 0] - 0.5, xy[:, 1] - 0.5  # integers are pixel centres
     x0, x1, x2 = px[faces[:, 0]], px[faces[:, 1]], px[faces[:, 2]]
     y0, y1, y2 = py[faces[:, 0]], py[faces[:, 1]], py[faces[:, 2]]
@@ -335,7 +367,6 @@ def rasterize_depth(
     counts = torch.where(area.abs() > 1e-12, nx * ny, torch.zeros_like(nx))
     ends = torch.cumsum(counts, 0)
     total_all = int(ends[-1])
-    zs = depth * s
     first, num = 0, faces.shape[0]
     while first < num and total_all > 0:
         base = int(ends[first - 1]) if first > 0 else 0
@@ -365,11 +396,58 @@ def rasterize_depth(
         inside = (w0 >= -EDGE_EPS) & (w1 >= -EDGE_EPS) & (w2 >= -EDGE_EPS)
         if not bool(inside.any()):
             continue
-        q = w0 * s[f[:, 0]] + w1 * s[f[:, 1]] + w2 * s[f[:, 2]]
-        d = (w0 * zs[f[:, 0]] + w1 * zs[f[:, 1]] + w2 * zs[f[:, 2]]) / q
-        pix = ys.long() * width + xs.long()
-        zbuf.scatter_reduce_(0, pix[inside], d[inside], reduce="amin", include_self=True)
+        f, t = f[inside], t[inside]
+        weighted = torch.stack([w0[inside] * s[f[:, 0]], w1[inside] * s[f[:, 1]], w2[inside] * s[f[:, 2]]], -1)
+        q = weighted.sum(-1)
+        d = (weighted * depth[f]).sum(-1) / q
+        pix = ys[inside].long() * width + xs[inside].long()
+        yield pix, d, t, weighted / q[:, None]
+
+
+def rasterize_depth(
+    xy: torch.Tensor,
+    depth: torch.Tensor,
+    s: torch.Tensor,
+    faces: torch.Tensor,
+    height: int,
+    width: int,
+    max_candidates: int = 1 << 22,
+) -> torch.Tensor:
+    """
+    Nearest depth at each pixel centre of an (height, width) image, +inf where nothing is.
+
+    ``xy`` (V, 2) are pixel coordinates (x to the right, y down; pixel (r, c) has its centre at
+    (c + 0.5, r + 0.5)), ``depth`` (V,) the depth to compare and ``s`` (V,) the perspective factor, which
+    is affine in screen space: depth is interpolated perspective-correctly as sum(b s depth) / sum(b s).
+    Triangles are enumerated over their pixel bounding boxes in batches of at most ``max_candidates``.
+    """
+    zbuf = torch.full((max(0, height) * max(0, width),), float("inf"), device=xy.device)
+    for pix, d, _, _ in _fragments(xy, depth, s, faces, height, width, max_candidates):
+        zbuf.scatter_reduce_(0, pix, d, reduce="amin", include_self=True)
     return zbuf.view(height, width)
+
+
+def rasterize_faces(
+    xy: torch.Tensor,
+    depth: torch.Tensor,
+    s: torch.Tensor,
+    faces: torch.Tensor,
+    zbuf: torch.Tensor,
+    max_candidates: int = 1 << 22,
+):
+    """
+    The triangle ``rasterize_depth`` found nearest at each pixel ((H, W), -1 where none) and the pixel
+    centre's perspective-correct barycentrics in it ((H, W, 3)).
+    """
+    height, width = zbuf.shape
+    nearest = zbuf.flatten()
+    face = torch.full((height * width,), -1, dtype=torch.long, device=xy.device)
+    bary = torch.zeros((height * width, 3), device=xy.device)
+    for pix, d, t, b in _fragments(xy, depth, s, faces, height, width, max_candidates):
+        win = d <= nearest[pix]
+        face[pix[win]] = t[win]
+        bary[pix[win]] = b[win]
+    return face.view(height, width), bary.view(height, width, 3)
 
 
 # --- Inputs -------------------------------------------------------------------------------------------
@@ -870,6 +948,80 @@ def _push_pull(values: torch.Tensor, known: torch.Tensor) -> torch.Tensor:
     return filled
 
 
+def _gaussian(images: torch.Tensor, sigma: float) -> torch.Tensor:
+    """Separable Gaussian blur of (B, C, H, W) images, zeros beyond their edges."""
+    if sigma <= 0:
+        return images
+    radius = max(1, int(math.ceil(3 * sigma)))
+    t = torch.arange(-radius, radius + 1, device=images.device, dtype=images.dtype)
+    kernel = torch.exp(-0.5 * (t / sigma) ** 2)
+    kernel = kernel / kernel.sum()
+    b, c, h, w = images.shape
+    x = images.reshape(1, b * c, h, w)
+    x = F.conv2d(x, kernel.view(1, 1, 1, -1).expand(b * c, 1, 1, -1).contiguous(), padding=(0, radius), groups=b * c)
+    x = F.conv2d(x, kernel.view(1, 1, -1, 1).expand(b * c, 1, -1, 1).contiguous(), padding=(radius, 0), groups=b * c)
+    return x.view(b, c, h, w)
+
+
+def _smooth(values: torch.Tensor, weight: torch.Tensor, sigma: float) -> torch.Tensor:
+    """
+    Weighted Gaussian average: blur(values * weight) / blur(weight), for (B, C, H, W) values and (B, 1,
+    H, W) weights. Worked out on a grid coarse enough for sigma to span two of its cells, then
+    interpolated back: the averages are smooth.
+    """
+    h, w = values.shape[-2:]
+    step = max(1, int(sigma // 2))
+    num, den = values * weight, weight
+    if step > 1:
+        num = F.avg_pool2d(num, step, ceil_mode=True)
+        den = F.avg_pool2d(den, step, ceil_mode=True)
+    num, den = _gaussian(num, sigma / step), _gaussian(den, sigma / step)
+    if step > 1:
+        num = F.interpolate(num, size=(h, w), mode="bilinear", align_corners=False)
+        den = F.interpolate(den, size=(h, w), mode="bilinear", align_corners=False)
+    return num / den.clamp_min(1e-6)
+
+
+_XYZ = ((0.4124, 0.3576, 0.1805), (0.2126, 0.7152, 0.0722), (0.0193, 0.1192, 0.9505))
+_WHITE = (0.9505, 1.0, 1.089)
+
+
+def _lab(linear: torch.Tensor) -> torch.Tensor:
+    """CIELAB (..., 3) of linear sRGB colours (..., 3), D65 white."""
+    matrix = torch.tensor(_XYZ, device=linear.device, dtype=linear.dtype)
+    t = (linear @ matrix.T) / torch.tensor(_WHITE, device=linear.device, dtype=linear.dtype)
+    f = torch.where(t > 0.008856, t.clamp_min(1e-12) ** (1 / 3), 7.787 * t + 16 / 116)
+    return torch.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], -1)
+
+
+def _hue(linear: torch.Tensor, brightness: float = 0.2) -> torch.Tensor:
+    """
+    CIELAB a*b* (..., 2) of linear colours brought to one brightness: their hue and saturation, whatever
+    the light on them. Near-black reads as neutral.
+    """
+    c = linear.clamp_min(0) + 0.004
+    return _lab(c * (brightness / _luma(c))[..., None])[..., 1:]
+
+
+def _ramp(edges: tuple[float, float], x: float) -> float:
+    return float(_smoothstep(edges[0], edges[1], torch.tensor(float(x))))
+
+
+def _wquantile(x: torch.Tensor, w: torch.Tensor, q: float) -> torch.Tensor:
+    """The weighted q-quantile of x (N,), weights w (N,)."""
+    order = torch.argsort(x)
+    total = torch.cumsum(w[order], 0)
+    i = int(torch.searchsorted(total, (q * total[-1]).reshape(1))[0].clamp(max=x.numel() - 1))
+    return x[order[i]]
+
+
+def _hex(linear: torch.Tensor) -> str:
+    return "#" + "".join(f"{round(float(c) * 255):02x}" for c in _linear_to_srgb(linear))
+
+
+# --- Paints -------------------------------------------------------------------------------------------
+
+
 def _paint_features(srgb: torch.Tensor) -> torch.Tensor:
     """
     Where a colour (N, 3, sRGB) sits among paints: its red-green and yellow-blue opponents, and its
@@ -882,10 +1034,10 @@ def _paint_features(srgb: torch.Tensor) -> torch.Tensor:
 
 def _paints(colours: torch.Tensor, count: int, levels: int = 16, rounds: int = 10) -> torch.Tensor:
     """
-    The texture's main paints: k-means centres (count, 3), in _paint_features, of ``colours`` (N, 3,
-    sRGB). Over the colours used rather than the texels: colours are binned (``levels`` per channel)
-    and each occupied bin weighs the square root of its texel count, so a small part's colour gets a
-    centre of its own.
+    The texture's main paints: k-means centres (at most count, 3), in _paint_features, of ``colours``
+    (N, 3, sRGB). Over the colours used rather than the texels: colours are binned (``levels`` per
+    channel) and each occupied bin weighs the square root of its texel count, so a small part's colour
+    gets a centre of its own. Centres closer than PAINT_MERGE are merged.
     """
     key = (colours.clamp(0, 1) * (levels - 1)).round().long()
     key = (key[:, 0] * levels + key[:, 1]) * levels + key[:, 2]
@@ -906,6 +1058,19 @@ def _paints(colours: torch.Tensor, count: int, levels: int = 16, rounds: int = 1
         sums = torch.zeros_like(centres).index_add_(0, assign, x * weight[:, None])
         total = torch.zeros(centres.shape[0], device=x.device).index_add_(0, assign, weight)
         centres = torch.where(total[:, None] > 0, sums / total.clamp_min(1e-9)[:, None], centres)
+    assign = torch.cdist(x, centres).argmin(1)
+    total = torch.zeros(centres.shape[0], device=x.device).index_add_(0, assign, weight)
+    centres, total = centres[total > 0], total[total > 0]
+    while centres.shape[0] > 1:
+        d = torch.cdist(centres, centres)
+        d.fill_diagonal_(float("inf"))
+        a, b = divmod(int(torch.argmin(d)), centres.shape[0])
+        if float(d[a, b]) >= PAINT_MERGE:
+            break
+        merged = (centres[a] * total[a] + centres[b] * total[b]) / (total[a] + total[b])
+        keep = [i for i in range(centres.shape[0]) if i not in (a, b)]
+        centres = torch.cat([centres[keep], merged[None]])
+        total = torch.cat([total[keep], (total[a] + total[b])[None]])
     return centres
 
 
@@ -915,67 +1080,411 @@ def _membership(colours: torch.Tensor, centres: torch.Tensor) -> torch.Tensor:
     return torch.softmax(-distance.square() / (2 * PAINT_SPREAD**2), dim=1)
 
 
-def _smooth_field(points: torch.Tensor, values: torch.Tensor, weights: torch.Tensor, membership: torch.Tensor):
-    """
-    A smooth 3D field of ``values`` (N, C) at ``points`` (N, 3) in the unit cube, per paint: for each
-    column of ``membership`` (N, K), the Gaussian-weighted average on a grid of the values with that
-    paint, read back at the points and mixed by membership. Returns the field (N, C) and, also (N,):
-    its support, the share of nearby surface of the same paint that had weight; how far the values it
-    averages agree, as the field's squared length over their average squared length (1 when they're
-    all the same, near 0 when they cancel out); and their spread, their standard deviation.
-    """
-    g = FIELD_GRID
-    device = points.device
-    idx = ((points.clamp(-1, 1) + 1) / 2 * (g - 1)).round().long()
-    flat = (idx[:, 0] * g + idx[:, 1]) * g + idx[:, 2]
-    c = values.shape[1]
-    paints = membership.shape[1]
-    channels = c + 3
-    power = values.square().sum(-1)
-    acc = torch.zeros((paints, channels, g * g * g), device=device)
-    for j in range(paints):
-        share = membership[:, j]
-        w = weights * share
-        acc[j, :c].index_add_(1, flat, (values * w[:, None]).T)
-        acc[j, c].index_add_(0, flat, power * w)
-        acc[j, c + 1].index_add_(0, flat, w)
-        acc[j, c + 2].index_add_(0, flat, share)
-    vol = acc.view(1, paints * channels, g, g, g)
-    radius = int(math.ceil(3 * FIELD_SIGMA))
-    t = torch.arange(-radius, radius + 1, device=device, dtype=torch.float32)
-    kernel = torch.exp(-0.5 * (t / FIELD_SIGMA) ** 2)
-    kernel = kernel / kernel.sum()
-    for axis in range(3):
-        shape = [1, 1, 1]
-        shape[axis] = kernel.numel()
-        k = kernel.view(1, 1, *shape).repeat(paints * channels, 1, 1, 1, 1)
-        pad = [0, 0, 0, 0, 0, 0]
-        pad[2 * (2 - axis)] = pad[2 * (2 - axis) + 1] = radius
-        vol = F.conv3d(F.pad(vol, pad), k, groups=paints * channels)
-    grid = points.clamp(-1, 1)[:, [2, 1, 0]].view(1, -1, 1, 1, 3)
-    field = torch.zeros_like(values)
-    support = torch.zeros_like(weights)
-    agreement = torch.zeros_like(weights)
-    spread = torch.zeros_like(weights)
-    for j in range(paints):
-        part = vol[:, j * channels : (j + 1) * channels]
-        sampled = F.grid_sample(part, grid, mode="bilinear", align_corners=True)[0, :, :, 0, 0].T  # (N, C + 3)
-        weight = sampled[:, c + 1]
-        known = (weight > 1e-6).float()
-        mean = sampled[:, :c] / weight.clamp_min(1e-9)[:, None]
-        mean_power = sampled[:, c] / weight.clamp_min(1e-9)
-        share = membership[:, j] * known
-        field += share[:, None] * mean
-        support += share * (weight / sampled[:, c + 2].clamp_min(1e-9)).clamp(0, 1)
-        agreement += share * (mean.square().sum(-1) / mean_power.clamp_min(1e-9)).clamp(0, 1)
-        spread += share * (mean_power - mean.square().sum(-1)).clamp_min(0).sqrt()
-    # Where no paint had weight nearby there is nothing to agree on; spread stays 0 but so does support
-    return field, support, agreement, spread
+@dataclass
+class _Recolour:
+    gains: torch.Tensor  # (K, 3) per paint: picture over texture, per channel, of (colour + RECOLOUR_EPS)
+    amounts: torch.Tensor  # (K,) how far each paint goes there, 0-1
+    trusted: torch.Tensor  # (K,) how far the picture's detail and decals on each paint are trusted, 0-1
+    paints: list  # per paint, for the report
 
 
-def _consistent(agreement: torch.Tensor, spread: torch.Tensor) -> torch.Tensor:
-    """How far changes nearby make one colour change: they agree, or there are hardly any."""
-    return torch.maximum(_smoothstep(*CONSISTENT, agreement), 1 - _smoothstep(*SPREAD, spread))
+def _recolour_plan(old: torch.Tensor, new: torch.Tensor, membership: torch.Tensor, weight: torch.Tensor) -> _Recolour:
+    """
+    Whether each paint takes the picture's colour, from its texels' texture and picture colours (linear,
+    (N, 3)), soft membership (N, K) and how far each texel counts (N,): seen squarely, the paint's own
+    all around, outside decals, not metal.
+    """
+    count = membership.shape[1]
+    owner = membership.argmax(1)
+    hue_new = _hue(new)
+    stats = []
+    for k in range(count):
+        mine = owner == k
+        texels = int(mine.sum())
+        w = weight * mine
+        use = w > 1e-3
+        entry: dict = {"texels": texels, "seen": float(w.sum())}
+        if texels and int(use.sum()) >= 20:
+            w, o, n, h = w[use], old[use], new[use], hue_new[use]
+            t_med = torch.stack([_wquantile(o[:, c], w, 0.5) for c in range(3)])
+            s_med = torch.stack([_wquantile(n[:, c], w, 0.5) for c in range(3)])
+            centre = torch.stack([_wquantile(h[:, c], w, 0.5) for c in range(2)])
+            bright = torch.log(_luma(n).clamp_min(1e-4))
+            alike = (h - centre).norm(dim=-1) <= RECOLOUR_TOLERANCE
+            alike &= (bright - _wquantile(bright, w, 0.5)).abs() <= math.log(RECOLOUR_BRIGHTNESS)
+            entry.update(
+                t_med=t_med,
+                s_med=s_med,
+                one=float((w * alike).sum() / w.sum()),
+                change=float((_hue(s_med) - _hue(t_med)).norm()),
+                ratio=float(_luma(s_med) / _luma(t_med).clamp_min(1e-4)),
+            )
+        stats.append(entry)
+    gains = torch.ones((count, 3), device=old.device)
+    amounts = torch.zeros(count, device=old.device)
+    trusted = torch.ones(count, device=old.device)
+    paints = []
+    for k, e in enumerate(stats):
+        if not e["texels"]:
+            paints.append({"texture": None, "share": 0.0, "amount": 0.0, "decision": "unused"})
+            continue
+        mine = owner == k
+        report = {
+            "texture": _hex(old[mine].median(0).values),
+            "share": round(e["texels"] / old.shape[0], 3),
+            "seen": round(e["seen"] / e["texels"], 3),
+        }
+        if "ratio" not in e:
+            paints.append({**report, "amount": 0.0, "decision": "kept: not seen"})
+            continue
+        # Near black can't be darker; a paint much darker in the picture is in shade there, or isn't
+        # what the picture shows (a car's white windows: the seats behind the glass). Its colour stays,
+        # and, as far as that is clear, its detail and decals aren't trusted
+        shade = 1.0 if float(_luma(e["t_med"])) < RECOLOUR_DARK else _ramp(RECOLOUR_DARKER, e["ratio"])
+        seen = _ramp(RECOLOUR_SEEN, e["seen"] / e["texels"]) * _ramp(RECOLOUR_COUNT, e["seen"])
+        one = _ramp(RECOLOUR_ONE, e["one"])
+        factors = {
+            "kept: too little seen": seen,
+            "detail only: the picture shows it in several colours": one,
+            "kept: the same colour": _ramp(RECOLOUR_CHANGE, e["change"]),
+            "kept: only darker in the picture (shade)": shade,
+        }
+        amount = math.prod(factors.values())
+        gains[k] = (e["s_med"] + RECOLOUR_EPS) / (e["t_med"] + RECOLOUR_EPS)
+        amounts[k] = amount
+        trusted[k] = 1 - (1 - shade) * seen * one
+        paints.append(
+            {
+                **report,
+                "picture": _hex(e["s_med"]),
+                "one_colour": round(e["one"], 3),
+                "change": round(e["change"], 1),
+                "brightness": round(e["ratio"], 3),
+                "amount": round(amount, 3),
+                "decision": "recoloured" if amount >= 0.5 else min(factors, key=factors.get),
+            }
+        )
+    return _Recolour(gains=gains, amounts=amounts, trusted=trusted, paints=paints)
+
+
+def _recoloured(old: torch.Tensor, membership: torch.Tensor, plan: _Recolour) -> torch.Tensor:
+    """Texture colours (linear, (N, 3)) with each paint taken as far as planned to the picture's."""
+    shift = (membership * plan.amounts[None])[..., None] * (plan.gains[None] - 1)  # (N, K, 3)
+    return (old + (old + RECOLOUR_EPS) * shift.sum(1)).clamp(0, 1)
+
+
+# --- The picture side ---------------------------------------------------------------------------------
+
+
+def _components(labels: torch.Tensor) -> torch.Tensor:
+    """
+    4-connected components of equal labels in an (H, W) label image (negative: no label). Returns ids
+    0..n-1 per pixel (-1 where no label): label propagation with pointer jumping.
+    """
+    h, w = labels.shape
+    n = h * w
+    valid = labels >= 0
+    if not bool(valid.any()):
+        return torch.full_like(labels, -1)
+
+    def runs(grid: torch.Tensor) -> torch.Tensor:  # run of equal labels along each row: an id per pixel
+        start = torch.ones_like(grid, dtype=torch.bool)
+        start[:, 1:] = grid[:, 1:] != grid[:, :-1]
+        return torch.cumsum(start.flatten(), 0) - 1
+
+    across = runs(labels)  # row-major pixel order
+    down = runs(labels.T.contiguous()).view(w, h).T.flatten()  # the same along columns
+    index = torch.arange(n, device=labels.device)
+    comp = torch.where(valid.flatten(), index, torch.full_like(index, n))
+    while True:
+        previous = comp
+        # Each run takes its least label, along rows, then columns; then each pixel follows its label (a
+        # pixel of its component) to that pixel's label
+        for run in (across, down):
+            least = torch.full((int(run[-1]) + 1,), n, device=labels.device, dtype=comp.dtype)
+            comp = least.scatter_reduce(0, run, comp, reduce="amin")[run]
+        for _ in range(2):
+            comp = torch.minimum(comp, torch.where(comp < n, comp[comp.clamp(max=n - 1)], comp))
+        if torch.equal(comp, previous):
+            break
+    ids = torch.full_like(labels, -1)
+    ids[valid] = torch.unique(comp.view(h, w)[valid], return_inverse=True)[1]
+    return ids
+
+
+def _pairs(x: torch.Tensor, dy: int, dx: int):
+    """Two aligned views of (..., H, W) x: x[p] and x[p + (dy, dx)], over the p where both exist."""
+    h, w = x.shape[-2:]
+    a = x[..., max(0, -dy) : h - max(0, dy), max(0, -dx) : w - max(0, dx)]
+    b = x[..., max(0, dy) : h - max(0, -dy), max(0, dx) : w - max(0, -dx)]
+    return a, b
+
+
+class _Canvas:
+    """
+    The part of the picture the model covers (cropped to it), and where texels land on it: each visible
+    texel at the pixel its point projects to.
+    """
+
+    def __init__(self, picture: _Picture, zbuf: torch.Tensor, xy: torch.Tensor, visible: torch.Tensor) -> None:
+        inside = (picture.mask > 0.5) & torch.isfinite(zbuf)
+        rows = torch.nonzero(inside.any(1)).flatten()
+        cols = torch.nonzero(inside.any(0)).flatten()
+        if rows.numel() == 0:
+            raise _Skip("the model and the picture don't overlap")
+        self.top, self.left = int(rows[0]), int(cols[0])
+        self.height, self.width = int(rows[-1]) + 1 - self.top, int(cols[-1]) + 1 - self.left
+        self.window = (slice(self.top, self.top + self.height), slice(self.left, self.left + self.width))
+        self.inside = inside[self.window]
+        col = xy[:, 0].floor().long() - self.left
+        row = xy[:, 1].floor().long() - self.top
+        landed = visible & (col >= 0) & (col < self.width) & (row >= 0) & (row < self.height)
+        self.pixel = (row * self.width + col).clamp(0, self.height * self.width - 1)
+        self.landed = landed & self.inside.flatten()[self.pixel]
+        u = (xy[:, 0] - self.left) / self.width * 2 - 1
+        v = (xy[:, 1] - self.top) / self.height * 2 - 1
+        self.grid = torch.stack([u, v], -1)[None, None]
+
+    def crop(self, image: torch.Tensor) -> torch.Tensor:
+        """(C, H, W) of the whole picture to (C, h, w)."""
+        return image[(slice(None),) + self.window]
+
+    def counts(self, values: torch.Tensor):
+        """Sums of (N, C) texel values per pixel (C, h, w), and how many texels landed there (h, w)."""
+        n = self.height * self.width
+        idx = self.pixel[self.landed]
+        sums = torch.zeros((values.shape[1], n), device=values.device).index_add_(1, idx, values[self.landed].T)
+        counts = torch.zeros(n, device=values.device).index_add_(0, idx, torch.ones_like(idx, dtype=values.dtype))
+        return sums.view(-1, self.height, self.width), counts.view(self.height, self.width)
+
+    def splat(self, values: torch.Tensor) -> torch.Tensor:
+        """The mean of (N, C) texel values at each pixel (C, h, w), filled in where none landed."""
+        sums, counts = self.counts(values)
+        return _push_pull(sums / counts.clamp_min(1), (counts > 0).float())
+
+    def sample(self, image: torch.Tensor) -> torch.Tensor:
+        """(C, h, w) at each texel, (N, C), bilinear; 0 for texels that don't land on the picture."""
+        out = F.grid_sample(image[None], self.grid, mode="bilinear", padding_mode="border", align_corners=False)
+        return out[0, :, 0].T * self.landed[:, None]
+
+
+def _purity(canvas: _Canvas, owner: torch.Tensor, paints: int, radius: float) -> torch.Tensor:
+    """Per texel (N,): the share of the texels landing within about ``radius`` pixels that are its paint."""
+    sums, counts = canvas.counts(F.one_hot(owner, paints).float())
+    shares = _smooth((sums / counts.clamp_min(1))[None], counts[None, None], radius)[0]
+    return canvas.sample(shares).gather(1, owner[:, None])[:, 0]
+
+
+def _colour_classes(lab: torch.Tensor, inside: torch.Tensor, count: int):
+    """
+    The picture's colours (CIELAB, (3, h, w)) clustered over the ``inside`` pixels (k-means). Returns soft
+    memberships (K, h, w), 0 outside, and hard labels (h, w), -1 outside.
+    """
+    device = lab.device
+    pixels = lab.permute(1, 2, 0)[inside]
+    gen = torch.Generator().manual_seed(0)
+    sample = pixels[torch.randperm(pixels.shape[0], generator=gen)[:20000].to(device)]
+    centres = sample[:1]
+    for _ in range(count - 1):
+        d = torch.cdist(sample, centres).amin(1).square()
+        if float(d.sum()) <= 0:
+            break
+        pick = int(torch.multinomial((d / d.sum()).cpu().double(), 1, generator=gen))
+        centres = torch.cat([centres, sample[pick : pick + 1]])
+    for _ in range(10):
+        assign = torch.cdist(sample, centres).argmin(1)
+        sums = torch.zeros_like(centres).index_add_(0, assign, sample)
+        total = torch.zeros(centres.shape[0], device=device).index_add_(0, assign, torch.ones_like(assign, dtype=lab.dtype))
+        centres = torch.where(total[:, None] > 0, sums / total.clamp_min(1)[:, None], centres)
+    k = centres.shape[0]
+    distance = torch.cdist(pixels, centres)
+    membership = torch.zeros((k,) + inside.shape, device=device)
+    membership[:, inside] = torch.softmax(-distance.square() / (2 * CLASS_SOFTNESS**2), 1).T
+    labels = torch.full(inside.shape, -1, dtype=torch.long, device=device)
+    labels[inside] = distance.argmin(1)
+    # A pixel none of whose four neighbours shares its cluster joins the majority round it (a lone
+    # pixel of noise; corners where two regions of one colour meet diagonally stay apart)
+    votes = torch.zeros((k,) + inside.shape, device=device)
+    votes[:, inside] = F.one_hot(labels[inside], k).T.float()
+    votes = F.avg_pool2d(votes[None], 3, 1, 1)[0]
+    padded = F.pad(labels[None, None].float(), (1, 1, 1, 1), value=-2)[0, 0]
+    alone = inside.clone()
+    for dy, dx in ((0, 1), (2, 1), (1, 0), (1, 2)):
+        alone &= padded[dy : dy + labels.shape[0], dx : dx + labels.shape[1]] != labels
+    labels = torch.where(alone, votes.argmax(0), labels)
+    return membership, labels
+
+
+@dataclass
+class _Regions:
+    """The picture's regions of one colour, and which of them may be decals."""
+
+    membership: torch.Tensor  # (K, h, w) soft colour classes
+    ids: torch.Tensor  # (h, w) region of each pixel, -1 outside
+    candidate: torch.Tensor  # (R,) bool: may be a decal
+    area: torch.Tensor  # (R,) pixels
+    seen: torch.Tensor  # (R,) mean detail weight
+    core: torch.Tensor  # (h, w) bool: pixels whose four neighbours are in their region
+
+
+def _regions(lab: torch.Tensor, inside: torch.Tensor, blocked: torch.Tensor, seen: torch.Tensor, highlight: torch.Tensor) -> _Regions:
+    """
+    Regions of one colour class in the picture (CIELAB (3, h, w) over ``inside``), and which may be
+    decals: clear of ``blocked`` pixels (the outline, depth edges and misfits, widened), standing out from
+    what is round them with a sharp edge, seen well (``seen``: detail weight per pixel), not highlights and
+    not too big.
+    """
+    membership, labels = _colour_classes(lab, inside, DETAIL_CLASSES)
+    ids = _components(labels)
+    flat = ids.flatten()
+    has = flat >= 0
+    count = int(flat.max()) + 1 if bool(has.any()) else 0
+    device = lab.device
+
+    def total(values: torch.Tensor) -> torch.Tensor:  # (h, w) or (C, h, w) -> sums per region (R, C)
+        v = values.reshape(-1, inside.numel()).T
+        return torch.zeros((count, v.shape[1]), device=device).index_add_(0, flat[has], v[has].float())
+
+    area = total(torch.ones_like(seen))[:, 0]
+    mean_lab = total(lab) / area[:, None]
+    touches = total(blocked.float())[:, 0] > 0
+    mean_seen = total(seen)[:, 0] / area
+    mean_highlight = total(highlight)[:, 0] / area
+    ring = torch.zeros((count, 3), device=device)
+    ring_n = torch.zeros(count, device=device)
+    step = torch.zeros(count, device=device)
+    step_n = torch.zeros(count, device=device)
+    # Core pixels: all four neighbours in the same region (a region's mean colour is read there, clear of
+    # its anti-aliased edge)
+    core = torch.zeros_like(inside)
+    middle = ids[1:-1, 1:-1]
+    core[1:-1, 1:-1] = (
+        (middle >= 0)
+        & (ids[:-2, 1:-1] == middle)
+        & (ids[2:, 1:-1] == middle)
+        & (ids[1:-1, :-2] == middle)
+        & (ids[1:-1, 2:] == middle)
+    )
+    for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+        for distance in (1, 3):
+            a, b = _pairs(ids, dy * distance, dx * distance)
+            la, lb = _pairs(lab, dy * distance, dx * distance)
+            differ = (a >= 0) & (b >= 0) & (a != b)
+            if distance == 1:
+                d = (la - lb).norm(dim=0)[differ]
+                step.index_add_(0, a[differ], d)
+                step_n.index_add_(0, a[differ], torch.ones_like(d))
+            else:
+                ring.index_add_(0, a[differ], lb.permute(1, 2, 0)[differ])
+                ring_n.index_add_(0, a[differ], torch.ones_like(a[differ], dtype=lab.dtype))
+    contrast = (mean_lab - ring / ring_n.clamp_min(1)[:, None]).norm(dim=-1)
+    sharp = step / step_n.clamp_min(1)
+    candidate = (
+        ~touches
+        & (ring_n > 0)
+        & (area >= 3)
+        & (area <= DECAL_AREA * float(inside.sum()))
+        & (contrast >= DECAL_CONTRAST)
+        & (sharp >= DECAL_SHARPNESS * contrast)
+        & (mean_seen >= DECAL_SEEN[0])
+        & (mean_highlight < 0.5)
+    )
+    return _Regions(membership=membership, ids=ids, candidate=candidate, area=area, seen=mean_seen, core=core)
+
+
+def _detail(residual: torch.Tensor, membership: torch.Tensor, valid: torch.Tensor, sigma: float):
+    """
+    The detail in a (3, h, w) residual, what is left after smoothing it over ``sigma`` pixels within each
+    colour class (soft ``membership``, (K, h, w)), and the smoothed rest: both on ``valid`` pixels (0
+    elsewhere).
+    """
+    weight = membership * valid
+    low = torch.zeros_like(residual)
+    for start in range(0, weight.shape[0], 4):  # a few classes at a time: (B, 3, h, w) at once
+        part = weight[start : start + 4]
+        means = _smooth(residual[None].expand(part.shape[0], -1, -1, -1), part[:, None], sigma)
+        low += (part[:, None] * means).sum(0)
+    low = low / weight.sum(0, keepdim=True).clamp_min(1e-6)
+    return (residual - low) * valid, low * valid
+
+
+def _only_light(picture: torch.Tensor, texture: torch.Tensor, glossy: torch.Tensor) -> torch.Tensor:
+    """
+    Whether each picture colour (linear, (R, 3)) is the texture's (R, 3) under different light: the
+    texture's times a brightness within LIGHT_RATIO either way, plus white on a glossy surface (glossy
+    (R,), 0-1: a reflection), to within LIGHT_FIT of their difference.
+    """
+    k = torch.exp(torch.linspace(-math.log(LIGHT_RATIO), math.log(LIGHT_RATIO), 25, device=picture.device))
+    lit = k[None, :, None] * texture[:, None, :]  # (R, 25, 3)
+    white = (picture[:, None, :] - lit).mean(-1, keepdim=True).clamp_min(0) * (glossy > 0.5)[:, None, None]
+    misfit = (picture[:, None, :] - lit - white).norm(dim=-1).amin(1)
+    return misfit <= LIGHT_FIT * (picture - texture).norm(dim=-1)
+
+
+def _decal_fills(
+    regions: _Regions,
+    residual: torch.Tensor,
+    low: torch.Tensor,
+    picture: torch.Tensor,
+    base: torch.Tensor,
+    glossy: torch.Tensor,
+    canvas: _Canvas,
+    trust: torch.Tensor,
+    weight: torch.Tensor,
+):
+    """
+    What the decals add on top of the detail, as an image (3, h, w): inside each, the part of the
+    picture's difference from the recoloured texture that the detail left out (``low``), so the decal
+    goes on whole, times how well it was seen and how far its paint is trusted. And a report.
+    ``residual`` is that difference; ``picture``, ``base`` and ``glossy`` are the picture (light taken
+    out), the recoloured texture and the texture's glossiness in the picture ((3, h, w), (h, w)); per
+    texel, ``trust`` is how far its paint is trusted and ``weight`` its detail weight.
+    """
+    h, w = regions.ids.shape
+    flat = regions.ids.flatten()
+    has = flat >= 0
+    count = regions.area.numel()
+    report = {"count": 0, "area": 0.0, "only_light": 0, "untrusted": 0}
+    if count == 0 or not bool(regions.candidate.any()):
+        return torch.zeros_like(residual), report
+    device = residual.device
+
+    def total(values: torch.Tensor, where: torch.Tensor) -> torch.Tensor:  # (C, h, w) -> (R, C)
+        v = values.reshape(values.shape[0], -1).T
+        return torch.zeros((count, v.shape[1]), device=device).index_add_(0, flat[where], v[where])
+
+    ones = torch.ones((1, h, w), device=device)
+    core = regions.core.flatten() & has
+    cored = total(ones, core)[:, 0] > 0
+    # A region's colours are read on its core pixels, or all of them if it's too thin to have any
+    use = has & torch.where(cored[flat.clamp_min(0)], core, torch.ones_like(core))
+    n = total(ones, use)[:, 0].clamp_min(1)[:, None]
+    seen = total(picture, use) / n
+    texture = total(base, use) / n
+    shine = total(glossy[None], use)[:, 0] / n[:, 0]
+    # How much each varies inside: the texture's own garbled try at a design (a skateboard's smeared
+    # letters) varies where the picture's clean one doesn't
+    spread_seen = (total(picture.square(), use) / n - seen.square()).clamp_min(0).sum(-1).sqrt()
+    spread_texture = (total(base.square(), use) / n - texture.square()).clamp_min(0).sum(-1).sqrt()
+    garbled = (spread_texture > DECAL_GARBLED * spread_seen) & (spread_texture > 0.03)
+    light = regions.candidate & _only_light(seen, texture, shine) & ~garbled
+    decal = regions.candidate & ~light
+    # How far the paints of the texels landing in each region are trusted
+    at = torch.where(canvas.landed, flat[canvas.pixel], torch.full((trust.shape[0],), -1, dtype=torch.long, device=device))
+    landed = at >= 0
+    mass = torch.zeros(count, device=device).index_add_(0, at[landed], weight[landed])
+    trusted = torch.zeros(count, device=device).index_add_(0, at[landed], (weight * trust)[landed])
+    trusted = torch.where(mass > 0, trusted / mass.clamp_min(1e-9), torch.ones_like(mass))
+    strength = _smoothstep(*DECAL_SEEN, regions.seen) * trusted * decal
+    image = low * (strength[flat.clamp_min(0)] * has).view(1, h, w)
+    applied = strength > 0.05
+    report.update(
+        count=int(applied.sum()),
+        area=round(float(regions.area[applied].sum()) / max(1.0, float(has.sum())), 4),
+        only_light=int(light.sum()),
+        untrusted=int((decal & (trusted < 0.5)).sum()),
+    )
+    return image, report
 
 
 def _lighting(old: torch.Tensor, new: torch.Tensor, normals: torch.Tensor, metallic: torch.Tensor):
@@ -1032,6 +1541,8 @@ def _lighting(old: torch.Tensor, new: torch.Tensor, normals: torch.Tensor, metal
     return coef.float(), "matched"
 
 
+
+
 def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tensor, report: dict, clock, debug):
     tex_h, tex_w = model.texture.shape[:2]
     h, w = zbuf.shape
@@ -1052,8 +1563,9 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
     points, normals = texel[:, :3], texel[:, 3:]
     normals = normals / normals.norm(dim=-1, keepdim=True).clamp_min(1e-9)
     a, b, c = (model.verts[model.faces[:, i]] for i in range(3))
-    face_normals = torch.cross(b - a, c - a, dim=-1)
-    face_normals = (face_normals / face_normals.norm(dim=-1, keepdim=True).clamp_min(1e-12))[face]
+    all_face_normals = torch.cross(b - a, c - a, dim=-1)
+    all_face_normals = all_face_normals / all_face_normals.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+    face_normals = all_face_normals[face]
     clock("texels_s")
 
     # What the camera sees of each texel
@@ -1070,7 +1582,7 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
     # Normals pointing inwards (a flipped mesh) would hide the whole visible side
     seen_cos = cos[visible]
     if seen_cos.numel() and float(seen_cos.median()) < 0:
-        cos, cos_face, face_normals = -cos, -cos_face, -face_normals
+        cos, cos_face, face_normals, all_face_normals = -cos, -cos_face, -face_normals, -all_face_normals
 
     # Fade out near the picture's outline, near depth edges and near misfits
     side_px = picture.box[2]
@@ -1116,8 +1628,7 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
     coef, note = _lighting(old_lin[strong], new_lin[strong], face_normals[strong], rm[strong, 1])
     exposure = {"gain": 1.0, "shading": 1.0, "note": note}
     if coef is not None:
-        light = face_normals @ coef[1:] + coef[0]
-        factor = torch.exp(-light).clamp(*GAIN_RANGE)
+        factor = torch.exp(-(face_normals @ coef[1:] + coef[0])).clamp(*GAIN_RANGE)
         new_lin = (new_lin * factor[:, None]).clamp(0, 1)
         seen_factor = factor[strong]
         exposure["gain"] = round(float(seen_factor.median()), 3)
@@ -1152,30 +1663,74 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
     if coverage < MIN_COVERAGE:
         raise _Skip(f"too little of the model faces the camera ({coverage:.1%} of texels)")
 
-    # Broad colour: the change smoothed in 3D, reaching past where detail fades, out to where the
-    # surface turns away; detail: the rest of the change, where the picture saw the surface well
-    delta = new_lin - old_lin
-    data = seen * _smoothstep(*FACING_DATA, cos)
+    # The picture's regions of one colour, and which may be decals (designs painted on a paint)
+    canvas = _Canvas(picture, zbuf, xy, visible)
+    picture_lin = canvas.crop(_srgb_to_linear(picture.rgb).permute(2, 0, 1))
+    seen_px = canvas.splat(detail_weight[:, None])[0]
+    highlight_px = canvas.splat(highlight[:, None])[0]
+    clear = canvas.inside & ~canvas.crop(edges[None])[0] & ~(canvas.crop(misfit[0])[0] > 0)
+    blocked = _dilate((~clear).float()[None, None], DECAL_MARGIN)[0, 0] > 0
+    lab = _lab(picture_lin.permute(1, 2, 0)).permute(2, 0, 1)
+    regions = _regions(lab, canvas.inside, blocked, seen_px, highlight_px)
+    del lab
+    clock("regions_s")
+
+    # Paints: each takes the picture's colour all round, or keeps its own
     old_srgb = model.texture.view(-1, 3)[flat]
     membership = _membership(old_srgb, _paints(old_srgb, PAINTS))
-    broad, support, agreement, spread = _smooth_field(points, delta, data, membership)
-    del membership
-    # Only where the paint's changes nearby agree
-    consistent = _consistent(agreement, spread)
-    broad = broad * consistent[:, None]
-    # Support is the share of nearby surface seen well; a model made of nested shells (a cup's glass
-    # around its drink) never gets near 1, so it is measured against its typical value where seen well
-    if bool((data > 0.5).any()):
-        support = (support / torch.median(support[data > 0.5]).clamp_min(1e-3)).clamp(0, 1)
-    # (not round a hard corner, though: there a colour change looks natural)
-    turning = _smoothstep(*FACING_BROAD, torch.minimum(cos, cos_face))
-    reach = _smoothstep(*SUPPORT_FADE, support) * turning
-    broad_weight = torch.maximum(reach, detail_weight)
-    blended = old_lin + broad_weight[:, None] * broad + detail_weight[:, None] * (delta - broad)
+    del old_srgb
+    owner = membership.argmax(1)
+    purity = _purity(canvas, owner, membership.shape[1], PURITY_RADIUS * side_px)
+    region = torch.where(canvas.landed, regions.ids.flatten()[canvas.pixel], torch.full_like(owner, -1))
+    in_decal = (region >= 0) & regions.candidate[region.clamp_min(0)] if regions.area.numel() else region >= 0
+    metal = rm[:, 1] >= 0.8
+    data = seen * _smoothstep(*FACING_DATA, cos) * _smoothstep(*PURITY, purity) * ~in_decal * ~metal
+    plan = _recolour_plan(old_lin, new_lin, membership, data)
+    base = _recoloured(old_lin, membership, plan)
+    report["paints"] = plan.paints
+    clock("paints_s")
+
+    # The recoloured texture as the camera sees it: each pixel's triangle, its UV there, the texture there
+    # (its gutters carried along, for bilinear lookups at chart edges)
+    old_tex = _srgb_to_linear(model.texture).permute(2, 0, 1)
+    change = torch.zeros_like(old_tex).view(3, -1)
+    change[:, flat] = (base - old_lin).T
+    base_tex = (old_tex + _push_pull(change.view(3, tex_h, tex_w), covered.float())).clamp(0, 1)
+    del old_tex, change
+    vxy, vdepth, vs = mapping(model.verts)
+    face_px, bary_px = rasterize_faces(vxy, vdepth, vs, model.faces, zbuf)
+    face_px, bary_px = face_px[canvas.window], bary_px[canvas.window]
+    uv_px = (bary_px[..., None] * model.uv[model.faces[face_px.clamp_min(0)]]).sum(-2)
+    lookup = torch.stack([uv_px[..., 0] * 2 - 1, (1 - uv_px[..., 1]) * 2 - 1], -1)[None]
+    base_px = F.grid_sample(base_tex[None], lookup, mode="bilinear", padding_mode="border", align_corners=False)[0]
+    del base_tex, lookup, uv_px
+    # ... and the picture with its light taken out, as at the texels
+    factor_px = torch.ones_like(base_px[0])
+    if coef is not None:
+        factor_px = torch.exp(-(all_face_normals[face_px.clamp_min(0)] @ coef[1:] + coef[0])).clamp(*GAIN_RANGE)
+
+    # Detail: the picture's difference from the recoloured texture, less what changes slowly, plus the
+    # decals whole
+    picture_px = (picture_lin * factor_px).clamp(0, 1)
+    residual = picture_px - base_px
+    valid = (canvas.inside & (highlight_px < 0.5)).float()
+    high, low = _detail(residual, regions.membership, valid, max(1.0, DETAIL_SIGMA * side_px))
+    trust = membership @ plan.trusted
+    glossy_px = canvas.splat(glossy[:, None])[0]
+    fill, decals = _decal_fills(regions, residual, low, picture_px, base_px, glossy_px, canvas, trust, detail_weight)
+    del low
+    report["decals"] = decals
+    recoloured = any(p["amount"] >= 0.5 for p in plan.paints)
+    report["mode"] = "recolour and detail" if recoloured else "detail only"
+    # Detail where the picture saw the surface well; decals on whole wherever they show, but not where it
+    # turns away
+    decal_weight = seen * _smoothstep(*FACING_DECAL, cos)
+    blended = base + (detail_weight * trust)[:, None] * canvas.sample(high) + decal_weight[:, None] * canvas.sample(fill)
     if debug is not None:
-        debug.update(broad_weight=broad_weight, consistent=consistent, support=support)
-    reached = (broad.abs().amax(-1) * broad_weight).sum() / broad_weight.sum().clamp_min(1)
-    report["broad_change"] = round(float(reached), 4)
+        debug.update(
+            canvas=canvas, regions=regions, residual=residual, high=high, fill=fill, base=base, purity=purity,
+            membership=membership, data=data, in_decal=in_decal,
+        )
 
     texture = model.texture.clone().view(-1, 3)
     texture[flat] = _linear_to_srgb(blended)
@@ -1193,8 +1748,18 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
 
 def summary(report: dict) -> dict:
     """A report's essentials, for a job's result and the worker's log."""
-    keys = ("applied", "reason", "iou", "colour", "coverage", "pose", "gpu_fault")
+    keys = ("applied", "reason", "iou", "colour", "coverage", "pose", "mode", "gpu_fault")
     out = {key: report[key] for key in keys if report.get(key) is not None}
+    recoloured = [
+        {"from": p["texture"], "to": p["picture"], "share": p["share"]}
+        for p in report.get("paints") or []
+        if p.get("decision") == "recoloured"
+    ]
+    if recoloured:
+        out["recoloured"] = recoloured
+    decals = (report.get("decals") or {}).get("count")
+    if decals:
+        out["decals"] = decals
     seconds = report.get("timings", {}).get("total_s")
     if seconds is not None:
         out["seconds"] = seconds

@@ -193,6 +193,13 @@ def angle_to(report_pose: dict, view: P.View) -> float:
     return float(P._angle_between(a.float(), b.float())[0])
 
 
+def checker_square(points: np.ndarray):
+    """Which of the checker's squares (column i, row j from the bottom) each front point is in."""
+    i = np.floor((points[:, 0] + HALF[0]) / (2 * HALF[0]) * 4).astype(int)
+    j = np.floor((points[:, 1] + HALF[1]) / (2 * HALF[1]) * 3).astype(int)
+    return i, j
+
+
 def test_finds_the_camera_and_paints_the_side_it_shows():
     mesh = make_box()
     before = np.asarray(mesh.visual.material.baseColorTexture).copy()
@@ -204,28 +211,37 @@ def test_finds_the_camera_and_paints_the_side_it_shows():
     # Where the picture shows the texture's paint (the light squares) it is as bright: nothing to match
     assert report["exposure"]["note"] == "matched"
     assert report["exposure"]["gain"] == pytest.approx(1.0, abs=0.05)
+    # Half the front is dark squares in the picture: not one colour, so no paint changes all round
+    assert report["mode"] == "detail only"
     after = np.asarray(mesh.visual.material.baseColorTexture.convert("RGB")).astype(np.float64)
     assert after.shape == before.shape
 
-    # The front (+Z) faces the camera: its texels now carry the picture's checker
-    points, texels = texel_points(side=4, inset=0.2)
+    # The front (+Z) faces the camera. The checker's dark squares that lie inside what the picture shows
+    # are designs on the paint: painted on whole. Those on the picture's outline (the front's left and
+    # bottom edges, from this view) might go on round the side the picture doesn't show: left as they were
+    points, texels = texel_points(side=4, inset=0.05, step=2)
+    i, j = checker_square(points)
+    fx = (points[:, 0] + HALF[0]) / (2 * HALF[0]) * 4
+    fy = (points[:, 1] + HALF[1]) / (2 * HALF[1]) * 3
+    clear = (np.abs(fx - np.round(fx)) > 0.15) & (np.abs(fy - np.round(fy)) > 0.15)  # off the squares' edges
     expected = exposed(checker(points), report["exposure"])
-    error = np.abs(after[texels[:, 0], texels[:, 1]] - expected).mean(axis=1)
-    # Away from the checker's own edges (a texel straddling one samples both colours)
-    i = (points[:, 0] + HALF[0]) / (2 * HALF[0]) * 4
-    j = (points[:, 1] + HALF[1]) / (2 * HALF[1]) * 3
-    interior = (np.abs(i - np.round(i)) > 0.15) & (np.abs(j - np.round(j)) > 0.15)
-    assert np.median(error[interior]) < 10, np.median(error[interior])
-    assert (error[interior] < 30).mean() > 0.95
+    got = after[texels[:, 0], texels[:, 1]]
+    error = np.abs(got - expected).mean(axis=1)
+    dark = (i + j) % 2 == 1
+    inner = dark & (i > 0) & (j > 0) & clear
+    assert inner.sum() > 50 and np.median(error[inner]) < 10, np.median(error[inner])
+    assert (error[inner] < 30).mean() > 0.95
+    outer = dark & ((i == 0) | (j == 0)) & clear
+    unchanged = np.abs(got - before[texels[:, 0], texels[:, 1]]).max(axis=1)
+    assert outer.sum() > 50 and np.median(unchanged[outer]) < 12, np.median(unchanged[outer])
+    light = ~dark & clear
+    assert np.median(unchanged[light]) < 6, np.median(unchanged[light])
 
-    # The back (-Z), bottom (-Y) and left (-X) never face this camera: no picture on them. The broad
-    # colour change may reach round the edges a little; away from the front they are untouched
+    # The back (-Z), bottom (-Y) and left (-X) never face this camera: untouched
     for side in (1, 3, 5):
-        points, tx = texel_points(side=side)
+        _, tx = texel_points(side=side)
         change = np.abs(after[tx[:, 0], tx[:, 1]] - before[tx[:, 0], tx[:, 1]]).max(axis=1)
-        assert change.max() < 12, (side, change.max())
-        far = points[:, 2] < 0 if side != 5 else np.ones(len(points), bool)
-        assert change[far].max() <= 3, (side, change[far].max())
+        assert change.max() <= 3, (side, change.max())
 
 
 def test_the_pictures_shading_is_taken_out():
@@ -382,7 +398,7 @@ def test_the_gutters_follow_the_new_colours():
         row = round(r0 + (k + 0.5) * INNER / 3)
         edge, gutter = after[row, c0 + INNER - 1], after[row, c0 + INNER + 1]
         assert np.abs(gutter - edge).max() < 35, (row, edge, gutter)
-        if k != 1:  # the checker's dark squares along that edge: the gutter changed with them
+        if k == 0:  # the checker's dark square at the top of that edge, painted on: the gutter followed it
             assert np.abs(gutter - before[row, c0 + INNER + 1]).max() > 40, (row, gutter)
     # Next to the back's square, which didn't change, the gutter is as it was
     c0, r0 = cell_origin(5)
@@ -472,51 +488,135 @@ def side_profile(texture: np.ndarray, segments: int = 72, height: float = 0.5) -
     return texture[row, cols].astype(np.float64)
 
 
-def test_a_wrong_colour_fades_round_the_sides_without_a_seam():
-    # The model's texture is near-black (the "cola" milk tea); the picture shows the cup orange.
-    # The cylinder looks the same from every azimuth, so any camera round it will do
+def round_the_side(texture: np.ndarray, azimuth: float, height: float = 0.5):
+    """The side's colour `height` of the way up (segments, 3), and each segment's degrees from the camera."""
+    profile = side_profile(texture, height=height)
+    phi = (np.arange(72) + 0.5) * 5.0
+    return profile, np.abs((phi - azimuth + 180) % 360 - 180)
+
+
+def test_a_paint_the_picture_shows_in_another_colour_changes_all_round():
+    # The model's texture is near-black (the "cola" milk tea); the picture shows the cup orange. The cup
+    # looks the same from every side, so any camera round it will do
     view = P.View(azimuth=0.0, elevation=15.0, roll=0.0, perspective=0.25)
     mesh, report = P.project_picture(make_cylinder(), render_cylinder(view), device="cpu")
     assert report["applied"], report["reason"]
     assert report["exposure"]["note"].startswith("kept")  # far too dark to be the same colour, dimmer
     assert all(r["shape_difference"] < P.SAME_SHAPE for r in report["rivals"])
-    found = report["pose"]["azimuth"]
     assert abs(report["pose"]["elevation"] - view.elevation) < 5
+    assert report["mode"] == "recolour and detail"
+    assert [p["decision"] for p in report["paints"] if p["share"] > 0.5] == ["recoloured"]
 
-    profile = side_profile(np.asarray(mesh.visual.material.baseColorTexture.convert("RGB")))
-    phi = (np.arange(72) + 0.5) * 5.0
-    away = np.abs((phi - found + 180) % 360 - 180)  # degrees round from the camera
-    share = (profile[:, 0] - BLACK[0]) / (ORANGE[0] - BLACK[0])  # 1: the picture's orange; 0: unchanged
-    order = np.argsort(away)
-    away, share = away[order], share[order]
-    assert share[away < 40].min() > 0.85, share[away < 40]
-    assert share[away > 150].max() < 0.02
-    # Past where the picture saw it well, the orange still reaches round the side, fading out
-    turning = (away > 70) & (away < 110)
-    assert 0.15 < share[turning].mean() < 0.9
-    # ... gradually: no step between neighbouring segments is more than a fifth of the whole change
-    assert np.abs(np.diff(share)).max() < 0.2, np.round(share, 2)
+    texture = np.asarray(mesh.visual.material.baseColorTexture.convert("RGB")).astype(np.float64)
+    for height in (0.2, 0.5, 0.8):
+        profile, away = round_the_side(texture, report["pose"]["azimuth"], height)
+        # Orange all round, the far side included, with no step where the picture stopped seeing it
+        assert np.abs(profile - np.array(ORANGE)).max() < 12, (height, np.abs(profile - np.array(ORANGE)).max())
+        assert np.abs(np.diff(profile[np.argsort(away)], axis=0)).max() < 6
 
 
-def test_only_one_colour_change_reaches_round_the_sides(monkeypatch):
-    # The model's orange is right; the picture shows black and white stripes up the side it sees. Their
-    # changes average to a grey-blue tint that no part of the picture has: it mustn't spread round
+def test_a_paint_the_picture_shows_in_several_colours_keeps_its_own():
+    # The model's orange is right; the picture shows black and white stripes up the side it sees. That is
+    # no one colour for the paint: it keeps its own all round, and the stripes, which run on past the
+    # picture's outline, aren't painted on either
+    view = P.View(azimuth=0.0, elevation=15.0, roll=0.0, perspective=0.25)
+    picture = render_cylinder(view, stripes=True)
+    mesh, report = P.project_picture(make_cylinder(colour=ORANGE), picture, device="cpu")
+    assert report["applied"], report["reason"]
+    assert report["mode"] == "detail only"
+    texture = np.asarray(mesh.visual.material.baseColorTexture.convert("RGB")).astype(np.float64)
+    profile, away = round_the_side(texture, report["pose"]["azimuth"])
+    assert np.abs(profile[away > 70] - np.array(ORANGE)).max() < 8
+    assert np.median(np.abs(profile[away < 40] - np.array(ORANGE)).max(axis=1)) < 12
+
+
+def test_each_paint_changes_on_its_own(monkeypatch):
+    # The model's top half is orange and its bottom half blue. The picture shows the top green and the
+    # bottom blue, as the model has it: the top turns green all round, the blue stays blue
+    blue, green = (40, 90, 200), (60, 170, 70)
     view = P.View(azimuth=0.0, elevation=15.0, roll=0.0, perspective=0.25)
 
-    def sides_after() -> np.ndarray:
-        picture = render_cylinder(view, stripes=True)
-        mesh, report = P.project_picture(make_cylinder(colour=ORANGE), picture, device="cpu")
+    def sides() -> tuple[np.ndarray, np.ndarray, dict]:
+        model = make_cylinder(colour=ORANGE, lower=blue)
+        mesh, report = P.project_picture(model, render_cylinder(view, upper=green, lower=blue), device="cpu")
         assert report["applied"], report["reason"]
-        profile = side_profile(np.asarray(mesh.visual.material.baseColorTexture.convert("RGB")))
-        phi = (np.arange(72) + 0.5) * 5.0
-        away = np.abs((phi - report["pose"]["azimuth"] + 180) % 360 - 180)
-        beyond = (away > 70) & (away < 95)  # past where the picture's detail fades out
-        return np.abs(profile[beyond] - np.array(ORANGE)).max(axis=1)
+        texture = np.asarray(mesh.visual.material.baseColorTexture.convert("RGB")).astype(np.float64)
+        top, _ = round_the_side(texture, report["pose"]["azimuth"], height=0.85)
+        bottom, _ = round_the_side(texture, report["pose"]["azimuth"], height=0.3)
+        return top, bottom, report
 
-    assert sides_after().max() < 8
-    # Without the check the tint does spread there
-    monkeypatch.setattr(P, "CONSISTENT", (-1.0, -0.5))
-    assert sides_after().max() > 20
+    top, bottom, report = sides()
+    assert np.abs(top - np.array(green)).max() < 15, np.abs(top - np.array(green)).max()
+    assert np.abs(bottom - np.array(blue)).max() < 8
+    # One paint for the whole model would show two colours in the picture: then nothing changes
+    monkeypatch.setattr(P, "PAINTS", 1)
+    top, bottom, report = sides()
+    assert report["mode"] == "detail only"
+    assert np.abs(top - np.array(ORANGE)).max() < 12 and np.abs(bottom - np.array(blue)).max() < 12
+
+
+def glow(picture: Image.Image, centre: tuple[float, float], radius: float, colour, strength: float) -> Image.Image:
+    """Add a soft round glow of light (linear) to a picture: the burner under a balloon."""
+    rgba_ = np.asarray(picture).astype(np.float64)
+    size = rgba_.shape[0]
+    yy, xx = np.mgrid[:size, :size] / size
+    g = np.exp(-((xx - centre[0]) ** 2 + (yy - centre[1]) ** 2) / (2 * radius**2))[..., None]
+    lit = to_linear(rgba_[..., :3]) + strength * g * (np.array(colour) / 255)
+    rgba_[..., :3] = to_srgb(lit)
+    return Image.fromarray(rgba_.astype(np.uint8), "RGBA")
+
+
+def test_glow_and_shade_are_left_out():
+    # The picture shows the model's own colours, with a yellow glow on the front and a broad shadow over
+    # the right side: light, not paint. Nothing should change
+    picture = render_box(VIEW, pattern=False)
+    picture = glow(picture, (0.42, 0.62), 0.12, (255, 190, 60), 0.6)
+    shade = np.asarray(picture).astype(np.float64)
+    size = shade.shape[0]
+    xx = np.arange(size)[None, :, None] / size
+    shade[..., :3] = to_srgb(to_linear(shade[..., :3]) * (1 - 0.5 * np.clip((xx - 0.55) / 0.2, 0, 1)))
+    mesh = make_box()
+    before = np.asarray(mesh.visual.material.baseColorTexture).astype(np.float64)
+    mesh, report = P.project_picture(mesh, Image.fromarray(shade.astype(np.uint8), "RGBA"), device="cpu")
+    assert report["applied"], report["reason"]
+    after = np.asarray(mesh.visual.material.baseColorTexture.convert("RGB")).astype(np.float64)
+    for side in (0, 2, 4):
+        _, tx = texel_points(side=side, inset=0.1)
+        change = np.abs(after[tx[:, 0], tx[:, 1]] - before[tx[:, 0], tx[:, 1]]).max(axis=1)
+        assert np.percentile(change, 95) < 12, (side, np.percentile(change, 95))
+
+
+def test_a_design_is_painted_on_whole_but_a_shadow_is_not():
+    # Two small squares inside the front in the picture: one green (a design), one the front's own
+    # colour, half as bright (a shadow cast on it). Only the design goes on
+    picture = np.asarray(render_box(VIEW, pattern=False)).copy()
+    front = np.all(np.abs(picture[..., :3].astype(int) - np.array(SIDES[4][2])) < 3, axis=-1)
+    rows, cols = np.nonzero(front)
+    r, c, half = int(rows.mean()), int(cols.mean()), 9
+    design = (slice(r - half, r + half), slice(c - 3 * half, c - half))
+    shadow = (slice(r - half, r + half), slice(c + half, c + 3 * half))
+    assert front[design].all() and front[shadow].all()
+    picture[design + (slice(0, 3),)] = (40, 160, 70)
+    picture[shadow + (slice(0, 3),)] = to_srgb(to_linear(np.array(SIDES[4][2], np.float64)) * 0.5)
+    mesh = make_box()
+    before = np.asarray(mesh.visual.material.baseColorTexture).astype(np.float64)
+    debug: dict = {}
+    mesh, report = P.project_picture(mesh, Image.fromarray(picture), device="cpu", debug=debug)
+    assert report["applied"], report["reason"]
+    assert report["decals"]["count"] >= 1 and report["decals"]["only_light"] >= 1, report["decals"]
+    after = np.asarray(mesh.visual.material.baseColorTexture.convert("RGB")).astype(np.float64)
+    # The texels whose points land well inside each square
+    xy, flat, seen = debug["xy"].numpy(), debug["flat"].numpy(), debug["visible"].numpy()
+    for (rs, cs), green in ((design, True), (shadow, False)):
+        hit = seen & (xy[:, 1] >= rs.start + 3) & (xy[:, 1] < rs.stop - 3)
+        hit &= (xy[:, 0] >= cs.start + 3) & (xy[:, 0] < cs.stop - 3)
+        assert hit.sum() > 20
+        texel_rows, texel_cols = np.divmod(flat[hit], TEXTURE)
+        got = after[texel_rows, texel_cols]
+        if green:
+            assert np.median(np.abs(got - np.array([40, 160, 70])).max(axis=1)) < 20
+        else:
+            assert np.median(np.abs(got - before[texel_rows, texel_cols]).max(axis=1)) < 10
 
 
 def test_rasterizer_depth_is_perspective_correct_and_nearest_wins():
@@ -578,33 +678,30 @@ def test_paints_follow_colour_more_than_shade_and_small_parts_get_their_own():
     assert float(m[3].max()) > 0.9  # 1% of the texels, but a paint of its own
 
 
-def test_a_colour_change_spreads_over_the_same_paint_only(monkeypatch):
-    # The model's top half is orange and its bottom half blue. The picture shows the top black (as a car's
-    # windows show what's behind them) and the bottom blue, as the model has it: the black reaches round
-    # the top, but not onto the blue below it
-    blue = (40, 90, 200)
-    view = P.View(azimuth=0.0, elevation=15.0, roll=0.0, perspective=0.25)
-
-    def round_the_side() -> tuple[np.ndarray, np.ndarray]:
-        model = make_cylinder(colour=ORANGE, lower=blue)
-        mesh, report = P.project_picture(model, render_cylinder(view, upper=BLACK, lower=blue), device="cpu")
-        assert report["applied"], report["reason"]
-        texture = np.asarray(mesh.visual.material.baseColorTexture.convert("RGB"))
-        phi = (np.arange(72) + 0.5) * 5.0
-        away = np.abs((phi - report["pose"]["azimuth"] + 180) % 360 - 180)
-        beyond = (away > 70) & (away < 95)  # past where the picture's detail fades out
-        top = np.abs(side_profile(texture, height=0.85)[beyond] - np.array(ORANGE)).max(axis=1)
-        bottom = np.abs(side_profile(texture, height=0.3)[beyond] - np.array(blue)).max(axis=1)
-        return top, bottom
-
-    top, bottom = round_the_side()
-    assert top.max() > 40  # the orange went dark round the top
-    assert bottom.max() < 8, bottom
-    # The paints alone keep it off the blue: without the consistency check as well, still nothing...
-    monkeypatch.setattr(P, "CONSISTENT", (-1.0, -0.5))
-    _, bottom = round_the_side()
-    assert bottom.max() < 8, bottom
-    # ... while one paint for the whole model would carry the dark onto it
-    monkeypatch.setattr(P, "PAINTS", 1)
-    _, bottom = round_the_side()
-    assert bottom.max() > 30, bottom
+def test_connected_regions_match_a_flood_fill():
+    gen = torch.Generator().manual_seed(3)
+    labels = torch.randint(0, 3, (40, 50), generator=gen)
+    labels[torch.rand((40, 50), generator=gen) < 0.1] = -1
+    ids = P._components(labels).numpy()
+    grid = labels.numpy()
+    expected = np.full(grid.shape, -1)
+    count = 0
+    for r in range(grid.shape[0]):
+        for c in range(grid.shape[1]):
+            if grid[r, c] < 0 or expected[r, c] >= 0:
+                continue
+            stack = [(r, c)]
+            expected[r, c] = count
+            while stack:
+                a, b = stack.pop()
+                for da, db in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    y, x = a + da, b + db
+                    if 0 <= y < grid.shape[0] and 0 <= x < grid.shape[1] and expected[y, x] < 0 and grid[y, x] == grid[a, b]:
+                        expected[y, x] = count
+                        stack.append((y, x))
+            count += 1
+    assert ids.max() + 1 == count
+    assert (ids < 0).sum() == (grid < 0).sum()
+    # The same partition: each expected region is one id and each id one region
+    pairs = set(zip(expected[grid >= 0].tolist(), ids[grid >= 0].tolist()))
+    assert len(pairs) == count
