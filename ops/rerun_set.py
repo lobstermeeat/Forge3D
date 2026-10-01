@@ -4,6 +4,8 @@ each run starts from the picture its original used, as an image run, with the or
 (or the next seed, for a second try). Uses the deployed orainge-ai app.
 
     modal run ops/rerun_set.py --source phase2 --names phase2b,phase2c --out ops-out/private
+
+``--only 06,14`` limits it to those prompt numbers (a smoke test before the whole set).
 """
 
 from __future__ import annotations
@@ -43,7 +45,7 @@ def _copy(volume: modal.Volume, run: str, target: pathlib.Path) -> list[str]:
 
 
 @app.local_entrypoint()
-def main(source: str, names: str, out: str = "ops-out/private") -> None:
+def main(source: str, names: str, out: str = "ops-out/private", only: str = "") -> None:
     volume = modal.Volume.from_name(OUTPUTS)
     make_model = modal.Function.from_name("orainge-ai", "make_model")
     runs = sorted(
@@ -51,6 +53,9 @@ def main(source: str, names: str, out: str = "ops-out/private") -> None:
         for entry in volume.listdir("/")
         if entry.path.strip("/").startswith(f"{source}-")
     )
+    if only:
+        wanted = {number.strip().zfill(2) for number in only.split(",") if number.strip()}
+        runs = [run for run in runs if run.split("-")[1] in wanted]
     print(f"{len(runs)} runs in {source}")
     jobs = []
     for offset, name in enumerate(names.split(",")):
