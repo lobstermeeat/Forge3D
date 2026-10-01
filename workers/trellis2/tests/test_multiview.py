@@ -512,3 +512,49 @@ def test_views_carry_through_the_out_of_memory_fallback(monkeypatch, capsys):
     assert runtime.pipeline_used == "512" and runtime.views_used == 2
     assert all(getattr(pipeline, name) is stock[name] for name in multiview.SAMPLERS)
     assert "get_cond" not in vars(pipeline) and pipeline.low_vram is False
+
+
+def test_a_job_with_views_conditions_every_flow_and_reports_them():
+    """handle_job end to end: decoded views, cut out like the picture (one has nothing in it), every flow."""
+    import base64
+    import io
+
+    from PIL import Image
+
+    from forge3d_worker.service import handle_job
+
+    class PicturePipeline(RuntimePipeline):
+        """A picture's number is its first pixel's red channel; a fully transparent one has no object."""
+
+        def preprocess_image(self, image):
+            if image.mode == "RGBA" and image.getextrema()[3][1] == 0:
+                raise ValueError("zero-size array to reduction operation minimum which has no identity")
+            value = image.convert("RGB").getpixel((0, 0))[0] / 255
+            self.prepared.append(value)
+            return value
+
+    def png(red, alpha=255):
+        buffer = io.BytesIO()
+        Image.new("RGBA", (16, 16), (red, 10, 10, alpha)).save(buffer, "PNG")
+        return base64.b64encode(buffer.getvalue()).decode()
+
+    pipeline = PicturePipeline()
+    runtime = runtime_around(pipeline, MultiView(mode="multidiffusion", picture_weight=2.0))
+    weights = []
+    stock_run = pipeline.run
+
+    def run(image, **options):
+        weights.append(pipeline.tex_slat_sampler.mv_weights)
+        return stock_run(image, **options)
+
+    pipeline.run = run
+    runtime.export = lambda mesh, preset: (b"glb" * 10, 1234)
+    views = [{"image_base64": png(51), "azimuth": 90}, {"image_base64": png(0, alpha=0), "azimuth": 180},
+             {"image_base64": png(204), "azimuth": 270, "weight": 0.5}]  # fmt: skip
+    job = {"id": "j", "input": {"image_base64": png(102), "mode": "final", "seed": 3, "views": views}}
+    out = handle_job(job, runtime, types.SimpleNamespace(put=lambda key, data, kind: {"key": key}), lambda raw, size: raw)
+
+    assert "error" not in out and out["views_used"] == 2 and out["pipeline"] == "1024_cascade"
+    assert pipeline.prepared == pytest.approx([0.4, 0.2, 0.8])  # the picture, then the views with objects
+    assert weights == [(2.0, 1.0, 0.5)]
+    assert [rows for _, *rows in pipeline.sampler_calls] == [[3, 1]] * 4  # structure, both shape stages, texture
