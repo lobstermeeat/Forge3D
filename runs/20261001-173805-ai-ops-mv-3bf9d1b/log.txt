@@ -1,0 +1,87 @@
+== All twenty with the worker's chosen defaults (30 steps) and the Phase 2 prompt as the caption;
+== plus hidden-side hints (BACK_PROMPTS) on the three they helped
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-eaU04kr23qPTMb2nCjtWvU
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/exp_mv.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/scripts/download_weights
+│   .py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/multiview_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/multiview/mvadapter
+├── ✓ Created Function download.
+└── ✓ Created Function make_views.
+multiview: already downloaded
+[mv] 20 runs x 2 variants: phase2-01-cute-low-poly-fox-sitting-down, phase2-02-red-high-top-sneaker, phase2-03-gaming-chair-black-and-purple, phase2-04-retro-arcade-machine, phase2-05-sci-fi-laser-pistol-white, phase2-06-wooden-shield-with-a-lion, phase2-07-chibi-knight-with-a-big-helmet, phase2-08-vintage-film-camera, phase2-09-donut-with-pink-frosting, phase2-10-astronaut-helmet, phase2-11-stack-of-old-books-with-a-candle, phase2-12-skateboard-with-graffiti-art, phase2-13-cute-cartoon-car-bright-blue, phase2-14-bubble-tea-with-tapioca-pearls, phase2-15-health-potion-in-a-round-glass, phase2-16-green-dragon-sitting-cartoon, phase2-17-bowl-of-ramen-with-an-egg, phase2-18-electric-guitar, phase2-19-small-cabin-in-a-snowy-forest, phase2-20-hot-air-balloon; [{'name': 'caption30', 'prompt': 'caption'}, {'name': 'back30', 'prompt': 'back', 'runs': '04+06+18'}]
+You are offline and the cache for model files in Transformers v4.22.0 has been updated while your local cache seems to be the one of a previous version. It is very likely that all your calls to any `from_pretrained()` method will fail. Remove the offline mode and enable internet connection to have your cache be updated automatically, then you can go back to offline mode.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+
+[1ALoading pipeline components...:   0%|          | 0/7 [00:00<?, ?it/s]
+[1ALoading pipeline components...:  14%|█▍        | 1/7 [00:01<00:06,  1.04s/it]
+[1ALoading pipeline components...:  29%|██▊       | 2/7 [00:04<00:10,  2.18s/it]
+[1ALoading pipeline components...:  71%|███████▏  | 5/7 [00:04<00:01,  1.55it/s]
+[1ALoading pipeline components...: 100%|██████████| 7/7 [00:04<00:00,  2.17it/s]
+[1ALoading pipeline components...: 100%|██████████| 7/7 [00:04<00:00,  1.55it/s]
+[mv] NVIDIA A10G: loaded in 20.0 s, 9.14 GiB allocated
+[mv] caption30/phase2-01-cute-low-poly-fox-sitting-down: 46.956 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-02-red-high-top-sneaker: 45.941 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-03-gaming-chair-black-and-purple: 45.932 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-04-retro-arcade-machine: 45.994 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-05-sci-fi-laser-pistol-white: 45.796 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-06-wooden-shield-with-a-lion: 45.945 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-07-chibi-knight-with-a-big-helmet: 46.182 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-08-vintage-film-camera: 46.128 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-09-donut-with-pink-frosting: 46.348 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-10-astronaut-helmet: 46.259 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-11-stack-of-old-books-with-a-candle: 46.371 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-12-skateboard-with-graffiti-art: 45.824 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-13-cute-cartoon-car-bright-blue: 46.114 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-14-bubble-tea-with-tapioca-pearls: 46.161 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-15-health-potion-in-a-round-glass: 46.153 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-16-green-dragon-sitting-cartoon: 45.977 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-17-bowl-of-ramen-with-an-egg: 46.183 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-18-electric-guitar: 45.767 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-19-small-cabin-in-a-snowy-forest: 46.33 s, peak 19.07 GiB reserved
+[mv] caption30/phase2-20-hot-air-balloon: 46.149 s, peak 19.07 GiB reserved
+[mv] back30/phase2-04-retro-arcade-machine: 46.069 s, peak 19.07 GiB reserved
+[mv] back30/phase2-06-wooden-shield-with-a-lion: 45.969 s, peak 19.07 GiB reserved
+[mv] back30/phase2-18-electric-guitar: 45.766 s, peak 19.07 GiB reserved
+caption30/phase2-01-cute-low-poly-fox-sitting-down: 46.956
+caption30/phase2-02-red-high-top-sneaker: 45.941
+caption30/phase2-03-gaming-chair-black-and-purple: 45.932
+caption30/phase2-04-retro-arcade-machine: 45.994
+caption30/phase2-05-sci-fi-laser-pistol-white: 45.796
+caption30/phase2-06-wooden-shield-with-a-lion: 45.945
+caption30/phase2-07-chibi-knight-with-a-big-helmet: 46.182
+caption30/phase2-08-vintage-film-camera: 46.128
+caption30/phase2-09-donut-with-pink-frosting: 46.348
+caption30/phase2-10-astronaut-helmet: 46.259
+caption30/phase2-11-stack-of-old-books-with-a-candle: 46.371
+caption30/phase2-12-skateboard-with-graffiti-art: 45.824
+caption30/phase2-13-cute-cartoon-car-bright-blue: 46.114
+caption30/phase2-14-bubble-tea-with-tapioca-pearls: 46.161
+caption30/phase2-15-health-potion-in-a-round-glass: 46.153
+caption30/phase2-16-green-dragon-sitting-cartoon: 45.977
+caption30/phase2-17-bowl-of-ramen-with-an-egg: 46.183
+caption30/phase2-18-electric-guitar: 45.767
+caption30/phase2-19-small-cabin-in-a-snowy-forest: 46.33
+caption30/phase2-20-hot-air-balloon: 46.149
+back30/phase2-04-retro-arcade-machine: 46.069
+back30/phase2-06-wooden-shield-with-a-lion: 45.969
+back30/phase2-18-electric-guitar: 45.766
+[mv] NVIDIA A10G: load 20.0 s, total 1123.6 s
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-eaU04kr23qPTMb2nCjtWvU
+68M	ops-out/private/views
+exit status: 0

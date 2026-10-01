@@ -1,0 +1,1916 @@
+{
+  "runs": {
+    "caption30/phase2-01-cute-low-poly-fox-sitting-down": {
+      "folder": "phase6/mv/caption30/phase2-01-cute-low-poly-fox-sitting-down",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.956,
+      "timings": {
+        "cutout_s": 0.995,
+        "views_s": 43.329,
+        "view_cutouts_s": 1.975,
+        "upload_s": 0.657
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            134,
+            40,
+            634,
+            726
+          ],
+          "coverage": 0.3425
+        },
+        "45": {
+          "bbox": [
+            144,
+            41,
+            651,
+            727
+          ],
+          "coverage": 0.3469
+        },
+        "90": {
+          "bbox": [
+            112,
+            41,
+            647,
+            727
+          ],
+          "coverage": 0.3688
+        },
+        "180": {
+          "bbox": [
+            134,
+            42,
+            635,
+            726
+          ],
+          "coverage": 0.3423
+        },
+        "270": {
+          "bbox": [
+            123,
+            44,
+            656,
+            727
+          ],
+          "coverage": 0.3624
+        },
+        "315": {
+          "bbox": [
+            90,
+            41,
+            625,
+            726
+          ],
+          "coverage": 0.3775
+        }
+      }
+    },
+    "caption30/phase2-02-red-high-top-sneaker": {
+      "folder": "phase6/mv/caption30/phase2-02-red-high-top-sneaker",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.941,
+      "timings": {
+        "cutout_s": 0.349,
+        "views_s": 43.061,
+        "view_cutouts_s": 1.983,
+        "upload_s": 0.549
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            44,
+            147,
+            725,
+            624
+          ],
+          "coverage": 0.3147
+        },
+        "45": {
+          "bbox": [
+            110,
+            145,
+            689,
+            625
+          ],
+          "coverage": 0.282
+        },
+        "90": {
+          "bbox": [
+            193,
+            145,
+            568,
+            625
+          ],
+          "coverage": 0.2092
+        },
+        "180": {
+          "bbox": [
+            42,
+            146,
+            724,
+            625
+          ],
+          "coverage": 0.3132
+        },
+        "270": {
+          "bbox": [
+            199,
+            146,
+            576,
+            625
+          ],
+          "coverage": 0.2095
+        },
+        "315": {
+          "bbox": [
+            73,
+            146,
+            685,
+            624
+          ],
+          "coverage": 0.3016
+        }
+      }
+    },
+    "caption30/phase2-03-gaming-chair-black-and-purple": {
+      "folder": "phase6/mv/caption30/phase2-03-gaming-chair-black-and-purple",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.932,
+      "timings": {
+        "cutout_s": 0.345,
+        "views_s": 43.063,
+        "view_cutouts_s": 1.986,
+        "upload_s": 0.537
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            141,
+            42,
+            616,
+            728
+          ],
+          "coverage": 0.2334
+        },
+        "45": {
+          "bbox": [
+            121,
+            40,
+            611,
+            728
+          ],
+          "coverage": 0.2575
+        },
+        "90": {
+          "bbox": [
+            94,
+            39,
+            640,
+            730
+          ],
+          "coverage": 0.2646
+        },
+        "180": {
+          "bbox": [
+            152,
+            41,
+            627,
+            728
+          ],
+          "coverage": 0.2287
+        },
+        "270": {
+          "bbox": [
+            129,
+            40,
+            674,
+            730
+          ],
+          "coverage": 0.2627
+        },
+        "315": {
+          "bbox": [
+            166,
+            40,
+            644,
+            728
+          ],
+          "coverage": 0.1922
+        }
+      }
+    },
+    "caption30/phase2-04-retro-arcade-machine": {
+      "folder": "phase6/mv/caption30/phase2-04-retro-arcade-machine",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.994,
+      "timings": {
+        "cutout_s": 0.35,
+        "views_s": 43.062,
+        "view_cutouts_s": 1.974,
+        "upload_s": 0.608
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            240,
+            34,
+            528,
+            735
+          ],
+          "coverage": 0.3368
+        },
+        "45": {
+          "bbox": [
+            154,
+            35,
+            585,
+            734
+          ],
+          "coverage": 0.4534
+        },
+        "90": {
+          "bbox": [
+            210,
+            35,
+            502,
+            735
+          ],
+          "coverage": 0.2778
+        },
+        "180": {
+          "bbox": [
+            238,
+            34,
+            529,
+            734
+          ],
+          "coverage": 0.3376
+        },
+        "270": {
+          "bbox": [
+            264,
+            35,
+            558,
+            734
+          ],
+          "coverage": 0.2781
+        },
+        "315": {
+          "bbox": [
+            181,
+            34,
+            614,
+            734
+          ],
+          "coverage": 0.4565
+        }
+      }
+    },
+    "caption30/phase2-05-sci-fi-laser-pistol-white": {
+      "folder": "phase6/mv/caption30/phase2-05-sci-fi-laser-pistol-white",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.796,
+      "timings": {
+        "cutout_s": 0.347,
+        "views_s": 43.067,
+        "view_cutouts_s": 1.98,
+        "upload_s": 0.402
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            41,
+            92,
+            726,
+            675
+          ],
+          "coverage": 0.2382
+        },
+        "45": {
+          "bbox": [
+            135,
+            92,
+            658,
+            675
+          ],
+          "coverage": 0.2195
+        },
+        "90": {
+          "bbox": [
+            329,
+            93,
+            440,
+            676
+          ],
+          "coverage": 0.0924
+        },
+        "180": {
+          "bbox": [
+            42,
+            93,
+            727,
+            676
+          ],
+          "coverage": 0.2389
+        },
+        "270": {
+          "bbox": [
+            329,
+            92,
+            439,
+            675
+          ],
+          "coverage": 0.0923
+        },
+        "315": {
+          "bbox": [
+            140,
+            91,
+            658,
+            676
+          ],
+          "coverage": 0.2245
+        }
+      }
+    },
+    "caption30/phase2-06-wooden-shield-with-a-lion": {
+      "folder": "phase6/mv/caption30/phase2-06-wooden-shield-with-a-lion",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.945,
+      "timings": {
+        "cutout_s": 0.36,
+        "views_s": 43.062,
+        "view_cutouts_s": 1.986,
+        "upload_s": 0.537
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            154,
+            40,
+            614,
+            729
+          ],
+          "coverage": 0.4255
+        },
+        "45": {
+          "bbox": [
+            204,
+            39,
+            607,
+            731
+          ],
+          "coverage": 0.3936
+        },
+        "90": {
+          "bbox": [
+            293,
+            40,
+            478,
+            730
+          ],
+          "coverage": 0.1672
+        },
+        "180": {
+          "bbox": [
+            155,
+            40,
+            614,
+            730
+          ],
+          "coverage": 0.4245
+        },
+        "270": {
+          "bbox": [
+            289,
+            39,
+            475,
+            730
+          ],
+          "coverage": 0.1674
+        },
+        "315": {
+          "bbox": [
+            162,
+            39,
+            563,
+            730
+          ],
+          "coverage": 0.3939
+        }
+      }
+    },
+    "caption30/phase2-07-chibi-knight-with-a-big-helmet": {
+      "folder": "phase6/mv/caption30/phase2-07-chibi-knight-with-a-big-helmet",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.182,
+      "timings": {
+        "cutout_s": 0.365,
+        "views_s": 43.058,
+        "view_cutouts_s": 1.979,
+        "upload_s": 0.78
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            25,
+            35,
+            735,
+            732
+          ],
+          "coverage": 0.4525
+        },
+        "45": {
+          "bbox": [
+            58,
+            35,
+            656,
+            732
+          ],
+          "coverage": 0.4421
+        },
+        "90": {
+          "bbox": [
+            112,
+            35,
+            649,
+            732
+          ],
+          "coverage": 0.4411
+        },
+        "180": {
+          "bbox": [
+            32,
+            36,
+            742,
+            731
+          ],
+          "coverage": 0.4505
+        },
+        "270": {
+          "bbox": [
+            119,
+            35,
+            656,
+            732
+          ],
+          "coverage": 0.4455
+        },
+        "315": {
+          "bbox": [
+            137,
+            34,
+            754,
+            732
+          ],
+          "coverage": 0.4576
+        }
+      }
+    },
+    "caption30/phase2-08-vintage-film-camera": {
+      "folder": "phase6/mv/caption30/phase2-08-vintage-film-camera",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.128,
+      "timings": {
+        "cutout_s": 0.346,
+        "views_s": 43.055,
+        "view_cutouts_s": 1.987,
+        "upload_s": 0.739
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            41,
+            179,
+            726,
+            591
+          ],
+          "coverage": 0.3857
+        },
+        "45": {
+          "bbox": [
+            86,
+            191,
+            726,
+            593
+          ],
+          "coverage": 0.3777
+        },
+        "90": {
+          "bbox": [
+            62,
+            191,
+            700,
+            592
+          ],
+          "coverage": 0.3493
+        },
+        "180": {
+          "bbox": [
+            41,
+            178,
+            727,
+            591
+          ],
+          "coverage": 0.3904
+        },
+        "270": {
+          "bbox": [
+            66,
+            191,
+            706,
+            595
+          ],
+          "coverage": 0.3508
+        },
+        "315": {
+          "bbox": [
+            43,
+            189,
+            691,
+            592
+          ],
+          "coverage": 0.3787
+        }
+      }
+    },
+    "caption30/phase2-09-donut-with-pink-frosting": {
+      "folder": "phase6/mv/caption30/phase2-09-donut-with-pink-frosting",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.348,
+      "timings": {
+        "cutout_s": 0.348,
+        "views_s": 43.059,
+        "view_cutouts_s": 1.992,
+        "upload_s": 0.949
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            44,
+            158,
+            726,
+            598
+          ],
+          "coverage": 0.4279
+        },
+        "45": {
+          "bbox": [
+            28,
+            165,
+            734,
+            600
+          ],
+          "coverage": 0.4454
+        },
+        "90": {
+          "bbox": [
+            35,
+            165,
+            731,
+            601
+          ],
+          "coverage": 0.4368
+        },
+        "180": {
+          "bbox": [
+            42,
+            158,
+            730,
+            601
+          ],
+          "coverage": 0.4421
+        },
+        "270": {
+          "bbox": [
+            36,
+            165,
+            733,
+            602
+          ],
+          "coverage": 0.4375
+        },
+        "315": {
+          "bbox": [
+            43,
+            165,
+            768,
+            602
+          ],
+          "coverage": 0.4325
+        }
+      }
+    },
+    "caption30/phase2-10-astronaut-helmet": {
+      "folder": "phase6/mv/caption30/phase2-10-astronaut-helmet",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.259,
+      "timings": {
+        "cutout_s": 0.352,
+        "views_s": 43.06,
+        "view_cutouts_s": 1.993,
+        "upload_s": 0.853
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            57,
+            43,
+            711,
+            726
+          ],
+          "coverage": 0.5525
+        },
+        "45": {
+          "bbox": [
+            45,
+            43,
+            768,
+            726
+          ],
+          "coverage": 0.5902
+        },
+        "90": {
+          "bbox": [
+            31,
+            44,
+            737,
+            725
+          ],
+          "coverage": 0.5704
+        },
+        "180": {
+          "bbox": [
+            57,
+            43,
+            711,
+            726
+          ],
+          "coverage": 0.5539
+        },
+        "270": {
+          "bbox": [
+            30,
+            44,
+            737,
+            725
+          ],
+          "coverage": 0.5629
+        },
+        "315": {
+          "bbox": [
+            0,
+            43,
+            722,
+            726
+          ],
+          "coverage": 0.5876
+        }
+      }
+    },
+    "caption30/phase2-11-stack-of-old-books-with-a-candle": {
+      "folder": "phase6/mv/caption30/phase2-11-stack-of-old-books-with-a-candle",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.371,
+      "timings": {
+        "cutout_s": 0.354,
+        "views_s": 43.055,
+        "view_cutouts_s": 1.99,
+        "upload_s": 0.972
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            134,
+            42,
+            635,
+            727
+          ],
+          "coverage": 0.3794
+        },
+        "45": {
+          "bbox": [
+            226,
+            41,
+            768,
+            728
+          ],
+          "coverage": 0.2265
+        },
+        "90": {
+          "bbox": [
+            36,
+            41,
+            732,
+            728
+          ],
+          "coverage": 0.5045
+        },
+        "180": {
+          "bbox": [
+            133,
+            41,
+            635,
+            727
+          ],
+          "coverage": 0.3804
+        },
+        "270": {
+          "bbox": [
+            37,
+            41,
+            732,
+            728
+          ],
+          "coverage": 0.5035
+        },
+        "315": {
+          "bbox": [
+            0,
+            42,
+            768,
+            727
+          ],
+          "coverage": 0.5887
+        }
+      }
+    },
+    "caption30/phase2-12-skateboard-with-graffiti-art": {
+      "folder": "phase6/mv/caption30/phase2-12-skateboard-with-graffiti-art",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.824,
+      "timings": {
+        "cutout_s": 0.343,
+        "views_s": 43.062,
+        "view_cutouts_s": 1.989,
+        "upload_s": 0.43
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            41,
+            270,
+            727,
+            500
+          ],
+          "coverage": 0.1853
+        },
+        "45": {
+          "bbox": [
+            75,
+            270,
+            692,
+            499
+          ],
+          "coverage": 0.1969
+        },
+        "90": {
+          "bbox": [
+            229,
+            269,
+            539,
+            500
+          ],
+          "coverage": 0.0825
+        },
+        "180": {
+          "bbox": [
+            40,
+            269,
+            728,
+            500
+          ],
+          "coverage": 0.1853
+        },
+        "270": {
+          "bbox": [
+            229,
+            269,
+            539,
+            498
+          ],
+          "coverage": 0.0822
+        },
+        "315": {
+          "bbox": [
+            77,
+            269,
+            692,
+            499
+          ],
+          "coverage": 0.1957
+        }
+      }
+    },
+    "caption30/phase2-13-cute-cartoon-car-bright-blue": {
+      "folder": "phase6/mv/caption30/phase2-13-cute-cartoon-car-bright-blue",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.114,
+      "timings": {
+        "cutout_s": 0.356,
+        "views_s": 43.064,
+        "view_cutouts_s": 1.975,
+        "upload_s": 0.719
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            104,
+            143,
+            664,
+            592
+          ],
+          "coverage": 0.3128
+        },
+        "45": {
+          "bbox": [
+            0,
+            143,
+            768,
+            592
+          ],
+          "coverage": 0.4594
+        },
+        "90": {
+          "bbox": [
+            17,
+            144,
+            768,
+            592
+          ],
+          "coverage": 0.3823
+        },
+        "180": {
+          "bbox": [
+            103,
+            144,
+            666,
+            591
+          ],
+          "coverage": 0.3191
+        },
+        "270": {
+          "bbox": [
+            0,
+            144,
+            751,
+            593
+          ],
+          "coverage": 0.3812
+        },
+        "315": {
+          "bbox": [
+            0,
+            143,
+            768,
+            592
+          ],
+          "coverage": 0.4596
+        }
+      }
+    },
+    "caption30/phase2-14-bubble-tea-with-tapioca-pearls": {
+      "folder": "phase6/mv/caption30/phase2-14-bubble-tea-with-tapioca-pearls",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.161,
+      "timings": {
+        "cutout_s": 0.351,
+        "views_s": 43.068,
+        "view_cutouts_s": 1.977,
+        "upload_s": 0.765
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            184,
+            35,
+            584,
+            733
+          ],
+          "coverage": 0.4086
+        },
+        "45": {
+          "bbox": [
+            185,
+            34,
+            583,
+            733
+          ],
+          "coverage": 0.404
+        },
+        "90": {
+          "bbox": [
+            182,
+            35,
+            586,
+            733
+          ],
+          "coverage": 0.4115
+        },
+        "180": {
+          "bbox": [
+            184,
+            35,
+            584,
+            734
+          ],
+          "coverage": 0.4078
+        },
+        "270": {
+          "bbox": [
+            183,
+            35,
+            586,
+            733
+          ],
+          "coverage": 0.4116
+        },
+        "315": {
+          "bbox": [
+            184,
+            35,
+            583,
+            733
+          ],
+          "coverage": 0.4065
+        }
+      }
+    },
+    "caption30/phase2-15-health-potion-in-a-round-glass": {
+      "folder": "phase6/mv/caption30/phase2-15-health-potion-in-a-round-glass",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.153,
+      "timings": {
+        "cutout_s": 0.346,
+        "views_s": 43.067,
+        "view_cutouts_s": 1.981,
+        "upload_s": 0.759
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            147,
+            35,
+            622,
+            730
+          ],
+          "coverage": 0.393
+        },
+        "45": {
+          "bbox": [
+            139,
+            36,
+            630,
+            731
+          ],
+          "coverage": 0.4065
+        },
+        "90": {
+          "bbox": [
+            136,
+            36,
+            630,
+            730
+          ],
+          "coverage": 0.4073
+        },
+        "180": {
+          "bbox": [
+            146,
+            35,
+            622,
+            731
+          ],
+          "coverage": 0.3933
+        },
+        "270": {
+          "bbox": [
+            138,
+            36,
+            630,
+            730
+          ],
+          "coverage": 0.4066
+        },
+        "315": {
+          "bbox": [
+            137,
+            35,
+            632,
+            730
+          ],
+          "coverage": 0.4072
+        }
+      }
+    },
+    "caption30/phase2-16-green-dragon-sitting-cartoon": {
+      "folder": "phase6/mv/caption30/phase2-16-green-dragon-sitting-cartoon",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.977,
+      "timings": {
+        "cutout_s": 0.351,
+        "views_s": 43.073,
+        "view_cutouts_s": 1.977,
+        "upload_s": 0.576
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            75,
+            41,
+            664,
+            727
+          ],
+          "coverage": 0.3059
+        },
+        "45": {
+          "bbox": [
+            109,
+            40,
+            684,
+            713
+          ],
+          "coverage": 0.3094
+        },
+        "90": {
+          "bbox": [
+            146,
+            39,
+            622,
+            713
+          ],
+          "coverage": 0.2752
+        },
+        "180": {
+          "bbox": [
+            104,
+            40,
+            694,
+            727
+          ],
+          "coverage": 0.3069
+        },
+        "270": {
+          "bbox": [
+            147,
+            39,
+            620,
+            711
+          ],
+          "coverage": 0.2723
+        },
+        "315": {
+          "bbox": [
+            97,
+            40,
+            615,
+            711
+          ],
+          "coverage": 0.3148
+        }
+      }
+    },
+    "caption30/phase2-17-bowl-of-ramen-with-an-egg": {
+      "folder": "phase6/mv/caption30/phase2-17-bowl-of-ramen-with-an-egg",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.183,
+      "timings": {
+        "cutout_s": 0.356,
+        "views_s": 43.07,
+        "view_cutouts_s": 1.988,
+        "upload_s": 0.769
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            52,
+            41,
+            714,
+            713
+          ],
+          "coverage": 0.3836
+        },
+        "45": {
+          "bbox": [
+            14,
+            42,
+            762,
+            729
+          ],
+          "coverage": 0.4291
+        },
+        "90": {
+          "bbox": [
+            27,
+            43,
+            734,
+            729
+          ],
+          "coverage": 0.3815
+        },
+        "180": {
+          "bbox": [
+            52,
+            42,
+            714,
+            720
+          ],
+          "coverage": 0.3851
+        },
+        "270": {
+          "bbox": [
+            34,
+            41,
+            741,
+            730
+          ],
+          "coverage": 0.386
+        },
+        "315": {
+          "bbox": [
+            0,
+            42,
+            768,
+            727
+          ],
+          "coverage": 0.4312
+        }
+      }
+    },
+    "caption30/phase2-18-electric-guitar": {
+      "folder": "phase6/mv/caption30/phase2-18-electric-guitar",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.767,
+      "timings": {
+        "cutout_s": 0.359,
+        "views_s": 43.062,
+        "view_cutouts_s": 1.98,
+        "upload_s": 0.365
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            40,
+            85,
+            727,
+            683
+          ],
+          "coverage": 0.1766
+        },
+        "45": {
+          "bbox": [
+            52,
+            83,
+            707,
+            684
+          ],
+          "coverage": 0.1751
+        },
+        "90": {
+          "bbox": [
+            116,
+            80,
+            492,
+            683
+          ],
+          "coverage": 0.1174
+        },
+        "180": {
+          "bbox": [
+            40,
+            86,
+            728,
+            684
+          ],
+          "coverage": 0.1763
+        },
+        "270": {
+          "bbox": [
+            275,
+            81,
+            654,
+            684
+          ],
+          "coverage": 0.1167
+        },
+        "315": {
+          "bbox": [
+            273,
+            84,
+            548,
+            684
+          ],
+          "coverage": 0.1163
+        }
+      }
+    },
+    "caption30/phase2-19-small-cabin-in-a-snowy-forest": {
+      "folder": "phase6/mv/caption30/phase2-19-small-cabin-in-a-snowy-forest",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.33,
+      "timings": {
+        "cutout_s": 0.347,
+        "views_s": 43.062,
+        "view_cutouts_s": 1.99,
+        "upload_s": 0.93
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            49,
+            121,
+            730,
+            602
+          ],
+          "coverage": 0.3436
+        },
+        "45": {
+          "bbox": [
+            0,
+            121,
+            768,
+            627
+          ],
+          "coverage": 0.5711
+        },
+        "90": {
+          "bbox": [
+            35,
+            122,
+            734,
+            607
+          ],
+          "coverage": 0.4841
+        },
+        "180": {
+          "bbox": [
+            39,
+            121,
+            719,
+            602
+          ],
+          "coverage": 0.344
+        },
+        "270": {
+          "bbox": [
+            35,
+            122,
+            733,
+            618
+          ],
+          "coverage": 0.48
+        },
+        "315": {
+          "bbox": [
+            0,
+            121,
+            768,
+            602
+          ],
+          "coverage": 0.54
+        }
+      }
+    },
+    "caption30/phase2-20-hot-air-balloon": {
+      "folder": "phase6/mv/caption30/phase2-20-hot-air-balloon",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.149,
+      "timings": {
+        "cutout_s": 0.354,
+        "views_s": 43.067,
+        "view_cutouts_s": 1.993,
+        "upload_s": 0.735
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            126,
+            42,
+            639,
+            726
+          ],
+          "coverage": 0.3707
+        },
+        "45": {
+          "bbox": [
+            129,
+            42,
+            645,
+            726
+          ],
+          "coverage": 0.3768
+        },
+        "90": {
+          "bbox": [
+            130,
+            43,
+            638,
+            726
+          ],
+          "coverage": 0.3667
+        },
+        "180": {
+          "bbox": [
+            126,
+            42,
+            642,
+            726
+          ],
+          "coverage": 0.3734
+        },
+        "270": {
+          "bbox": [
+            130,
+            42,
+            638,
+            726
+          ],
+          "coverage": 0.3668
+        },
+        "315": {
+          "bbox": [
+            126,
+            43,
+            649,
+            726
+          ],
+          "coverage": 0.3805
+        }
+      }
+    },
+    "back30/phase2-04-retro-arcade-machine": {
+      "folder": "phase6/mv/back30/phase2-04-retro-arcade-machine",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.069,
+      "timings": {
+        "cutout_s": 0.35,
+        "views_s": 43.093,
+        "view_cutouts_s": 1.991,
+        "upload_s": 0.635
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            241,
+            35,
+            527,
+            735
+          ],
+          "coverage": 0.3354
+        },
+        "45": {
+          "bbox": [
+            155,
+            35,
+            584,
+            734
+          ],
+          "coverage": 0.4523
+        },
+        "90": {
+          "bbox": [
+            210,
+            35,
+            502,
+            734
+          ],
+          "coverage": 0.278
+        },
+        "180": {
+          "bbox": [
+            241,
+            34,
+            527,
+            734
+          ],
+          "coverage": 0.3329
+        },
+        "270": {
+          "bbox": [
+            264,
+            35,
+            558,
+            734
+          ],
+          "coverage": 0.2807
+        },
+        "315": {
+          "bbox": [
+            181,
+            34,
+            613,
+            735
+          ],
+          "coverage": 0.4565
+        }
+      }
+    },
+    "back30/phase2-06-wooden-shield-with-a-lion": {
+      "folder": "phase6/mv/back30/phase2-06-wooden-shield-with-a-lion",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.969,
+      "timings": {
+        "cutout_s": 0.358,
+        "views_s": 43.072,
+        "view_cutouts_s": 1.997,
+        "upload_s": 0.542
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            154,
+            40,
+            614,
+            729
+          ],
+          "coverage": 0.4254
+        },
+        "45": {
+          "bbox": [
+            205,
+            40,
+            607,
+            730
+          ],
+          "coverage": 0.3934
+        },
+        "90": {
+          "bbox": [
+            299,
+            39,
+            475,
+            730
+          ],
+          "coverage": 0.1415
+        },
+        "180": {
+          "bbox": [
+            155,
+            40,
+            614,
+            730
+          ],
+          "coverage": 0.4244
+        },
+        "270": {
+          "bbox": [
+            292,
+            39,
+            470,
+            729
+          ],
+          "coverage": 0.1421
+        },
+        "315": {
+          "bbox": [
+            162,
+            39,
+            563,
+            730
+          ],
+          "coverage": 0.3937
+        }
+      }
+    },
+    "back30/phase2-18-electric-guitar": {
+      "folder": "phase6/mv/back30/phase2-18-electric-guitar",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.766,
+      "timings": {
+        "cutout_s": 0.359,
+        "views_s": 43.072,
+        "view_cutouts_s": 1.988,
+        "upload_s": 0.347
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            43,
+            84,
+            727,
+            682
+          ],
+          "coverage": 0.1696
+        },
+        "45": {
+          "bbox": [
+            52,
+            83,
+            721,
+            683
+          ],
+          "coverage": 0.1737
+        },
+        "90": {
+          "bbox": [
+            180,
+            81,
+            493,
+            682
+          ],
+          "coverage": 0.0865
+        },
+        "180": {
+          "bbox": [
+            40,
+            85,
+            725,
+            682
+          ],
+          "coverage": 0.1686
+        },
+        "270": {
+          "bbox": [
+            275,
+            81,
+            589,
+            683
+          ],
+          "coverage": 0.0869
+        },
+        "315": {
+          "bbox": [
+            275,
+            83,
+            548,
+            684
+          ],
+          "coverage": 0.117
+        }
+      }
+    }
+  },
+  "load_s": 20.0,
+  "total_s": 1123.6,
+  "gpu": "NVIDIA A10G"
+}
