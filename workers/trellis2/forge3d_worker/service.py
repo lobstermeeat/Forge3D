@@ -73,7 +73,7 @@ def handle_job(
             result["refresh_worker"] = True
         return result
 
-    return {
+    result = {
         "request_id": spec.request_id,
         "mode": spec.mode,
         "seed": spec.seed,
@@ -84,3 +84,10 @@ def handle_job(
         "timings": timings,
         "credits": list(CREDITS),
     }
+    # Optional: whether the picture was painted onto the model, and why not (Trellis2Runtime)
+    projection = getattr(runtime, "last_projection", None)
+    if isinstance(projection, dict) and projection:
+        result["projection"] = projection
+        if projection.get("gpu_fault"):
+            result["refresh_worker"] = True  # the model went out unprojected; CUDA may not be usable
+    return result

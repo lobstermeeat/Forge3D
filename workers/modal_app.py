@@ -516,13 +516,16 @@ def run_pipeline(
             state["seed"] = result["seed"]
             name = f"{mode}-{result['seed']}.glb"
             (folder / name).write_bytes(fetch(result["glb"]))
-            return {
+            fields = {
                 "files": [name],
                 "triangles": result["triangles"],
                 "bytes": result.get("bytes"),
                 "timings": result["timings"],
                 "gpu_seconds": round(sum(result["timings"].values()), 1),
             }
+            if result.get("projection"):  # finals: whether the picture was painted on, and why not
+                fields["projection"] = result["projection"]
+            return fields
 
         return work
 
