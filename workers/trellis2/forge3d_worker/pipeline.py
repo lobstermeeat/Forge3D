@@ -267,6 +267,9 @@ class Trellis2Runtime:
             self._restore()
 
     def _export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]:
+        # CuMesh (to_glb's remesh) allocates outside torch's cache, so hand that cache back to CUDA first:
+        # what the generation, or the last job's projection, left reserved would otherwise not be free
+        self._free_gpu_memory()
         glb = self._o_voxel.postprocess.to_glb(
             vertices=mesh.vertices,
             faces=mesh.faces,
@@ -295,7 +298,10 @@ class Trellis2Runtime:
         if cutout is None:
             report = {"applied": False, "reason": "no picture came with the mesh"}
         else:
-            _, report = projection.project_picture(glb, cutout)
+            try:
+                _, report = projection.project_picture(glb, cutout)
+            finally:
+                self._free_gpu_memory()  # its buffers stay out of the next job's CuMesh's way
         summary = projection.summary(report)
         print(f"[forge3d] projection: {json.dumps(summary)}")
         return summary
