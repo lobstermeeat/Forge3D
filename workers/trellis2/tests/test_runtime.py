@@ -1,5 +1,6 @@
 """Trellis2Runtime on a fake pipeline: the retry after running out of GPU memory."""
 
+import types
 import weakref
 
 import numpy as np
@@ -368,3 +369,15 @@ def test_export_without_a_picture_says_so():
     mesh = types.SimpleNamespace(vertices=None, faces=None, attrs=None, coords=None, layout=None, voxel_size=None)
     runtime.export(mesh, PRESETS["final"])
     assert runtime.last_projection == {"applied": False, "reason": "no picture came with the mesh"}
+
+
+def test_a_final_made_by_the_fallback_still_carries_the_picture_to_paint_on():
+    class MeshPipeline(FakePipeline):
+        def run(self, image, **options):
+            super().run(image, **options)  # raises for the scripted failures
+            return [types.SimpleNamespace(pipeline_type=options["pipeline_type"])]
+
+    pipeline = MeshPipeline(outcomes=["oom", "oom", "mesh"])
+    picture = cutout()  # has its own alpha, so it is its own cutout
+    mesh = runtime_around(pipeline).generate(picture, PRESETS["final"], seed=7)
+    assert mesh.pipeline_type == "512" and mesh.forge3d_cutout is picture
