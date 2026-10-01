@@ -129,13 +129,15 @@ MV-Adapter's own cameras (`get_orthogonal_camera` as its inference script calls 
 them to its code.
 
 - **World**: right-handed, **+Z up**, the object at the origin, its front facing **-Y**.
-- **Azimuth 0 looks level at the front of the object in the picture.** The model was trained to draw
-  fixed views of an object from a reference taken from anywhere, so it turns the object to face the 0°
-  camera and draws it level. A head-on picture matches its 0° view; a three-quarter picture does not
-  (Phase 2's arcade machine came out turned about 20°), and pictures that look down (FLUX's are taken
-  "from slightly above") are redrawn at elevation 0. The picture is not one of the six cameras: give
-  the 3D step the views with their poses, and find the picture's own camera by silhouette search (as
-  the projection does) rather than placing it at azimuth 0.
+- **Azimuth 0 is the picture's view, made level and squared up.** The model was trained to draw fixed
+  views of an object from a reference taken from anywhere, so it keeps the side the picture mostly
+  shows and turns it to face the 0° camera. A head-on picture matches its 0° view; a three-quarter
+  picture comes out straight-on (Phase 2's arcade machine was about 20° off, its car about 35°), so
+  the picture sits between two views; a profile picture keeps the profile at 0° (Phase 2's dragon,
+  whose face is then at 270°); pictures that look down (FLUX's are taken "from slightly above") are
+  redrawn at elevation 0. The picture is not one of the six cameras: give the 3D step the views with
+  their poses, and find the picture's own camera by silhouette search (as the projection does) rather
+  than placing it at azimuth 0.
 - **Positive azimuth moves the camera counter-clockwise seen from above**: the 90° view shows the side
   that is on the right of the 0° view, with the front facing image-left; 180° shows the back, 270° the
   left side. The camera at azimuth a is at 1.8 · (sin a, -cos a, 0), looking at the origin, with image
@@ -145,9 +147,11 @@ them to its code.
   698.2 px per unit, with the origin at the image centre: pixel x = 384 · (1 + r / 0.55),
   y = 384 · (1 - u / 0.55) for a point's offsets r and u along the camera's right and up.
 - **Framing**: the picture's object is centred with its longer side at 90% of the frame (691 px,
-  0.99 units), as MV-Adapter's inference script prepares it, and the 0° view keeps that framing
-  (measured 685-700 px). The other views share its scale, so a wide object can overflow the frame at
-  45° and 315° (a stack of books did).
+  0.99 units), as MV-Adapter's inference script prepares it, and the 0° view comes out at that size
+  (measured 685-700 px) whatever the reference's framing: the scale is the model's, not the input's.
+  The other views share it, so an object that is deeper than it is wide overflows the frame in the
+  views that show its long axis (a stack of books at 45° and 315°; a car in all four side views, wheels
+  cut). A view's cutout touching the frame edge means "unknown beyond here", not the object's edge.
 
 Invalid input (including an image where no object stands out from the background) comes back
 as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`. After
