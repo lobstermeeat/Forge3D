@@ -27,8 +27,9 @@ production's export and packing. Plans:
   weights levelled afterwards by that elevation ("mvlevel"). Nothing else is turned.
 - final20 (run 4): production's recipe on all twenty prompts at the phase2d seeds: TRELLIS.2's '512'
   preview first (written as preview-<seed>.glb), the picture's camera found against it, Pixal3D's
-  single-view weights, the model levelled by that elevation, then the full export. Runs are named
-  phase2f-NN-<slug> and written to /outputs/phase6/pixal3d/final20/.
+  multi-view weights with the picture as their one view, the model levelled by that elevation, then
+  the full export. Runs are named phase2f-NN-<slug> and written to /outputs/phase6/pixal3d/final20/.
+  final20single is the same on the single-view weights (phase2fs-NN-<slug>).
 
 Every multi-view result is checked against its views: the packed final is rendered from each view's
 camera and its silhouette compared with the view's (IoU). Results go to the volume,
@@ -513,11 +514,19 @@ PLANS: dict[str, dict] = {
         "jobs": [{"number": n, "variant": "posed", "tilt": PHASE5_POSES[n], "posed": 1} for n in TILTED]
         + [{"number": n, "variant": "mvlevel", "tilt": PHASE5_POSES[n]} for n in ["09", "17"]],
     },
-    # Run 4: production's recipe on all twenty, at the phase2d seeds
+    # Run 4: production's recipe on all twenty, at the phase2d seeds. The multi-view weights with the
+    # picture as their one view: in run 3 they gave the ramen a white bowl all round and the donut its
+    # frosting where the single-view weights (runs 1-2) invented a dark outside
     "final20": {
-        "weights": "single",
+        "weights": "multiview",
         "level": "preview",
         "jobs": [{"number": n, "variant": "phase2f", "name_like_source": "phase2f"} for n in ALL],
+    },
+    # The same recipe on the single-view weights, for the comparison
+    "final20single": {
+        "weights": "single",
+        "level": "preview",
+        "jobs": [{"number": n, "variant": "phase2fs", "name_like_source": "phase2fs"} for n in ALL],
     },
     # The single-view weights on the rest of the controls (run 2)
     "controls": {"weights": "single", "jobs": [{"number": n, "variant": "single"} for n in MORE_CONTROLS]},

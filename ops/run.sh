@@ -6,14 +6,13 @@
 # Phase 6, PIXAL3D line: its own ephemeral app (orainge-exp-pixal3d) through `modal run`, never
 # `modal deploy workers/modal_app.py`, which would replace the production app orainge-ai.
 #
-# Run 3: the tilt. Pixal3D builds in the picture's camera frame, so an object pictured from above leans
-# by that elevation. Experiment A: the multi-view weights with the picture's real camera as an absolute
-# pose ("posed", 09 10 17 04 13), beside the same weights levelled afterwards ("mvlevel", 09 17).
-# Experiment B (the single-view weights levelled afterwards) was judged locally on run 2's models.
+# Run 4a: production's recipe (TRELLIS.2 '512' preview -> the picture's camera -> Pixal3D's multi-view
+# weights on the picture alone -> levelled -> full export) on two backs and the three controls the
+# single-view weights made worse (04 08 10 13 20). The rest of the twenty follow once these are judged.
 set -euo pipefail
 
 echo "== Pixal3D's weights (CPU; already there, so only the marker is checked)"
 modal run ops/exp_pixal3d.py::download
-echo "== Experiment A: the picture posed at its real elevation (multi-view weights), and mvlevel"
-modal run ops/exp_pixal3d.py::experiment --plan posed --out ops-out/private
+echo "== final20 on 04 08 10 13 20"
+modal run ops/exp_pixal3d.py::experiment --plan final20 --only 04,08,10,13,20 --out ops-out/private
 du -sh ops-out/private/* || true
