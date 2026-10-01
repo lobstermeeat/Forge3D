@@ -57,7 +57,7 @@ def glb_json(data: bytes) -> dict:
 
 
 @pytest.mark.skipif(shutil.which(GLTFPACK) is None, reason="gltfpack not installed")
-def test_pack_glb_produces_meshopt_and_ktx2(tmp_path):
+def test_pack_glb_produces_meshopt_webp_colour_and_ktx2_attributes(tmp_path):
     trimesh = pytest.importorskip("trimesh")
     from PIL import Image
 
@@ -73,6 +73,36 @@ def test_pack_glb_produces_meshopt_and_ktx2(tmp_path):
 
     packed = pack_glb(raw, texture_limit=256)
     meta = glb_json(packed)
-    assert {"EXT_meshopt_compression", "KHR_texture_basisu", "KHR_mesh_quantization"} <= set(meta["extensionsUsed"])
-    assert all(image["mimeType"] == "image/ktx2" for image in meta["images"])
+    used = set(meta["extensionsUsed"])
+    assert {"EXT_meshopt_compression", "KHR_mesh_quantization", "EXT_texture_webp", "KHR_texture_basisu"} <= used
+    material = meta["materials"][0]["pbrMetallicRoughness"]
+
+    def image_of(texture_ref):
+        extensions = meta["textures"][texture_ref["index"]]["extensions"]
+        source = next(iter(extensions.values()))["source"]
+        return meta["images"][source]
+
+    # Colour as WebP, metallic-roughness as KTX2 (UASTC)
+    assert image_of(material["baseColorTexture"])["mimeType"] == "image/webp"
+    assert image_of(material["metallicRoughnessTexture"])["mimeType"] == "image/ktx2"
     assert len(packed) < len(raw)
+
+
+def test_unpremultiply_restores_colour_hidden_by_a_spurious_alpha():
+    from PIL import Image
+
+    from forge3d_worker.pipeline import ALPHA_FLOOR, unpremultiply
+
+    def srgb(linear):
+        return round((linear * 12.92 if linear <= 0.0031308 else 1.055 * linear ** (1 / 2.4) - 0.055) * 255)
+
+    texture = Image.new("RGBA", (3, 1))
+    # Opaque; half of linear 0.6 at alpha 0.5; nearly transparent and nearly black
+    texture.putdata([(200, 120, 40, 255), (srgb(0.3),) * 3 + (128,), (4, 4, 4, 5)])
+    out = unpremultiply(texture)
+    assert out.mode == "RGB"
+    opaque, halved, faint = (out.getpixel((x, 0)) for x in range(3))
+    assert opaque == (200, 120, 40)  # untouched
+    assert all(abs(c - srgb(0.6)) <= 2 for c in halved)
+    # Divided by the floor, not by 5/255: brighter, but not blown up
+    assert all(c <= srgb(4 / 255 / 12.92 / ALPHA_FLOOR) + 1 for c in faint)

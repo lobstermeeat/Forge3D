@@ -10,6 +10,10 @@
 # 13=2,14=4,15=4,16=2,17=3,18=4,19=2,20=1"; phase2.verdicts.json holds the reviewers' verdicts
 # (make_gallery.py --verdicts). 10 of 20 were publishable as they stood, against a bar of 16.
 #
+# Phase 4 (30 Sep 2026) made the same pictures again with its fixes (ops/rerun_set.py on the ai-ops
+# branch): with the original seeds 11 of 20 were publishable, with the next seeds 10 of 20, and 12
+# of 20 with either. Verdicts: phase2.phase4-verdicts.json (make_gallery.py --per-group).
+#
 # One run per line: a prompt, or the path of a photo relative to this file (png, jpg, webp).
 # Lines starting with # are notes.
 

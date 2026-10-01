@@ -12,12 +12,20 @@ type Job =
   | { kind: 'model'; readyAt: number; mode: GenerationQuality; seed: number; noObject: boolean };
 
 const MOCK_CREDITS = ['Mock model for development: no AI ran'];
+/** Ratings like the FLUX worker's, by position, so the second picture is always the best */
+const MOCK_RATINGS: { score: number; issues: string[] }[] = [
+  { score: 0.64, issues: ['small in the frame'] },
+  { score: 0.91, issues: [] },
+  { score: 0.37, issues: ['cut off at the bottom', 'more than one object'] },
+  { score: 0.55, issues: ['cut off at the top'] },
+];
 
 /**
  * Stand-in GPU workers for development and browser tests (AI_WORKERS_MOCK=1): pictures and
- * models appear after a short delay, with no GPU, network or cost. A prompt containing "fail"
- * fails its pictures, and a photo run fails when the photo is very small, so error states can be
- * tried too. Never enable it in production.
+ * models appear after a short delay, with no GPU, network or cost. The pictures are rated like
+ * the real worker rates them, with the second always the best. A prompt containing "fail" fails
+ * its pictures, and a photo run fails when the photo is very small, so error states can be tried
+ * too. Never enable it in production.
  */
 export class MockWorkers implements StudioWorkers {
   readonly name = 'mock';
@@ -40,10 +48,15 @@ export class MockWorkers implements StudioWorkers {
     }
     const base = 1000 + this.next * 10;
     const images = await Promise.all(
-      Array.from({ length: job.count }, async (_, i) => ({
-        file: { data: await mockPicture(job.prompt, i) },
-        seed: base + i,
-      })),
+      Array.from({ length: job.count }, async (_, i) => {
+        const { score, issues } = MOCK_RATINGS[i % MOCK_RATINGS.length]!;
+        return {
+          file: { data: await mockPicture(job.prompt, i) },
+          seed: base + i,
+          score,
+          ...(issues.length ? { issues: [...issues] } : {}),
+        };
+      }),
     );
     return { status: 'done', output: { images } };
   }
@@ -88,6 +101,9 @@ export class MockWorkers implements StudioWorkers {
       },
     };
   }
+
+  /** Nothing to start: the mock has no cold start. */
+  async warm(): Promise<void> {}
 
   private add(job: Job): string {
     const id = `mock-${this.next++}`;

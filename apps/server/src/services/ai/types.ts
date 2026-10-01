@@ -65,7 +65,14 @@ export interface ReferenceImageProvider {
 export type WorkerFile = { url: string } | { data: Buffer };
 
 export interface ReferencesOutput {
-  images: { file: WorkerFile; seed: number }[];
+  images: {
+    file: WorkerFile;
+    seed: number;
+    /** How good a start for 3D the worker rates the picture (0..1), when it rates them */
+    score?: number;
+    /** What makes it a worse start, e.g. "cut off at the bottom"; left out when nothing does */
+    issues?: string[];
+  }[];
 }
 
 export interface ModelOutput {
@@ -84,6 +91,9 @@ export type WorkerJobState<T> =
   | { status: 'done'; output: T }
   | { status: 'failed'; message: string };
 
+/** The GPU workers the Studio uses: FLUX for the pictures, TRELLIS.2 for the models. */
+export type WorkerKind = 'references' | 'model';
+
 /**
  * What the Studio's AI panel needs from the GPU workers. Every step is a job that is started
  * and then polled, so no request waits on a GPU (a cold start takes a minute or more).
@@ -92,6 +102,11 @@ export interface StudioWorkers {
   readonly name: string;
   /** Text prompts need the reference-image worker; photos only need TRELLIS.2. */
   readonly prompts: boolean;
+  /**
+   * Starts a worker's GPU before a job needs it, when the host can (about 45 s for FLUX and
+   * 100 s for TRELLIS.2 from cold). Resolves once it's asked, not once the GPU is ready.
+   */
+  warm?(kind: WorkerKind): Promise<void>;
   startReferences(input: { prompt: string; count: number; requestId: string }): Promise<string>;
   references(jobId: string): Promise<WorkerJobState<ReferencesOutput>>;
   startModel(input: {

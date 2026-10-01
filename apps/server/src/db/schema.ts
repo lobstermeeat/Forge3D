@@ -108,7 +108,13 @@ export const aiGenerations = pgTable('ai_generations', {
   jobId: text('job_id'),
   /** references | preview | final: the job running now, or the one that failed */
   jobKind: text('job_kind'),
-  referenceImages: jsonb('reference_images').$type<{ url: string; seed: number }[]>(),
+  /**
+   * The pictures drawn for a prompt. When the worker rates them: score (0..1, how good a start
+   * for 3D) and issues (what makes it a worse one, e.g. "cut off at the bottom").
+   */
+  referenceImages: jsonb('reference_images').$type<
+    { url: string; seed: number; score?: number; issues?: string[] }[]
+  >(),
   seed: integer('seed'),
   previewUrl: text('preview_url'),
   previewTriangles: integer('preview_triangles'),

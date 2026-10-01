@@ -9,6 +9,13 @@ works with either host:
     GET  /{worker}/status/{id}    ->  {"id", "status", "output"?, "error"?}
     POST /{worker}/cancel/{id}    ->  {"id", "status": "CANCELLED"}
 
+and one route RunPod doesn't have:
+
+    POST /{worker}/warm           ->  {"status": "WARMING"}
+
+which starts one of the worker's containers without waiting for it, so a job that follows soon
+skips the cold start (about 45 s for FLUX and 100 s for TRELLIS.2).
+
 Every request needs ``Authorization: Bearer <ORAINGE_WORKER_TOKEN>``.
 """
 
@@ -65,6 +72,10 @@ class Calls(Protocol):
 
     def cancel(self, job_id: str) -> None: ...
 
+    def warm(self, worker: str) -> None:
+        """Start one of ``worker``'s containers (unless one is idle) without waiting for it."""
+        ...
+
 
 @contextlib.contextmanager
 def _modal_outages() -> Iterator[None]:
@@ -87,9 +98,12 @@ class ModalCalls:
 
     CALL_ID = re.compile(r"fc-[A-Za-z0-9]{1,64}")
 
-    def __init__(self, functions: Mapping[str, Any]) -> None:
+    def __init__(self, functions: Mapping[str, Any], warm: Mapping[str, Any] | None = None) -> None:
         # Worker name -> Modal function (or class method) that takes the job dict
         self._functions = dict(functions)
+        # Worker name -> class method that does nothing: calling it starts a container, which loads
+        # the model in @modal.enter
+        self._warm = dict(warm or {})
 
     @property
     def workers(self) -> tuple[str, ...]:
@@ -129,6 +143,10 @@ class ModalCalls:
                 call.cancel()
             except (mx.NotFoundError, mx.InvalidError) as err:
                 raise JobNotFound(job_id) from err
+
+    def warm(self, worker: str) -> None:
+        with _modal_outages():
+            self._warm[worker].spawn()
 
     def _call(self, job_id: str) -> Any:
         import modal
@@ -270,5 +288,14 @@ def create_app(token: str, calls: Calls, runsync_wait: float = RUNSYNC_WAIT_S) -
             _log(job_id, err)
             raise _unavailable() from None
         return {"id": job_id, "status": "CANCELLED"}
+
+    @app.post("/{worker}/warm")
+    def warm(worker: str = Depends(worker_name)) -> dict:
+        try:
+            calls.warm(worker)
+        except WorkersUnavailable as err:
+            _log(f"(warm {worker})", err)
+            raise _unavailable() from None
+        return {"status": "WARMING"}
 
     return app

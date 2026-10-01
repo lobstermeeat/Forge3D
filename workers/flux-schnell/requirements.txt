@@ -9,3 +9,5 @@ huggingface_hub>=0.25
 runpod>=1.7,<2
 boto3>=1.34
 pillow>=10.3
+# Picture scoring (reference_worker/service.py). diffusers installs it too
+numpy>=1.26

@@ -386,4 +386,86 @@ describe('SelfHostedProvider', () => {
       },
     });
   });
+
+  it('starts a GPU early through the job API on Modal, and not on RunPod', async () => {
+    const modal = fakeJobApi([{ status: 'WARMING' }, { status: 'WARMING' }]);
+    const provider = createSelfHostedProvider(
+      { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
+      modal.fetchImpl,
+    )!;
+    await provider.warm('references');
+    await provider.warm('model');
+    expect(modal.calls).toEqual([
+      {
+        url: 'https://w.modal.run/reference/warm',
+        method: 'POST',
+        body: undefined,
+        auth: 'Bearer worker-token',
+      },
+      {
+        url: 'https://w.modal.run/trellis2/warm',
+        method: 'POST',
+        body: undefined,
+        auth: 'Bearer worker-token',
+      },
+    ]);
+
+    // RunPod endpoints have no such route, so nothing is sent
+    const runPod = fakeJobApi([]);
+    const onRunPod = createSelfHostedProvider(
+      {
+        RUNPOD_API_KEY: 'k',
+        RUNPOD_TRELLIS2_ENDPOINT_ID: 'ep',
+        RUNPOD_REFERENCE_ENDPOINT_ID: 'ref',
+      },
+      runPod.fetchImpl,
+    )!;
+    await onRunPod.warm('references');
+    await onRunPod.warm('model');
+    expect(runPod.calls).toEqual([]);
+  });
+
+  it('passes on how the worker rated each picture, when it did', async () => {
+    const picture = (seed: number) => ({
+      key: `ai/gen-5/reference-${seed}.png`,
+      url: `https://r2.test/ai/gen-5/reference-${seed}.png`,
+      seed,
+    });
+    const api = fakeJobApi([
+      {
+        id: 'fc-ref',
+        status: 'COMPLETED',
+        output: {
+          request_id: 'gen-5',
+          prompt: 'a lamp',
+          seconds: 3.2,
+          images: [
+            { ...picture(7), score: 0.35, issues: ['cut off at the bottom', ' two objects '] },
+            { ...picture(8), score: 0.88, issues: [] },
+            picture(9), // a worker from before ratings
+            // What can't be read is left out
+            { ...picture(10), score: null, issues: ['', 7, null, 'small in the frame'] },
+            { ...picture(11), score: '0.9', issues: 'cut off' },
+          ],
+        },
+      },
+    ]);
+    const provider = createSelfHostedProvider(
+      { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
+      api.fetchImpl,
+    )!;
+    const file = (seed: number) => ({ url: `https://r2.test/ai/gen-5/reference-${seed}.png` });
+    expect(await provider.references('fc-ref')).toStrictEqual({
+      status: 'done',
+      output: {
+        images: [
+          { file: file(7), seed: 7, score: 0.35, issues: ['cut off at the bottom', 'two objects'] },
+          { file: file(8), seed: 8, score: 0.88 },
+          { file: file(9), seed: 9 },
+          { file: file(10), seed: 10, issues: ['small in the frame'] },
+          { file: file(11), seed: 11 },
+        ],
+      },
+    });
+  });
 });
