@@ -7,6 +7,7 @@ work. There are no third-party AI APIs involved.
 | ------------------------------- | ----------------------------- | ------------------------ | ------------------------------------------------ |
 | [`trellis2/`](trellis2)         | TRELLIS.2-4B (MIT)            | image to textured GLB    | 24 GB+ Ampere/Ada/Hopper (L40S, RTX 4090, A100…) |
 | [`flux-schnell/`](flux-schnell) | FLUX.1 [schnell] (Apache-2.0) | text to reference images | 48 GB (L40S, A6000, A40)                         |
+| [`pixal3d/`](pixal3d)           | Pixal3D (MIT), experimental   | image, or image and views around it, to textured GLB | 48 GB (L40S) with the models resident; 24 GB in low-VRAM mode (untested) |
 
 They run on [Modal](https://modal.com) (`modal_app.py`, the simplest way to start) or on
 RunPod serverless (the Dockerfiles). Both hosts speak the same job protocol, so the server talks
@@ -96,6 +97,37 @@ time is part of `export_s`.
 
 `flux-schnell` input: `{ "prompt": "a brass pocket watch", "count": 4, "seed": 5, "request_id": "gen_42" }`.
 Output: `{ "images": [{ "key", "url", "seed" }, …], "prompt", "seconds" }`.
+
+`pixal3d` (experimental; nothing in `modal_app.py` runs it yet) takes `trellis2`'s input, plus
+optionally the views the `multiview` worker draws around the picture:
+
+```json
+{
+  "image_url": "https://…", "mode": "final", "seed": 1234, "request_id": "gen_42",
+  "views": [
+    { "image_url": "https://…/view-0.png", "azimuth": 0, "elevation": 0 },
+    { "image_url": "https://…/view-90.png", "azimuth": 90, "elevation": 0 }
+  ],
+  "camera": { "type": "orthographic", "half_extent": 0.55 }
+}
+```
+
+Views are square RGBA cutouts from level orthographic cameras that share one scale; azimuth 0 is
+the picture's own view redrawn, positive azimuth towards the picture's right, 180 the back (the
+`multiview` worker's convention). `camera` is optional and says how wide their frame is in their
+own units (MV-Adapter's `0.55` by default); it only ends up in the result, because the worker
+rescales the views' world from their silhouettes so the object fills Pixal3D's cube the way its
+training objects did (`pixal3d_worker/views.py: fit_camera`). With views, both the preview and the
+final are built from the picture and the views with Pixal3D's multi-view weights; the picture
+stays the main image, and the final's projection still paints from it. The result is `trellis2`'s
+with `"pipeline": "pixal3d-1024_cascade"` or `"pixal3d-mv-1024_cascade"` (Pixal3D has no 512
+pipeline: a preview is the final's generation exported lighter), `"views_used"` (how many of the
+job's views went in; 0 without views), and `"camera"`: for a picture alone its field of view from
+MoGe-2 (`fov_deg`), for views the frame used (`half_extent`), the object's longest extent in the
+views' units (`extent`) and which views cut it off (`cut_off`, when they do). A job that runs out
+of GPU memory gets one retry in Pixal3D's low-VRAM mode. In the Phase 6 experiments a final took
+15–40 s to generate alone and 40–70 s with six views, plus 15–25 s to export, at 28–31 GB of GPU
+memory on an L40S with everything resident; loading the models takes about 90 s.
 
 Invalid input (including an image where no object stands out from the background) comes back
 as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`. After
@@ -322,6 +354,9 @@ editor's File › About dialog, and each result carries `credits` to show next t
 models). Excluded on purpose: nvdiffrast/nvdiffrec (research-only; replaced by
 `trellis2/forge3d_worker/uv_raster.py`), RMBG-2.0 (non-commercial; replaced by BiRefNet),
 FLUX.1 [dev] (non-commercial) and Hunyuan3D 2.1 (not licensed in South Korea, the EU or the UK).
+The experimental Pixal3D worker adds Pixal3D (MIT), MoGe-2 (MIT), NAF (Apache-2.0) and
+utils3d (MIT), all pinned, and reuses the TRELLIS.2 worker's decoders, DINOv3 and BiRefNet; see
+[`pixal3d/NOTICE.md`](pixal3d/NOTICE.md) for what it leaves out (RMBG-2.0, nvdiffrast, NATTEN).
 
 ## Tests
 
@@ -330,9 +365,10 @@ pip install -r workers/requirements-dev.txt
 python -m pytest workers/tests                 # the job API and modal_app.py
 python -m pytest workers/trellis2/tests        # CPU only; set GLTFPACK_BIN to include gltfpack
 python -m pytest workers/flux-schnell/tests
+python -m pytest workers/pixal3d/tests         # CPU only: cameras, views, the NATTEN stand-in, the runtime on a fake pipeline
 ```
 
-Run the three folders separately: they share test file names.
+Run the folders separately: they share test file names.
 
 The tests cover input validation, job handling, the out-of-memory retry and fallback, shading
 normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API, the
