@@ -5,6 +5,8 @@ Phase 6, PIXAL3D line: Pixal3D (TencentARC, MIT) on Modal. Does its multi-view m
     modal run ops/exp_pixal3d.py::experiment --plan single --out ops-out/private
     modal run ops/exp_pixal3d.py::experiment --plan synthetic --out ops-out/private
     modal run ops/exp_pixal3d.py::experiment --plan mvadapter --out ops-out/private
+    modal run ops/exp_pixal3d.py::experiment --plan controls --out ops-out/private     # run 2
+    modal run ops/exp_pixal3d.py::experiment --plan mvchoice --out ops-out/private
 
 An ephemeral app (orainge-exp-pixal3d; nothing is deployed) with one L40S, running workers/pixal3d through
 its handle_job as a worker would: the Phase 2 picture and its phase2d seed, mode "final", production's
@@ -15,6 +17,9 @@ export and packing. Plans:
   and level at MV-Adapter's azimuths and framing (Pixal3D's rebuild must line up with them: this checks
   the cameras before real views arrive).
 - mvadapter: the multi-view weights on the MV line's views, /outputs/phase6/views/<phase2 run>/.
+- controls: the single-view weights on the brief's other eight controls.
+- mvchoice: the 11 books' mv6 again, the car's synthetic views framed to fit the cube, then four views
+  against six and the picture against the redrawn front as the main view (see PLANS).
 
 Every multi-view result is checked against its views: the packed final is rendered from each view's
 camera and its silhouette compared with the view's (IoU). Results go to the volume,
@@ -222,12 +227,15 @@ def render_views(
     size: int = 768,
     half_extent: float = 0.55,
     fill: Optional[float] = 0.9,
+    fit: str = "front",
 ) -> tuple[list, list]:
     """
     RGBA renders (PIL) and silhouettes (bool arrays) of a mesh from MV-Adapter's cameras (orthographic,
     level, +-half_extent) at the given azimuths (pixal3d_worker.cameras' convention: 0 on the GLB's +Z).
-    With ``fill``, the mesh is first centred and scaled as MV-Adapter frames a picture (its longer side
-    in the 0-degree view at that share of the frame); without, it is drawn where it is.
+    With ``fill``, the mesh is first centred and scaled: ``fit`` "front" frames it as MV-Adapter frames a
+    picture (its longer side in the 0-degree view at that share of the frame), "cube" as Pixal3D's
+    training renders did (its longest side, depth included, at that share). Without, it is drawn where
+    it is.
     """
     import numpy as np
     import torch
@@ -241,7 +249,10 @@ def render_views(
     world = cameras.glb_to_world(mesh["positions"])
     if fill is not None:
         world = world - (world.min(0) + world.max(0)) / 2
-        extent = max(np.ptp(world[:, 0]), np.ptp(world[:, 2]))  # right and up in the 0-degree view
+        if fit == "cube":
+            extent = max(np.ptp(world, axis=0))
+        else:
+            extent = max(np.ptp(world[:, 0]), np.ptp(world[:, 2]))  # right and up in the 0-degree view
         world = world * (fill * 2 * half_extent / extent)
     verts = torch.tensor(world, dtype=torch.float32, device=device)
     faces = torch.tensor(mesh["faces"], dtype=torch.long, device=device)
@@ -341,8 +352,9 @@ class Pixal3D:
         if job.get("views") == "synthetic":  # the object's Phase 5 final (phase2d: the same picture and seed)
             finals = root / job["finals"]
             final = json.loads((finals / "progress.json").read_text())["steps"]["final"]["files"][0]
-            pictures, _ = render_views(plain_mesh((finals / final).read_bytes()), azimuths)
-            summary["views_from"] = f"{job['finals']}/{final}"
+            fit = job.get("fit", "front")
+            pictures, _ = render_views(plain_mesh((finals / final).read_bytes()), azimuths, fit=fit)
+            summary["views_from"] = f"{job['finals']}/{final} (framed by its {fit})"
         elif job.get("views") == "mvadapter":
             folder = root / VIEWS / job["source"]
             pictures = [Image.open(folder / f"view-{a}.png").convert("RGBA") for a in azimuths]
@@ -375,7 +387,8 @@ class Pixal3D:
 
         if views:  # the rebuild seen from each view's camera, against the view's silhouette
             mesh = plain_mesh(packed)
-            half = float((camera or {}).get("half_extent", 0.55))
+            # The rebuild is in Pixal3D's cube: the views' frame there is the one the worker fitted
+            half = float((result.get("camera") or {}).get("half_extent") or (camera or {}).get("half_extent", 0.55))
             _, rebuilt = render_views(mesh, azimuths, half_extent=half, fill=None)
             given = [np.asarray(v.getchannel("A")) > 127 for v in pictures]
             summary["silhouette_iou"] = {str(a): round(iou(g, r), 3) for a, g, r in zip(azimuths, given, rebuilt)}
@@ -425,11 +438,15 @@ class Pixal3D:
 
 BACKS = ["04", "06", "08", "11"]
 CONTROLS = ["01", "13"]
+# The brief's other controls, which must not get worse either
+MORE_CONTROLS = ["02", "05", "07", "09", "10", "17", "19", "20"]
 SIX = [0, 45, 90, 180, 270, 315]
 FOUR = [0, 90, 180, 270]
 
 PLANS: dict[str, dict] = {
     "single": {"weights": "single", "jobs": [{"number": n, "variant": "single"} for n in BACKS + CONTROLS]},
+    # The single-view weights on the rest of the controls (run 2)
+    "controls": {"weights": "single", "jobs": [{"number": n, "variant": "single"} for n in MORE_CONTROLS]},
     # Consistent views of known models: the rebuild must line up with them (cameras and framing)
     "synthetic": {
         "weights": "multiview",
@@ -441,10 +458,15 @@ PLANS: dict[str, dict] = {
         "weights": "multiview",
         "jobs": [{"number": n, "variant": "mv6", "views": "mvadapter", "azimuths": SIX} for n in BACKS],
     },
-    # Which views: four (Pixal3D's own rig), and the picture instead of the redrawn front
+    # Run 2, the multi-view weights: the 11 books' mv6 again (its export died on a stale CUDA error),
+    # the car's synthetic views framed so it fits the cube (the first run's side views were cut off),
+    # then which views: four (Pixal3D's own rig, no 45/315, which wash out or cut off), and the picture
+    # instead of the redrawn front
     "mvchoice": {
         "weights": "multiview",
-        "jobs": [{"number": n, "variant": "mv4", "views": "mvadapter", "azimuths": FOUR} for n in BACKS]
+        "jobs": [{"number": "11", "variant": "mv6", "views": "mvadapter", "azimuths": SIX}]
+        + [{"number": "13", "variant": "syn6fit", "views": "synthetic", "azimuths": SIX, "fit": "cube"}]
+        + [{"number": n, "variant": "mv4", "views": "mvadapter", "azimuths": FOUR} for n in BACKS]
         + [{"number": n, "variant": "mv6pic", "views": "mvadapter", "azimuths": SIX, "main": "picture"} for n in BACKS],
     },
 }
