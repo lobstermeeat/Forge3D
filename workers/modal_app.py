@@ -52,6 +52,7 @@ GLTFPACK_VERSION = "1.3"
 TRELLIS2_GPU = "L40S"
 TRELLIS2_LOW_VRAM = "0"
 FLUX_GPU = "L40S"  # FLUX.1 [schnell] needs about 34 GB
+MULTIVIEW_GPU = "A10G"  # MV-Adapter on SDXL needs about 14 GB: a 24 GB A10G, about half an L40S's price
 
 app = modal.App(APP_NAME)
 models = modal.Volume.from_name("orainge-models", create_if_missing=True)
@@ -142,6 +143,16 @@ flux_image = (
     .add_local_dir(WORKERS / "flux-schnell" / "reference_worker", "/root/reference_worker")
 )
 
+multiview_image = (
+    modal.Image.debian_slim(python_version="3.10")
+    .pip_install(*TORCH, index_url=TORCH_INDEX)
+    .pip_install_from_requirements(str(WORKERS / "multiview" / "requirements.txt"))
+    .env({"HF_HUB_OFFLINE": "1"})
+    .add_local_dir(WORKERS / "multiview" / "multiview_worker", "/root/multiview_worker")
+    # MV-Adapter's pipeline code (Apache-2.0), vendored without its nvdiffrast-based mesh tools
+    .add_local_dir(WORKERS / "multiview" / "mvadapter", "/root/mvadapter")
+)
+
 download_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("huggingface_hub[hf_xet]>=0.34,<2")
@@ -149,6 +160,7 @@ download_image = (
     .add_local_file(
         WORKERS / "flux-schnell" / "scripts" / "download_weights.py", "/root/weights/reference.py"
     )
+    .add_local_file(WORKERS / "multiview" / "scripts" / "download_weights.py", "/root/weights/multiview.py")
 )
 
 api_image = (
@@ -307,7 +319,47 @@ class FluxSchnell:
         return True
 
 
-WEIGHT_SCRIPTS = {"trellis2": "/root/weights/trellis2.py", "reference": "/root/weights/reference.py"}
+@app.cls(
+    image=multiview_image,
+    gpu=MULTIVIEW_GPU,
+    cpu=2.0,
+    memory=16384,  # SDXL's fp16 weights and the adapter pass through RAM on their way to the GPU
+    volumes={MODELS: models},
+    secrets=storage_secrets,
+    timeout=300,
+    startup_timeout=600,
+    scaledown_window=60,
+    max_containers=1,
+)
+class MultiView:
+    """One picture to six views around its object (MV-Adapter, Apache-2.0, on SDXL). See README.md."""
+
+    @modal.enter()
+    def load(self) -> None:
+        from multiview_worker.generator import MultiViewGenerator
+        from multiview_worker.service import handle_job
+        from multiview_worker.storage import storage_from_env
+
+        _require_weights("multiview")
+        storage = storage_from_env()
+        generate = MultiViewGenerator(MODELS)
+        self.handle = lambda job: handle_job(job, generate, storage)
+
+    @modal.method()
+    def generate(self, job: dict) -> dict:
+        return run_job(self.handle, job)
+
+    @modal.method()
+    def warm(self) -> bool:
+        """Does nothing: calling it starts a container (load() runs first) before a job needs one."""
+        return True
+
+
+WEIGHT_SCRIPTS = {
+    "trellis2": "/root/weights/trellis2.py",
+    "reference": "/root/weights/reference.py",
+    "multiview": "/root/weights/multiview.py",
+}
 
 
 @app.function(
@@ -319,9 +371,9 @@ WEIGHT_SCRIPTS = {"trellis2": "/root/weights/trellis2.py", "reference": "/root/w
     timeout=3 * 3600,  # generous for slow Hugging Face transfers; an interrupted run resumes
 )
 def download_models(which: str = "all", force: bool = False) -> None:
-    """Downloads the pinned weights (about 50 GB) into the orainge-models volume. CPU only."""
+    """Downloads the pinned weights (about 60 GB) into the orainge-models volume. CPU only."""
     if which != "all" and which not in WEIGHT_SCRIPTS:
-        raise SystemExit("--which must be all, trellis2 or reference")
+        raise SystemExit(f"--which must be all, {', '.join(WEIGHT_SCRIPTS)}")
     for name in WEIGHT_SCRIPTS if which == "all" else [which]:
         _download(name, force)
         models.commit()
@@ -363,10 +415,10 @@ def api():
     """https://<workspace>--orainge-ai-api.modal.run: set it as the server's AI_WORKERS_URL."""
     from job_api import ModalCalls, app_for_token
 
-    trellis2, flux = Trellis2(), FluxSchnell()
+    trellis2, flux, multiview = Trellis2(), FluxSchnell(), MultiView()
     calls = ModalCalls(
-        {"trellis2": trellis2.generate, "reference": flux.generate},
-        warm={"trellis2": trellis2.warm, "reference": flux.warm},
+        {"trellis2": trellis2.generate, "reference": flux.generate, "multiview": multiview.generate},
+        warm={"trellis2": trellis2.warm, "reference": flux.warm, "multiview": multiview.warm},
     )
     return app_for_token(os.environ.get("ORAINGE_WORKER_TOKEN"), calls)
 
@@ -847,7 +899,13 @@ def build_images() -> None:
     """Builds every image ahead of the first run, so a later deploy or run starts at once.
     Needs no secrets, so it can run while Hugging Face access is still pending."""
     builder = modal.App.lookup("orainge-ai-images", create_if_missing=True)
-    images = [("download", download_image), ("api", api_image), ("reference", flux_image), ("trellis2", trellis2_image)]
+    images = [
+        ("download", download_image),
+        ("api", api_image),
+        ("reference", flux_image),
+        ("multiview", multiview_image),
+        ("trellis2", trellis2_image),
+    ]
     with modal.enable_output():
         for name, image in images:
             started = time.monotonic()
