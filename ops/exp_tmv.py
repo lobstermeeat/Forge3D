@@ -112,6 +112,9 @@ PLANS: dict[str, list[dict]] = {
     ],
     # Controls that must not get worse (views from the MV line, when they are on the volume)
     "controls": [{"number": n, "runs": REAL_CONTROL} for n in ("01", "09", "13")],
+    # The candidate setting once a view clipped by its frame is left out (the car's side views are):
+    # the car again, and two more controls
+    "guard": [{"number": n, "runs": REAL_CONTROL[:2]} for n in ("13", "19", "05")],
 }
 
 
