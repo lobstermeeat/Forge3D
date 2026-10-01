@@ -1,5 +1,6 @@
 """Pixal3DRuntime on a fake pipeline: which pictures and cameras Pixal3D gets, and the GLB's frame."""
 
+import io
 import math
 import types
 
@@ -243,3 +244,158 @@ def test_to_glb_comes_out_upright_facing_plus_z():
     glb = wrapped.postprocess.to_glb(vertices=None)
     np.testing.assert_allclose(glb.vertices, native, atol=1e-12)
     assert wrapped.postprocess.other == 1
+
+
+# --- Levelling ----------------------------------------------------------------------------------------
+
+
+def tilted_plate(elevation: float) -> trimesh.Trimesh:
+    """to_glb's result for a flat plate, as Pixal3D builds it when the picture looked down by elevation."""
+    from pixal3d_worker import level
+
+    box = trimesh.creation.box(extents=(1.0, 0.05, 1.0))
+    box.apply_translation([0.1, 0.0, -0.1])
+    box.apply_transform(level.level_matrix(elevation).T)  # into the camera-aligned frame
+    texture = Image.new("RGB", (8, 8), (180, 90, 40))
+    box.visual = trimesh.visual.TextureVisuals(
+        uv=np.zeros((len(box.vertices), 2)), material=trimesh.visual.material.PBRMaterial(baseColorTexture=texture)
+    )
+    return box
+
+
+class FakeOVoxel:
+    """o_voxel.postprocess.to_glb returning a given mesh (already in the GLB's frame: the frame change is undone)."""
+
+    def __init__(self, glb):
+        self.glb = glb
+        self.calls = 0
+
+    def to_glb(self, **kwargs):
+        self.calls += 1
+        out = self.glb.copy()
+        out.apply_transform(np.linalg.inv(cameras.GLB_FROM_TO_GLB))
+        return out
+
+
+def exportable(rt: Pixal3DRuntime, glb) -> types.SimpleNamespace:
+    rt._o_voxel = _ViewAlignedOVoxel(types.SimpleNamespace(postprocess=FakeOVoxel(glb)))
+    return types.SimpleNamespace(vertices=None, faces=None, attrs=None, coords=None, layout=None, voxel_size=1 / 64)
+
+
+def test_a_given_tilt_travels_on_the_mesh_and_levels_the_export():
+    rt = runtime(multiview=False)
+    rt.level, rt.given_tilt = pipeline.LEVEL_GIVEN, (28.8, 0.0)
+    mesh = rt.generate(photo(), PRESETS["final"], seed=3)
+    assert getattr(mesh, pipeline.TILT) == (28.8, 0.0)
+    assert rt.last_camera["tilt"] == {"elevation": 28.8, "roll": 0.0, "source": "given"}
+    assert rt.last_pose is None  # nothing was searched for
+    plate = tilted_plate(28.8)
+    assert plate.extents[1] > 0.4
+    fake_mesh = exportable(rt, plate)
+    setattr(fake_mesh, pipeline.TILT, (28.8, 0.0))
+    raw, faces = rt.export(fake_mesh, PRESETS["preview"])
+    assert raw[:4] == b"glTF" and faces == 12
+    assert rt.last_level["applied"] is True and rt.last_level["elevation"] == 28.8
+    levelled = trimesh.load(io.BytesIO(raw), file_type="glb", force="mesh")
+    assert levelled.extents[1] == pytest.approx(0.05, abs=1e-3) and levelled.extents[0] == pytest.approx(1.0, abs=1e-3)
+    assert rt._o_voxel.postprocess.tilt == pipeline.NO_TILT  # reset for the next job
+    # A mesh without a tilt (another runtime's, or LEVEL_NONE) is exported as it is
+    raw, _ = rt.export(exportable(rt, plate), PRESETS["preview"])
+    assert rt.last_level["applied"] is False
+    assert trimesh.load(io.BytesIO(raw), file_type="glb", force="mesh").extents[1] > 0.4
+
+
+class FakeTrellis2:
+    """Trellis2Runtime as the levelling uses it: a preview mesh, exported to a GLB."""
+
+    def __init__(self, glb, fail=None):
+        self.glb, self.fail, self.calls = glb, fail, []
+        self.pipeline_used = "512"
+
+    def generate(self, image, preset, seed):
+        self.calls.append(("generate", preset.pipeline_type, seed))
+        if self.fail:
+            raise self.fail
+        return types.SimpleNamespace(**{CUTOUT: cutout()})
+
+    def export(self, mesh, preset):
+        self.calls.append(("export", preset.pipeline_type))
+        return self.glb.export(file_type="glb"), 12
+
+
+def test_the_tilt_comes_from_the_picture_against_the_trellis2_preview(monkeypatch):
+    from pixal3d_worker import level
+
+    rt = runtime(multiview=False)
+    rt.level, rt.trellis2 = pipeline.LEVEL_PREVIEW, FakeTrellis2(tilted_plate(0.0))
+    seen = {}
+
+    def estimate_pose(glb, picture, device=None):
+        seen["faces"], seen["picture"] = len(glb.faces), picture
+        return {"applied": True, "reason": "found", "pose": {"elevation": 21.2, "roll": 0.5}, "iou": 0.98}
+
+    monkeypatch.setattr(level, "estimate_pose", estimate_pose)
+    mesh = rt.generate(photo(), PRESETS["final"], seed=11)
+    assert rt.trellis2.calls == [("generate", "512", 11), ("export", "512")]  # the preview, at the final's seed
+    assert seen["faces"] == 12 and seen["picture"].mode == "RGBA"
+    assert getattr(mesh, pipeline.TILT) == (21.2, 0.5)
+    assert rt.last_pose["applied"] is True and rt.last_pose["preview"]["pipeline"] == "512"
+    assert rt.last_preview[:4] == b"glTF"
+    assert rt.last_camera["tilt"] == {"elevation": 21.2, "roll": 0.5, "source": "preview"}
+
+
+def test_a_failed_gate_or_preview_means_no_tilt(monkeypatch):
+    from pixal3d_worker import level
+
+    rt = runtime(multiview=False)
+    rt.level, rt.trellis2 = pipeline.LEVEL_PREVIEW, FakeTrellis2(tilted_plate(0.0))
+    report = {"applied": False, "reason": "the silhouettes don't match well enough (IoU 0.910 < 0.93)", "pose": {"elevation": 30.0, "roll": 0.0}, "iou": 0.91}
+    monkeypatch.setattr(level, "estimate_pose", lambda glb, picture, device=None: dict(report))
+    mesh = rt.generate(photo(), PRESETS["final"], seed=11)
+    assert getattr(mesh, pipeline.TILT) == (0.0, 0.0)
+    assert rt.last_pose["applied"] is False and "IoU" in rt.last_pose["reason"]
+    # The preview itself failing is reported the same way, and the job goes on
+    rt.trellis2 = FakeTrellis2(tilted_plate(0.0), fail=RuntimeError("CUDA error: out of memory"))
+    mesh = rt.generate(photo(), PRESETS["final"], seed=11)
+    assert getattr(mesh, pipeline.TILT) == (0.0, 0.0)
+    assert rt.last_pose["reason"].startswith("error: RuntimeError") and rt.last_preview is None
+    assert len(rt.pipeline.runs) == 2  # Pixal3D ran both times
+
+
+def test_level_none_leaves_the_camera_frame():
+    rt = runtime(multiview=False)
+    rt.level = pipeline.LEVEL_NONE
+    mesh = rt.generate(photo(), PRESETS["final"], seed=3)
+    assert getattr(mesh, pipeline.TILT) == (0.0, 0.0) and rt.last_camera["tilt"]["source"] == "none"
+
+
+def test_a_posed_picture_puts_the_elevation_in_the_camera(monkeypatch):
+    import sys
+
+    patched = []
+    fake = types.ModuleType(pipeline.PROJ_MODULE)
+    fake.compute_relative_calc_mat = lambda transform_matrix, distance, front: "relative"
+    monkeypatch.setitem(sys.modules, pipeline.PROJ_MODULE, fake)
+    rt = runtime()
+    rt.level, rt.given_tilt, rt.posed = pipeline.LEVEL_GIVEN, (45.0, -7.9), True
+    original = rt.pipeline.run_mv
+
+    def run_mv(views, **kwargs):
+        patched.append(fake.compute_relative_calc_mat(views["transform_matrix"], None, None))
+        return original(views, **kwargs)
+
+    rt.pipeline.run_mv = run_mv
+    mesh = rt.generate(photo(), PRESETS["final"], seed=3)
+    _, packed, _, _ = rt.pipeline.runs[0]
+    camera = packed["transform_matrix"][0, 0].numpy()
+    distance = float(packed["camera_distance"][0, 0])
+    np.testing.assert_allclose(camera, cameras.orbit_camera(0.0, 45.0, distance), atol=1e-6)
+    assert torch.equal(patched[0], packed["transform_matrix"])  # the poses were used as given
+    assert fake.compute_relative_calc_mat(None, None, None) == "relative"  # and the patch is undone
+    assert getattr(mesh, pipeline.TILT) == (0.0, 0.0)  # nothing to turn afterwards: the model was told
+    assert rt.last_camera["posed"]["elevation"] == 45.0
+    # No elevation to speak of: the ordinary one-view bundle, front camera
+    rt.given_tilt = (0.3, 0.0)
+    rt.generate(photo(), PRESETS["final"], seed=3)
+    front = cameras.front_camera(distance)
+    np.testing.assert_allclose(rt.pipeline.runs[1][1]["transform_matrix"][0, 0].numpy(), front, atol=1e-6)

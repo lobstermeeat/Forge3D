@@ -78,7 +78,10 @@ def handle_job(
     if "error" not in result:
         result["views_used"] = bound.views_used
         result["credits"] = list(CREDITS)
-        camera_used = getattr(runtime, "last_camera", None)
-        if isinstance(camera_used, dict) and camera_used:
-            result["camera"] = camera_used
+        # The picture's camera (field of view, the tilt levelled by), the pose search that found it
+        # against TRELLIS.2's preview, and what the export turned the model by
+        for key, attribute in (("camera", "last_camera"), ("pose", "last_pose"), ("level", "last_level")):
+            value = getattr(runtime, attribute, None)
+            if isinstance(value, dict) and value:
+                result[key] = value
     return result

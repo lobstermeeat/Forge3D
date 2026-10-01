@@ -28,7 +28,8 @@ class FakeRuntime:
     def generate(self, image, preset, seed):
         self.calls.append(("generate", preset.pipeline_type, seed))
         self.pipeline_used, self.views_used = "pixal3d-1024_cascade", 0
-        self.last_camera = {"fov_deg": 31.0}
+        self.last_camera = {"fov_deg": 31.0, "tilt": {"elevation": 21.2, "roll": 0.0, "source": "preview"}}
+        self.last_pose = {"applied": True, "reason": "found", "pose": {"elevation": 21.2}, "iou": 0.98}
         return "mesh"
 
     def generate_views(self, image, views, preset, seed, camera):
@@ -42,6 +43,8 @@ class FakeRuntime:
     def export(self, mesh, preset):
         if preset.project_picture:
             self.last_projection = {"applied": True, "reason": "applied"}
+        if getattr(self, "last_pose", None):
+            self.last_level = {"applied": True, "elevation": 21.2, "roll": 0.0}
         return b"glb", 1234
 
 
@@ -81,7 +84,8 @@ def test_without_views_it_is_production():
     result = run(job(mode="preview"), runtime)
     assert runtime.calls == [("generate", "512", 5)]
     assert result["views_used"] == 0 and result["mode"] == "preview"
-    assert result["camera"] == {"fov_deg": 31.0}
+    assert result["camera"]["fov_deg"] == 31.0 and result["camera"]["tilt"]["elevation"] == 21.2
+    assert result["pose"]["applied"] is True and result["level"] == {"applied": True, "elevation": 21.2, "roll": 0.0}
     assert "projection" not in result
 
 
