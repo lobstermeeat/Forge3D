@@ -4,16 +4,22 @@
 # ops-out/private/ only encrypted (see ops/seal.sh).
 set -euo pipefail
 
-echo "== Deploy Phase 4: cleaner textures, the memory retry, picture scores and warm-up"
-modal deploy workers/modal_app.py | tee ops-out/deploy.txt
-url=$(grep -o 'https://[a-z0-9-]*--orainge-ai-api\.modal\.run' ops-out/deploy.txt | head -1 || true)
-[ -n "$url" ] || { echo "The deploy didn't print the job API's URL"; exit 1; }
+echo "== Deploy: restarted runs carry on, and exports get the memory retry"
+modal deploy workers/modal_app.py | tail -3
 
 echo
-echo "== Phase 2 again from the same 20 pictures: the same seeds (phase2b) and the next seeds (phase2c)"
-modal run ops/rerun_set.py --source phase2 --names phase2b,phase2c --out ops-out/private
-du -sh ops-out/private/*
+echo "== Finish the Phase 4 runs that stopped (the finished ones are skipped)"
+modal run ops/rerun_set.py --source phase2 --names phase2b,phase2c --out ops-out/private/all
+mkdir -p ops-out/private/finished
+for run in phase2b-05-sci-fi-laser-pistol-white phase2b-11-stack-of-old-books-with-a-candle \
+  phase2b-13-cute-cartoon-car-bright-blue phase2b-18-electric-guitar phase2c-10-astronaut-helmet \
+  phase2c-20-hot-air-balloon; do
+  set_name=${run%%-*}
+  [ -d "ops-out/private/all/$set_name-runs/$run" ] && cp -r "ops-out/private/all/$set_name-runs/$run" ops-out/private/finished/
+done
+rm -rf ops-out/private/all
+du -sh ops-out/private/finished
 
 echo
-echo "== The job API end to end, with scores and warm-up"
-modal run ops/check_api.py --url "$url" --prompt "a wooden rocking chair" --out ops-out/private/api-check
+echo "== The worker's memory retries in the last hour"
+modal app logs orainge-ai --since 1h --tail 2000 2>/dev/null | grep -i "out of GPU memory\|retrying" | tail -20 || true
