@@ -72,7 +72,10 @@ azimuth 0 the side the main picture shows. Each is cut out and cropped like the 
 size limits apply), and all of them steer TRELLIS.2's three flows together (see
 `trellis2/forge3d_worker/multiview.py`); the main picture still counts most (`settings.MULTIVIEW`), and it
 alone is painted onto the final. Send the same views with the preview and the final, so the final keeps
-the previewed shape. Output:
+the previewed shape. TRELLIS.2 builds what the views show, good or bad, and the Phase 6 tests found that
+the multiview worker's four views at 0, 90, 180 and 270 are the ones to send: its 45 and 315 drawings
+made every object worse. Generation takes about one more single-picture pass per view (4 views: 3.3 to
+4.7 times a single picture's time on an L40S). Output:
 
 ```json
 {
