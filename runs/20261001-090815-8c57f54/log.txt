@@ -1,0 +1,25 @@
+== Deploy: torch's GPU cache is freed before remeshing and after the projection
+✓ App deployed in 2.607s! 🎉
+
+View Deployment: https://modal.com/apps/lobstermeeat/main/deployed/orainge-ai
+
+== Finish the Phase 5 run that ran out of memory while remeshing (phase2e-17; phase2d-17 is done and skipped)
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-wqQ0uOPUSWe50UngenWIr3
+✓ Created objects.
+1 runs in phase2
+Starting 2 runs
+phase2d-17-bowl-of-ramen-with-an-egg: preview-136916256.glb, final-136916256.glb, input-bowl-of-ramen-with-an-egg.png
+phase2e-17-bowl-of-ramen-with-an-egg: preview-136916257.glb, final-136916257.glb, input-bowl-of-ramen-with-an-egg.png
+Done: 2 of 2 runs finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-wqQ0uOPUSWe50UngenWIr3
+phase2d-17-bowl-of-ramen-with-an-egg: done pipeline=1024_cascade painted=True (applied) gpu_s=71.2
+phase2e-17-bowl-of-ramen-with-an-egg: done pipeline=1024_cascade painted=True (applied) gpu_s=107.4
+
+== Worker log: memory in the last hour
+[forge3d] out of GPU memory in 1024_cascade, retrying in low-VRAM mode: [CuMesh] CUDA error: File: /tmp/CuMesh/src/utils.h Line: 43 Error code: 2 Error text: out of memory
+[forge3d] out of GPU memory in 1024_cascade even in low-VRAM mode, falling back to 512: CUDA error: out of memory CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect. For debugging consider passing CUDA_LAUNCH_BLOCKING=1 Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+[forge3d] out of GPU memory exporting, retrying with the models off the GPU: [CuMesh] CUDA error: File: /tmp/CuMesh/src/utils.h Line: 43 Error code: 2 Error text: out of memory
+exit status: 0
