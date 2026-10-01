@@ -1,0 +1,949 @@
+{
+  "plan": "real2",
+  "objects": {
+    "06": {
+      "source": "phase2-06-wooden-shield-with-a-lion",
+      "seed": 1654818878,
+      "label": "06-wooden-shield-with-a-lion",
+      "runs": {
+        "06-wooden-shield-with-a-lion-single": {
+          "run": {
+            "name": "single",
+            "views": "none"
+          },
+          "wall_s": 39.3,
+          "peak_gib": 19.9,
+          "timings": {
+            "generate_s": 15.558,
+            "export_s": 22.509,
+            "compress_s": 1.193,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 0,
+          "triangles": 99223,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9912,
+            "colour": 0.5234,
+            "coverage": 0.1453,
+            "pose": {
+              "azimuth": 347.5,
+              "elevation": -5.0,
+              "roll": 0.0,
+              "fov": 0.0,
+              "scale": 1.008,
+              "shift": [
+                -0.0006,
+                0.0034
+              ]
+            },
+            "mode": "detail only",
+            "decals": 2117,
+            "seconds": 1.232
+          },
+          "gpu_s": 39.3,
+          "metrics": {
+            "extents": [
+              0.661,
+              1.0017,
+              0.0954
+            ],
+            "area": 3.8848,
+            "watertight": false,
+            "faces": 99223
+          }
+        },
+        "06-wooden-shield-with-a-lion-real4-multi-w1": {
+          "run": {
+            "name": "real4-multi-w1",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 1.0
+          },
+          "wall_s": 86.1,
+          "peak_gib": 21.0,
+          "timings": {
+            "generate_s": 67.704,
+            "export_s": 17.109,
+            "compress_s": 1.224,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 95170,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.991,
+            "colour": 0.4308,
+            "coverage": 0.1041,
+            "pose": {
+              "azimuth": 351.2,
+              "elevation": -2.5,
+              "roll": 0.0,
+              "fov": 5.7,
+              "scale": 1.009,
+              "shift": [
+                0.0,
+                0.0031
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#996f4e",
+                "to": "#aa622c",
+                "share": 0.191
+              }
+            ],
+            "decals": 2174,
+            "seconds": 0.844
+          },
+          "gpu_s": 86.0,
+          "metrics": {
+            "extents": [
+              0.6527,
+              1.0013,
+              0.1961
+            ],
+            "area": 5.0658,
+            "watertight": false,
+            "faces": 95170,
+            "vs_single": {
+              "extent_ratio": [
+                0.987,
+                1.0,
+                2.055
+              ],
+              "area_ratio": 1.304,
+              "silhouette_iou": [
+                0.979,
+                0.914,
+                0.49,
+                0.914,
+                0.979,
+                0.914,
+                0.49,
+                0.914,
+                0.56
+              ],
+              "silhouette_area_ratio": [
+                0.986,
+                1.093,
+                2.041,
+                1.093,
+                0.986,
+                1.093,
+                2.041,
+                1.093,
+                1.756
+              ],
+              "mean_iou": 0.795,
+              "mean_area_ratio": 1.354,
+              "chamfer_mean": 0.01722,
+              "chamfer_p90": 0.05076
+            }
+          }
+        },
+        "06-wooden-shield-with-a-lion-real4-multi-w4": {
+          "run": {
+            "name": "real4-multi-w4",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 4.0
+          },
+          "wall_s": 80.9,
+          "peak_gib": 21.1,
+          "timings": {
+            "generate_s": 63.59,
+            "export_s": 16.088,
+            "compress_s": 1.185,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 93028,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9915,
+            "colour": 0.4654,
+            "coverage": 0.104,
+            "pose": {
+              "azimuth": 2.5,
+              "elevation": -15.0,
+              "roll": 0.0,
+              "fov": 0.0,
+              "scale": 1.008,
+              "shift": [
+                -0.0006,
+                0.005
+              ]
+            },
+            "mode": "detail only",
+            "decals": 1893,
+            "seconds": 0.392
+          },
+          "gpu_s": 80.9,
+          "metrics": {
+            "extents": [
+              0.6504,
+              1.0013,
+              0.1932
+            ],
+            "area": 5.3103,
+            "watertight": false,
+            "faces": 93028,
+            "vs_single": {
+              "extent_ratio": [
+                0.984,
+                1.0,
+                2.024
+              ],
+              "area_ratio": 1.367,
+              "silhouette_iou": [
+                0.961,
+                0.914,
+                0.532,
+                0.914,
+                0.961,
+                0.914,
+                0.532,
+                0.914,
+                0.561
+              ],
+              "silhouette_area_ratio": [
+                0.967,
+                1.066,
+                1.85,
+                1.067,
+                0.967,
+                1.066,
+                1.85,
+                1.067,
+                1.725
+              ],
+              "mean_iou": 0.8,
+              "mean_area_ratio": 1.292,
+              "chamfer_mean": 0.01513,
+              "chamfer_p90": 0.04651
+            }
+          }
+        },
+        "06-wooden-shield-with-a-lion-real3-multi-w2": {
+          "run": {
+            "name": "real3-multi-w2",
+            "views": "real",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0
+          },
+          "wall_s": 79.6,
+          "peak_gib": 21.4,
+          "timings": {
+            "generate_s": 58.677,
+            "export_s": 19.579,
+            "compress_s": 1.288,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 94982,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.99,
+            "colour": 0.4496,
+            "coverage": 0.0951,
+            "pose": {
+              "azimuth": 3.8,
+              "elevation": 5.0,
+              "roll": 0.0,
+              "fov": 14.4,
+              "scale": 1.008,
+              "shift": [
+                0.0,
+                0.0034
+              ]
+            },
+            "mode": "detail only",
+            "decals": 2130,
+            "seconds": 0.402
+          },
+          "gpu_s": 79.5,
+          "metrics": {
+            "extents": [
+              0.6626,
+              1.0014,
+              0.197
+            ],
+            "area": 5.5215,
+            "watertight": false,
+            "faces": 94982,
+            "vs_single": {
+              "extent_ratio": [
+                1.002,
+                1.0,
+                2.064
+              ],
+              "area_ratio": 1.421,
+              "silhouette_iou": [
+                0.982,
+                0.922,
+                0.542,
+                0.921,
+                0.982,
+                0.922,
+                0.542,
+                0.921,
+                0.588
+              ],
+              "silhouette_area_ratio": [
+                0.997,
+                1.077,
+                1.832,
+                1.077,
+                0.997,
+                1.077,
+                1.832,
+                1.077,
+                1.697
+              ],
+              "mean_iou": 0.814,
+              "mean_area_ratio": 1.296,
+              "chamfer_mean": 0.01435,
+              "chamfer_p90": 0.04417
+            }
+          }
+        }
+      },
+      "load_s": 93.3,
+      "seconds": 299.7
+    },
+    "04": {
+      "source": "phase2-04-retro-arcade-machine",
+      "seed": 949054593,
+      "label": "04-retro-arcade-machine",
+      "runs": {
+        "04-retro-arcade-machine-single": {
+          "run": {
+            "name": "single",
+            "views": "none"
+          },
+          "wall_s": 44.0,
+          "peak_gib": 21.5,
+          "timings": {
+            "generate_s": 19.937,
+            "export_s": 22.635,
+            "compress_s": 1.437,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 0,
+          "triangles": 99034,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9854,
+            "colour": 0.5344,
+            "coverage": 0.1496,
+            "pose": {
+              "azimuth": 338.8,
+              "elevation": 5.0,
+              "roll": 0.0,
+              "fov": 17.3,
+              "scale": 0.995,
+              "shift": [
+                -0.0006,
+                -0.0019
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#e94148",
+                "to": "#d35552",
+                "share": 0.348
+              }
+            ],
+            "decals": 48,
+            "seconds": 1.021
+          },
+          "gpu_s": 44.0,
+          "metrics": {
+            "extents": [
+              0.3626,
+              1.0018,
+              0.5427
+            ],
+            "area": 5.3713,
+            "watertight": false,
+            "faces": 99034
+          }
+        },
+        "04-retro-arcade-machine-real4-multi-w1": {
+          "run": {
+            "name": "real4-multi-w1",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 1.0
+          },
+          "wall_s": 112.2,
+          "peak_gib": 21.9,
+          "timings": {
+            "generate_s": 90.796,
+            "export_s": 19.849,
+            "compress_s": 1.503,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 98023,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.948,
+            "colour": 0.4377,
+            "coverage": 0.1174,
+            "pose": {
+              "azimuth": 147.5,
+              "elevation": -5.0,
+              "roll": 0.0,
+              "fov": 29.0,
+              "scale": 1.028,
+              "shift": [
+                -0.005,
+                -0.0212
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#8a453f",
+                "to": "#a57c82",
+                "share": 0.087
+              }
+            ],
+            "decals": 51,
+            "seconds": 0.827
+          },
+          "gpu_s": 112.2,
+          "metrics": {
+            "extents": [
+              0.3829,
+              1.0012,
+              0.5684
+            ],
+            "area": 5.7282,
+            "watertight": false,
+            "faces": 98023,
+            "vs_single": {
+              "extent_ratio": [
+                1.056,
+                0.999,
+                1.047
+              ],
+              "area_ratio": 1.066,
+              "silhouette_iou": [
+                0.924,
+                0.836,
+                0.664,
+                0.836,
+                0.924,
+                0.836,
+                0.664,
+                0.836,
+                0.886
+              ],
+              "silhouette_area_ratio": [
+                1.082,
+                0.89,
+                0.879,
+                0.895,
+                1.082,
+                0.89,
+                0.879,
+                0.895,
+                1.028
+              ],
+              "mean_iou": 0.823,
+              "mean_area_ratio": 0.947,
+              "chamfer_mean": 0.0313,
+              "chamfer_p90": 0.08157
+            }
+          }
+        },
+        "04-retro-arcade-machine-real4-multi-w4": {
+          "run": {
+            "name": "real4-multi-w4",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 4.0
+          },
+          "wall_s": 79.4,
+          "peak_gib": 20.3,
+          "timings": {
+            "generate_s": 58.774,
+            "export_s": 19.01,
+            "compress_s": 1.524,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 99314,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9609,
+            "colour": 0.3117,
+            "coverage": 0.1694,
+            "pose": {
+              "azimuth": 332.5,
+              "elevation": 5.0,
+              "roll": 0.0,
+              "fov": 20.2,
+              "scale": 1.01,
+              "shift": [
+                -0.0083,
+                -0.0012
+              ]
+            },
+            "mode": "detail only",
+            "decals": 66,
+            "seconds": 0.318
+          },
+          "gpu_s": 79.3,
+          "metrics": {
+            "extents": [
+              0.3622,
+              1.0014,
+              0.5515
+            ],
+            "area": 4.4735,
+            "watertight": false,
+            "faces": 99314,
+            "vs_single": {
+              "extent_ratio": [
+                0.999,
+                1.0,
+                1.016
+              ],
+              "area_ratio": 0.833,
+              "silhouette_iou": [
+                0.992,
+                0.896,
+                0.818,
+                0.897,
+                0.992,
+                0.896,
+                0.818,
+                0.897,
+                0.985
+              ],
+              "silhouette_area_ratio": [
+                0.992,
+                0.907,
+                0.841,
+                0.907,
+                0.992,
+                0.907,
+                0.841,
+                0.907,
+                0.987
+              ],
+              "mean_iou": 0.91,
+              "mean_area_ratio": 0.92,
+              "chamfer_mean": 0.01811,
+              "chamfer_p90": 0.0679
+            }
+          }
+        },
+        "04-retro-arcade-machine-real3-multi-w2": {
+          "run": {
+            "name": "real3-multi-w2",
+            "views": "real",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0
+          },
+          "wall_s": 67.7,
+          "peak_gib": 20.5,
+          "timings": {
+            "generate_s": 50.151,
+            "export_s": 15.869,
+            "compress_s": 1.568,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 3,
+          "triangles": 96963,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9338,
+            "colour": 0.4695,
+            "coverage": 0.1485,
+            "pose": {
+              "azimuth": 146.2,
+              "elevation": 5.0,
+              "roll": 0.0,
+              "fov": 29.0,
+              "scale": 1.04,
+              "shift": [
+                0.0022,
+                -0.0044
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#920f1f",
+                "to": "#f96662",
+                "share": 0.052
+              }
+            ],
+            "decals": 46,
+            "seconds": 0.316
+          },
+          "gpu_s": 67.6,
+          "metrics": {
+            "extents": [
+              0.3542,
+              1.0017,
+              0.5594
+            ],
+            "area": 4.5823,
+            "watertight": false,
+            "faces": 96963,
+            "vs_single": {
+              "extent_ratio": [
+                0.977,
+                1.0,
+                1.031
+              ],
+              "area_ratio": 0.853,
+              "silhouette_iou": [
+                0.963,
+                0.821,
+                0.68,
+                0.826,
+                0.963,
+                0.821,
+                0.68,
+                0.826,
+                0.914
+              ],
+              "silhouette_area_ratio": [
+                0.992,
+                0.868,
+                0.873,
+                0.872,
+                0.992,
+                0.868,
+                0.873,
+                0.872,
+                0.966
+              ],
+              "mean_iou": 0.833,
+              "mean_area_ratio": 0.908,
+              "chamfer_mean": 0.03244,
+              "chamfer_p90": 0.08531
+            }
+          }
+        }
+      },
+      "load_s": 96.4,
+      "seconds": 322.7
+    },
+    "11": {
+      "source": "phase2-11-stack-of-old-books-with-a-candle",
+      "seed": 8026098,
+      "label": "11-stack-of-old-books-with-a-candle",
+      "runs": {
+        "11-stack-of-old-books-with-a-candle-single": {
+          "run": {
+            "name": "single",
+            "views": "none",
+            "mode": "preview"
+          },
+          "wall_s": 20.4,
+          "peak_gib": 21.1,
+          "timings": {
+            "generate_s": 11.104,
+            "export_s": 8.757,
+            "compress_s": 0.54,
+            "upload_s": 0.001
+          },
+          "pipeline": "512",
+          "views_used": 0,
+          "triangles": 29767,
+          "projection": null,
+          "gpu_s": 20.4,
+          "metrics": {
+            "extents": [
+              0.7335,
+              0.9992,
+              0.7714
+            ],
+            "area": 19.5957,
+            "watertight": false,
+            "faces": 29767
+          }
+        },
+        "11-stack-of-old-books-with-a-candle-real4-multi-w1": {
+          "run": {
+            "name": "real4-multi-w1",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 1.0,
+            "mode": "preview"
+          },
+          "wall_s": 51.9,
+          "peak_gib": 21.3,
+          "timings": {
+            "generate_s": 42.361,
+            "export_s": 8.933,
+            "compress_s": 0.549,
+            "upload_s": 0.001
+          },
+          "pipeline": "512",
+          "views_used": 4,
+          "triangles": 29122,
+          "projection": null,
+          "gpu_s": 51.8,
+          "metrics": {
+            "extents": [
+              0.7818,
+              1.0022,
+              0.8219
+            ],
+            "area": 21.015,
+            "watertight": false,
+            "faces": 29122,
+            "vs_single": {
+              "extent_ratio": [
+                1.066,
+                1.003,
+                1.065
+              ],
+              "area_ratio": 1.072,
+              "silhouette_iou": [
+                0.86,
+                0.911,
+                0.903,
+                0.92,
+                0.86,
+                0.911,
+                0.903,
+                0.92,
+                0.936
+              ],
+              "silhouette_area_ratio": [
+                1.016,
+                1.002,
+                1.047,
+                1.001,
+                1.016,
+                1.002,
+                1.047,
+                1.001,
+                1.052
+              ],
+              "mean_iou": 0.903,
+              "mean_area_ratio": 1.021,
+              "chamfer_mean": 0.01379,
+              "chamfer_p90": 0.0248
+            }
+          }
+        },
+        "11-stack-of-old-books-with-a-candle-real4-multi-w4": {
+          "run": {
+            "name": "real4-multi-w4",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 4.0,
+            "mode": "preview"
+          },
+          "wall_s": 46.2,
+          "peak_gib": 20.6,
+          "timings": {
+            "generate_s": 37.493,
+            "export_s": 8.063,
+            "compress_s": 0.541,
+            "upload_s": 0.001
+          },
+          "pipeline": "512",
+          "views_used": 4,
+          "triangles": 28952,
+          "projection": null,
+          "gpu_s": 46.1,
+          "metrics": {
+            "extents": [
+              0.7555,
+              1.0028,
+              0.8134
+            ],
+            "area": 18.6494,
+            "watertight": false,
+            "faces": 28952,
+            "vs_single": {
+              "extent_ratio": [
+                1.03,
+                1.004,
+                1.054
+              ],
+              "area_ratio": 0.952,
+              "silhouette_iou": [
+                0.898,
+                0.941,
+                0.935,
+                0.946,
+                0.898,
+                0.941,
+                0.935,
+                0.946,
+                0.953
+              ],
+              "silhouette_area_ratio": [
+                1.045,
+                1.014,
+                1.048,
+                1.012,
+                1.045,
+                1.014,
+                1.048,
+                1.012,
+                1.03
+              ],
+              "mean_iou": 0.933,
+              "mean_area_ratio": 1.03,
+              "chamfer_mean": 0.01222,
+              "chamfer_p90": 0.02032
+            }
+          }
+        },
+        "11-stack-of-old-books-with-a-candle-real3-multi-w2": {
+          "run": {
+            "name": "real3-multi-w2",
+            "views": "real",
+            "azimuths": [
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0,
+            "mode": "preview"
+          },
+          "wall_s": 45.5,
+          "peak_gib": 22.0,
+          "timings": {
+            "generate_s": 35.498,
+            "export_s": 9.349,
+            "compress_s": 0.619,
+            "upload_s": 0.001
+          },
+          "pipeline": "512",
+          "views_used": 3,
+          "triangles": 29057,
+          "projection": null,
+          "gpu_s": 45.5,
+          "metrics": {
+            "extents": [
+              0.8,
+              0.9921,
+              0.8448
+            ],
+            "area": 24.3219,
+            "watertight": false,
+            "faces": 29057,
+            "vs_single": {
+              "extent_ratio": [
+                1.091,
+                0.993,
+                1.095
+              ],
+              "area_ratio": 1.241,
+              "silhouette_iou": [
+                0.891,
+                0.938,
+                0.924,
+                0.938,
+                0.891,
+                0.938,
+                0.924,
+                0.938,
+                0.91
+              ],
+              "silhouette_area_ratio": [
+                1.058,
+                1.02,
+                1.046,
+                1.008,
+                1.058,
+                1.02,
+                1.046,
+                1.008,
+                1.087
+              ],
+              "mean_iou": 0.922,
+              "mean_area_ratio": 1.039,
+              "chamfer_mean": 0.01219,
+              "chamfer_p90": 0.01954
+            }
+          }
+        }
+      },
+      "load_s": 0.0,
+      "seconds": 174.9
+    }
+  },
+  "wall_s": 573.4,
+  "gpu_minutes": 16.4
+}

@@ -1,0 +1,758 @@
+{
+  "plan": "controls",
+  "objects": {
+    "01": {
+      "source": "phase2-01-cute-low-poly-fox-sitting-down",
+      "seed": 783047822,
+      "label": "01-cute-low-poly-fox-sitting-down",
+      "runs": {
+        "01-cute-low-poly-fox-sitting-down-single": {
+          "run": {
+            "name": "single",
+            "views": "none"
+          },
+          "wall_s": 63.4,
+          "peak_gib": 24.6,
+          "timings": {
+            "generate_s": 32.215,
+            "export_s": 29.919,
+            "compress_s": 1.196,
+            "upload_s": 0.003
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 0,
+          "triangles": 99648,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9335,
+            "colour": 0.4011,
+            "coverage": 0.0911,
+            "pose": {
+              "azimuth": 21.2,
+              "elevation": -10.0,
+              "roll": 0.0,
+              "fov": 50.3,
+              "scale": 1.05,
+              "shift": [
+                -0.0012,
+                -0.0281
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#de3701",
+                "to": "#ca6902",
+                "share": 0.442
+              },
+              {
+                "from": "#bc2e03",
+                "to": "#b25002",
+                "share": 0.321
+              }
+            ],
+            "decals": 57,
+            "seconds": 0.991
+          },
+          "gpu_s": 63.3,
+          "metrics": {
+            "extents": [
+              0.9318,
+              0.9818,
+              0.9185
+            ],
+            "area": 7.4908,
+            "watertight": false,
+            "faces": 99648
+          }
+        },
+        "01-cute-low-poly-fox-sitting-down-real4-multi-w2": {
+          "run": {
+            "name": "real4-multi-w2",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0
+          },
+          "wall_s": 105.8,
+          "peak_gib": 20.8,
+          "timings": {
+            "generate_s": 87.169,
+            "export_s": 17.335,
+            "compress_s": 1.17,
+            "upload_s": 0.001
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 99868,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9565,
+            "colour": 0.7273,
+            "coverage": 0.1326,
+            "pose": {
+              "azimuth": 30.0,
+              "elevation": -1.2,
+              "roll": 0.5,
+              "fov": 23.1,
+              "scale": 1.004,
+              "shift": [
+                0.01,
+                -0.0012
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#c88e5e",
+                "to": "#9a571d",
+                "share": 0.018
+              }
+            ],
+            "decals": 67,
+            "seconds": 0.919
+          },
+          "gpu_s": 105.7,
+          "metrics": {
+            "extents": [
+              0.9109,
+              0.9556,
+              0.9439
+            ],
+            "area": 4.296,
+            "watertight": false,
+            "faces": 99868,
+            "vs_single": {
+              "extent_ratio": [
+                0.978,
+                0.973,
+                1.028
+              ],
+              "area_ratio": 0.574,
+              "silhouette_iou": [
+                0.894,
+                0.925,
+                0.893,
+                0.858,
+                0.894,
+                0.925,
+                0.893,
+                0.858,
+                0.862
+              ],
+              "silhouette_area_ratio": [
+                0.945,
+                0.943,
+                0.969,
+                0.958,
+                0.945,
+                0.943,
+                0.969,
+                0.958,
+                1.011
+              ],
+              "mean_iou": 0.889,
+              "mean_area_ratio": 0.96,
+              "chamfer_mean": 0.01571,
+              "chamfer_p90": 0.03181
+            }
+          }
+        },
+        "01-cute-low-poly-fox-sitting-down-real4-stoch-w2": {
+          "run": {
+            "name": "real4-stoch-w2",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "stochastic",
+            "picture_weight": 2.0
+          },
+          "wall_s": 36.5,
+          "peak_gib": 20.1,
+          "timings": {
+            "generate_s": 20.471,
+            "export_s": 14.819,
+            "compress_s": 1.123,
+            "upload_s": 0.001
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 95326,
+          "projection": {
+            "applied": false,
+            "reason": "the silhouettes don't match well enough (IoU 0.845 < 0.93)",
+            "iou": 0.8454,
+            "colour": 0.2166,
+            "pose": {
+              "azimuth": 195.0,
+              "elevation": 12.5,
+              "roll": -2.0,
+              "fov": 29.0,
+              "scale": 1.008,
+              "shift": [
+                0.0025,
+                0.0155
+              ]
+            },
+            "seconds": 0.184
+          },
+          "gpu_s": 36.4,
+          "metrics": {
+            "extents": [
+              0.806,
+              0.9979,
+              0.7403
+            ],
+            "area": 3.742,
+            "watertight": false,
+            "faces": 95326,
+            "vs_single": {
+              "extent_ratio": [
+                0.865,
+                1.016,
+                0.806
+              ],
+              "area_ratio": 0.5,
+              "silhouette_iou": [
+                0.408,
+                0.595,
+                0.651,
+                0.4,
+                0.408,
+                0.595,
+                0.651,
+                0.4,
+                0.461
+              ],
+              "silhouette_area_ratio": [
+                0.798,
+                1.114,
+                0.982,
+                0.666,
+                0.798,
+                1.114,
+                0.982,
+                0.666,
+                0.734
+              ],
+              "mean_iou": 0.507,
+              "mean_area_ratio": 0.873,
+              "chamfer_mean": 0.09339,
+              "chamfer_p90": 0.20601
+            }
+          }
+        }
+      },
+      "load_s": 95.1,
+      "seconds": 214.5
+    },
+    "09": {
+      "source": "phase2-09-donut-with-pink-frosting",
+      "seed": 591143680,
+      "label": "09-donut-with-pink-frosting",
+      "runs": {
+        "09-donut-with-pink-frosting-single": {
+          "run": {
+            "name": "single",
+            "views": "none"
+          },
+          "wall_s": 69.4,
+          "peak_gib": 25.0,
+          "timings": {
+            "generate_s": 45.347,
+            "export_s": 22.744,
+            "compress_s": 1.316,
+            "upload_s": 0.003
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 0,
+          "triangles": 94961,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9815,
+            "colour": 0.3173,
+            "coverage": 0.1103,
+            "pose": {
+              "azimuth": 11.2,
+              "elevation": 28.8,
+              "roll": 0.5,
+              "fov": 0.0,
+              "scale": 1.006,
+              "shift": [
+                0.005,
+                0.0044
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#c05053",
+                "to": "#be8790",
+                "share": 0.386
+              }
+            ],
+            "decals": 83,
+            "seconds": 1.07
+          },
+          "gpu_s": 69.4,
+          "metrics": {
+            "extents": [
+              1.0012,
+              0.461,
+              0.985
+            ],
+            "area": 8.1465,
+            "watertight": false,
+            "faces": 94961
+          }
+        },
+        "09-donut-with-pink-frosting-real4-multi-w2": {
+          "run": {
+            "name": "real4-multi-w2",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0
+          },
+          "wall_s": 198.2,
+          "peak_gib": 25.5,
+          "timings": {
+            "generate_s": 171.904,
+            "export_s": 25.019,
+            "compress_s": 1.219,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 99317,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.978,
+            "colour": 0.4581,
+            "coverage": 0.0959,
+            "pose": {
+              "azimuth": 316.2,
+              "elevation": 30.0,
+              "roll": 1.0,
+              "fov": 0.0,
+              "scale": 1.015,
+              "shift": [
+                0.0091,
+                -0.0012
+              ]
+            },
+            "mode": "recolour and detail",
+            "recoloured": [
+              {
+                "from": "#af5603",
+                "to": "#c57f2f",
+                "share": 0.351
+              },
+              {
+                "from": "#e39d5e",
+                "to": "#c5b386",
+                "share": 0.073
+              },
+              {
+                "from": "#c36d80",
+                "to": "#b18088",
+                "share": 0.34
+              }
+            ],
+            "decals": 56,
+            "seconds": 0.403
+          },
+          "gpu_s": 198.1,
+          "metrics": {
+            "extents": [
+              1.0012,
+              0.4608,
+              0.9513
+            ],
+            "area": 8.6333,
+            "watertight": false,
+            "faces": 99317,
+            "vs_single": {
+              "extent_ratio": [
+                1.0,
+                1.0,
+                0.966
+              ],
+              "area_ratio": 1.06,
+              "silhouette_iou": [
+                0.969,
+                0.96,
+                0.942,
+                0.956,
+                0.969,
+                0.96,
+                0.942,
+                0.956,
+                0.952
+              ],
+              "silhouette_area_ratio": [
+                1.014,
+                1.003,
+                0.973,
+                1.002,
+                1.014,
+                1.003,
+                0.973,
+                1.002,
+                0.995
+              ],
+              "mean_iou": 0.956,
+              "mean_area_ratio": 0.997,
+              "chamfer_mean": 0.01033,
+              "chamfer_p90": 0.01819
+            }
+          }
+        },
+        "09-donut-with-pink-frosting-real4-stoch-w2": {
+          "run": {
+            "name": "real4-stoch-w2",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "stochastic",
+            "picture_weight": 2.0
+          },
+          "wall_s": 58.1,
+          "peak_gib": 22.1,
+          "timings": {
+            "generate_s": 31.772,
+            "export_s": 25.027,
+            "compress_s": 1.179,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 98717,
+          "projection": {
+            "applied": false,
+            "reason": "ambiguous camera: a view 139 degrees away fits as well but sees a different shape",
+            "iou": 0.9722,
+            "colour": 0.5629,
+            "pose": {
+              "azimuth": 300.0,
+              "elevation": 30.0,
+              "roll": 4.0,
+              "fov": 0.0,
+              "scale": 1.014,
+              "shift": [
+                0.0012,
+                -0.0073
+              ]
+            },
+            "seconds": 0.248
+          },
+          "gpu_s": 58.0,
+          "metrics": {
+            "extents": [
+              1.0,
+              0.466,
+              0.9617
+            ],
+            "area": 5.5249,
+            "watertight": false,
+            "faces": 98717,
+            "vs_single": {
+              "extent_ratio": [
+                0.999,
+                1.011,
+                0.976
+              ],
+              "area_ratio": 0.678,
+              "silhouette_iou": [
+                0.961,
+                0.947,
+                0.93,
+                0.942,
+                0.961,
+                0.947,
+                0.93,
+                0.942,
+                0.95
+              ],
+              "silhouette_area_ratio": [
+                1.013,
+                0.986,
+                0.958,
+                0.978,
+                1.013,
+                0.986,
+                0.958,
+                0.978,
+                0.985
+              ],
+              "mean_iou": 0.945,
+              "mean_area_ratio": 0.984,
+              "chamfer_mean": 0.01443,
+              "chamfer_p90": 0.02912
+            }
+          }
+        }
+      },
+      "load_s": 105.1,
+      "seconds": 333.5
+    },
+    "13": {
+      "source": "phase2-13-cute-cartoon-car-bright-blue",
+      "seed": 207648777,
+      "label": "13-cute-cartoon-car-bright-blue",
+      "runs": {
+        "13-cute-cartoon-car-bright-blue-single": {
+          "run": {
+            "name": "single",
+            "views": "none"
+          },
+          "wall_s": 57.4,
+          "peak_gib": 22.9,
+          "timings": {
+            "generate_s": 31.0,
+            "export_s": 24.829,
+            "compress_s": 1.541,
+            "upload_s": 0.002
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 0,
+          "triangles": 99856,
+          "projection": {
+            "applied": true,
+            "reason": "applied",
+            "iou": 0.9802,
+            "colour": 0.4874,
+            "coverage": 0.0748,
+            "pose": {
+              "azimuth": 34.4,
+              "elevation": 10.0,
+              "roll": -1.0,
+              "fov": 30.4,
+              "scale": 1.005,
+              "shift": [
+                -0.0011,
+                -0.0025
+              ]
+            },
+            "mode": "detail only",
+            "decals": 417,
+            "seconds": 1.117
+          },
+          "gpu_s": 57.4,
+          "metrics": {
+            "extents": [
+              0.5724,
+              0.466,
+              1.0015
+            ],
+            "area": 6.5774,
+            "watertight": false,
+            "faces": 99856
+          }
+        },
+        "13-cute-cartoon-car-bright-blue-real4-multi-w2": {
+          "run": {
+            "name": "real4-multi-w2",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "multidiffusion",
+            "picture_weight": 2.0
+          },
+          "wall_s": 180.9,
+          "peak_gib": 24.8,
+          "timings": {
+            "generate_s": 155.221,
+            "export_s": 24.03,
+            "compress_s": 1.532,
+            "upload_s": 0.003
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 97459,
+          "projection": {
+            "applied": false,
+            "reason": "the silhouettes don't match well enough (IoU 0.911 < 0.93)",
+            "iou": 0.9105,
+            "colour": 0.1355,
+            "pose": {
+              "azimuth": 50.0,
+              "elevation": 7.5,
+              "roll": -8.0,
+              "fov": 47.2,
+              "scale": 1.063,
+              "shift": [
+                0.0225,
+                -0.0197
+              ]
+            },
+            "seconds": 0.192
+          },
+          "gpu_s": 180.8,
+          "metrics": {
+            "extents": [
+              1.0012,
+              0.4944,
+              0.9628
+            ],
+            "area": 8.1888,
+            "watertight": false,
+            "faces": 97459,
+            "vs_single": {
+              "extent_ratio": [
+                1.749,
+                1.061,
+                0.961
+              ],
+              "area_ratio": 1.245,
+              "silhouette_iou": [
+                0.474,
+                0.88,
+                0.713,
+                0.801,
+                0.474,
+                0.88,
+                0.713,
+                0.801,
+                0.517
+              ],
+              "silhouette_area_ratio": [
+                1.751,
+                1.101,
+                0.85,
+                1.105,
+                1.751,
+                1.101,
+                0.85,
+                1.105,
+                1.36
+              ],
+              "mean_iou": 0.695,
+              "mean_area_ratio": 1.219,
+              "chamfer_mean": 0.0462,
+              "chamfer_p90": 0.13489
+            }
+          }
+        },
+        "13-cute-cartoon-car-bright-blue-real4-stoch-w2": {
+          "run": {
+            "name": "real4-stoch-w2",
+            "views": "real",
+            "azimuths": [
+              0,
+              90,
+              180,
+              270
+            ],
+            "view_mode": "stochastic",
+            "picture_weight": 2.0
+          },
+          "wall_s": 59.9,
+          "peak_gib": 23.6,
+          "timings": {
+            "generate_s": 34.545,
+            "export_s": 23.795,
+            "compress_s": 1.515,
+            "upload_s": 0.003
+          },
+          "pipeline": "1024_cascade",
+          "views_used": 4,
+          "triangles": 96092,
+          "projection": {
+            "applied": false,
+            "reason": "the silhouettes don't match well enough (IoU 0.924 < 0.93)",
+            "iou": 0.9237,
+            "colour": 0.206,
+            "pose": {
+              "azimuth": 128.8,
+              "elevation": -13.8,
+              "roll": 0.0,
+              "fov": 0.0,
+              "scale": 1.036,
+              "shift": [
+                0.0256,
+                -0.0012
+              ]
+            },
+            "seconds": 0.196
+          },
+          "gpu_s": 59.9,
+          "metrics": {
+            "extents": [
+              0.7961,
+              0.5032,
+              1.0001
+            ],
+            "area": 7.0237,
+            "watertight": false,
+            "faces": 96092,
+            "vs_single": {
+              "extent_ratio": [
+                1.391,
+                1.08,
+                0.999
+              ],
+              "area_ratio": 1.068,
+              "silhouette_iou": [
+                0.623,
+                0.787,
+                0.866,
+                0.819,
+                0.623,
+                0.787,
+                0.866,
+                0.819,
+                0.76
+              ],
+              "silhouette_area_ratio": [
+                1.48,
+                1.154,
+                1.04,
+                0.978,
+                1.48,
+                1.154,
+                1.04,
+                0.978,
+                1.136
+              ],
+              "mean_iou": 0.772,
+              "mean_area_ratio": 1.16,
+              "chamfer_mean": 0.0244,
+              "chamfer_p90": 0.06068
+            }
+          }
+        }
+      },
+      "load_s": 0.0,
+      "seconds": 306.3
+    }
+  },
+  "wall_s": 629.4,
+  "gpu_minutes": 17.6
+}
