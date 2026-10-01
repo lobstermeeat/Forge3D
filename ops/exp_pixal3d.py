@@ -7,10 +7,12 @@ Phase 6, PIXAL3D line: Pixal3D (TencentARC, MIT) on Modal. Does its multi-view m
     modal run ops/exp_pixal3d.py::experiment --plan mvadapter --out ops-out/private
     modal run ops/exp_pixal3d.py::experiment --plan controls --out ops-out/private     # run 2
     modal run ops/exp_pixal3d.py::experiment --plan mvchoice --out ops-out/private
+    modal run ops/exp_pixal3d.py::experiment --plan posed --out ops-out/private        # run 3
+    modal run ops/exp_pixal3d.py::experiment --plan final20 --out ops-out/private      # run 4
 
-An ephemeral app (orainge-exp-pixal3d; nothing is deployed) with one L40S, running workers/pixal3d through
-its handle_job as a worker would: the Phase 2 picture and its phase2d seed, mode "final", production's
-export and packing. Plans:
+An ephemeral app (orainge-exp-pixal3d; nothing is deployed) with one or two L40S, running workers/pixal3d
+through its handle_job as a worker would: the Phase 2 picture and its phase2d seed, mode "final",
+production's export and packing. Plans:
 
 - single: Pixal3D's single-view weights on the picture alone (its camera from MoGe-2).
 - synthetic: the multi-view weights on views rendered here from the object's Phase 5 final, orthographic
@@ -20,6 +22,13 @@ export and packing. Plans:
 - controls: the single-view weights on the brief's other eight controls.
 - mvchoice: the 11 books' mv6 again, the car's synthetic views framed to fit the cube, then four views
   against six and the picture against the redrawn front as the main view (see PLANS).
+- posed (run 3, the tilt): the multi-view weights with the picture as one view at its real camera
+  elevation (Phase 5's pose), as an absolute pose the model has to honour ("posed"), against the same
+  weights levelled afterwards by that elevation ("mvlevel"). Nothing else is turned.
+- final20 (run 4): production's recipe on all twenty prompts at the phase2d seeds: TRELLIS.2's '512'
+  preview first (written as preview-<seed>.glb), the picture's camera found against it, Pixal3D's
+  single-view weights, the model levelled by that elevation, then the full export. Runs are named
+  phase2f-NN-<slug> and written to /outputs/phase6/pixal3d/final20/.
 
 Every multi-view result is checked against its views: the packed final is rendered from each view's
 camera and its silhouette compared with the view's (IoU). Results go to the volume,
@@ -302,15 +311,18 @@ STARTED = time.time()
     image=pixal3d_image,
     gpu="L40S",
     cpu=4.0,
-    memory=32768,
+    memory=49152,  # TRELLIS.2 for the previews lives on the CPU between uses (level="preview")
     volumes={prod.MODELS: prod.models, prod.OUTPUTS: prod.outputs, prod.CACHE: prod.cache},
     timeout=3600,
     startup_timeout=1200,
     scaledown_window=20,  # the next job is sent as soon as this one is saved
-    max_containers=1,
+    max_containers=2,
 )
 class Pixal3D:
     weights: str = modal.parameter(default="multiview")
+    # How a single picture's model is levelled: "preview" (TRELLIS.2's '512' preview, the picture's camera
+    # found against it: production's way), "given" (the job's Phase 5 pose) or "none"
+    level: str = modal.parameter(default="none")
 
     @modal.enter()
     def load(self) -> None:
@@ -322,10 +334,10 @@ class Pixal3D:
         from pixal3d_worker.pipeline import Pixal3DRuntime
 
         started = time.time()
-        self.runtime = Pixal3DRuntime(multiview=self.weights == "multiview")
+        self.runtime = Pixal3DRuntime(multiview=self.weights == "multiview", level=self.level)
         self.load_seconds = round(time.time() - started, 1)
         self.gpu = torch.cuda.get_device_name()
-        print(f"[pixal3d] {self.weights} weights on {self.gpu} after {time.time() - STARTED:.0f} s")
+        print(f"[pixal3d] {self.weights} weights (level {self.level}) on {self.gpu} after {time.time() - STARTED:.0f} s")
 
     @modal.method()
     def make(self, job: dict) -> dict:
@@ -343,11 +355,19 @@ class Pixal3D:
         state = json.loads((source / "progress.json").read_text())
         picture = (source / state["input"]).read_bytes()
         seed = state["seed"]
-        run = f"{job['variant']}-{job['source']}"
+        run = job.get("run_name") or f"{job['variant']}-{job['source']}"
         out = root / RESULTS / job["plan"] / run
-        (out / "views").mkdir(parents=True, exist_ok=True)
+        out.mkdir(parents=True, exist_ok=True)
 
         views, camera, summary = [], None, {"run": run, "variant": job["variant"], "seed": seed}
+        tilt = job.get("tilt")  # Phase 5's (elevation, roll) for level="given"
+        self.runtime.given_tilt = tuple(tilt) if tilt else (0.0, 0.0)
+        # The picture's camera elevation into its camera as an absolute pose (multi-view weights only)
+        self.runtime.posed = bool(job.get("posed")) and self.weights == "multiview"
+        if tilt:
+            summary["given_tilt"] = list(tilt)
+        if self.runtime.posed:
+            summary["posed"] = True
         azimuths = job.get("azimuths") or []
         if job.get("views") == "synthetic":  # the object's Phase 5 final (phase2d: the same picture and seed)
             finals = root / job["finals"]
@@ -364,6 +384,7 @@ class Pixal3D:
         else:
             pictures = []
         for azimuth, view in zip(azimuths, pictures):
+            (out / "views").mkdir(exist_ok=True)
             buffer = io.BytesIO()
             view.save(buffer, "PNG")
             (out / "views" / f"view-{azimuth}.png").write_bytes(buffer.getvalue())
@@ -406,10 +427,35 @@ class Pixal3D:
             "pipeline": result.get("pipeline"),
             "views_used": result.get("views_used"),
         }
-        for key in ("projection", "camera"):
+        for key in ("projection", "camera", "pose", "level"):
             if result.get(key):
                 step[key] = result[key]
-        progress = {"prompt": None, "seed": seed, "input": state["input"], "final": True, "steps": {"final": step}}
+        steps = {"final": step}
+        files = {name: packed, state["input"]: picture}
+        preview_raw = getattr(self.runtime, "last_preview", None)
+        if preview_raw:  # TRELLIS.2's '512' preview the pose was found against, packed like production's
+            preview_name = f"preview-{seed}.glb"
+            preview_packed = pack_glb(preview_raw, 1024)
+            (out / preview_name).write_bytes(preview_packed)
+            files[preview_name] = preview_packed
+            pose = result.get("pose") or {}
+            steps["preview"] = {
+                "status": "done",
+                "files": [preview_name],
+                "bytes": len(preview_packed),
+                "pipeline": (pose.get("preview") or {}).get("pipeline", "512"),
+                "seconds": pose.get("seconds"),
+                "made_by": "TRELLIS.2, for the picture's camera (pixal3d_worker.level)",
+            }
+        progress = {
+            "prompt": state.get("prompt"),
+            "seed": seed,
+            "input": state["input"],
+            "final": True,
+            "steps": steps,
+            "made_by": {"worker": "pixal3d", "plan": job["plan"], "variant": job["variant"], "picture_from": job["source"]},
+            "updated": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+        }
         (out / "progress.json").write_text(json.dumps(progress, indent=2))
         prod.outputs.commit()
         prod.share_caches()
@@ -422,13 +468,15 @@ class Pixal3D:
                 "pipeline": result.get("pipeline"),
                 "projection": result.get("projection"),
                 "camera": result.get("camera"),
+                "pose": result.get("pose"),
+                "level": result.get("level"),
                 "peak_gpu_gb": round(torch.cuda.max_memory_reserved() / 2**30, 1),
                 "load_seconds": self.load_seconds,
                 "container_seconds": round(time.time() - STARTED, 1),
                 "gpu": self.gpu,
             }
         )
-        files = {name: packed, state["input"]: picture, "progress.json": json.dumps(progress, indent=2).encode()}
+        files["progress.json"] = json.dumps(progress, indent=2).encode()
         for azimuth in azimuths:
             files[f"views/view-{azimuth}.png"] = (out / "views" / f"view-{azimuth}.png").read_bytes()
         return {"summary": summary, "files": files}
@@ -440,11 +488,37 @@ BACKS = ["04", "06", "08", "11"]
 CONTROLS = ["01", "13"]
 # The brief's other controls, which must not get worse either
 MORE_CONTROLS = ["02", "05", "07", "09", "10", "17", "19", "20"]
+ALL = [f"{n:02d}" for n in range(1, 21)]
 SIX = [0, 45, 90, 180, 270, 315]
 FOUR = [0, 90, 180, 270]
+# The picture's camera (elevation, roll) as Phase 5's projection placed it against the TRELLIS.2 final
+# (phase2d-NN progress.json, steps.final.projection.pose); 03 and 18 failed its gate (IoU 0.91, 0.66)
+PHASE5_POSES: dict[str, tuple[float, float]] = {
+    "01": (-3.1, 0.0), "02": (5.0, 0.0), "03": (1.2, 0.0), "04": (5.6, 0.0), "05": (7.5, 0.0),
+    "06": (6.9, 0.0), "07": (5.0, 0.0), "08": (0.0, 0.0), "09": (28.8, 0.0), "10": (21.2, 0.5),
+    "11": (10.0, 0.0), "12": (47.5, 0.0), "13": (10.0, -1.5), "14": (10.0, 0.0), "15": (7.5, 0.0),
+    "16": (10.0, 0.0), "17": (45.0, -7.9), "18": (-5.0, 4.0), "19": (0.0, 0.0), "20": (4.4, 0.5),
+}  # fmt: skip
+# Run 3: the objects the tilt shows on, the backs and the car
+TILTED = ["09", "10", "17", "04", "13"]
 
 PLANS: dict[str, dict] = {
     "single": {"weights": "single", "jobs": [{"number": n, "variant": "single"} for n in BACKS + CONTROLS]},
+    # Run 3, the picture's elevation into Pixal3D itself (multi-view weights): the picture's camera as an
+    # absolute pose above the front ("posed"), against levelling the same weights' camera-aligned model
+    # afterwards ("mvlevel", experiment B on these weights)
+    "posed": {
+        "weights": "multiview",
+        "level": "given",
+        "jobs": [{"number": n, "variant": "posed", "tilt": PHASE5_POSES[n], "posed": 1} for n in TILTED]
+        + [{"number": n, "variant": "mvlevel", "tilt": PHASE5_POSES[n]} for n in ["09", "17"]],
+    },
+    # Run 4: production's recipe on all twenty, at the phase2d seeds
+    "final20": {
+        "weights": "single",
+        "level": "preview",
+        "jobs": [{"number": n, "variant": "phase2f", "name_like_source": "phase2f"} for n in ALL],
+    },
     # The single-view weights on the rest of the controls (run 2)
     "controls": {"weights": "single", "jobs": [{"number": n, "variant": "single"} for n in MORE_CONTROLS]},
     # Consistent views of known models: the rebuild must line up with them (cameras and framing)
@@ -480,42 +554,58 @@ def runs_by_number(volume: modal.Volume, prefix: str) -> dict[str, str]:
 
 
 @app.local_entrypoint()
-def experiment(plan: str, out: str = "ops-out/private", only: str = "") -> None:
+def experiment(plan: str, out: str = "ops-out/private", only: str = "", containers: int = 1) -> None:
     if plan not in PLANS:
         raise SystemExit(f"--plan must be one of {sorted(PLANS)}")
+    settings = PLANS[plan]
     pictures = runs_by_number(prod.outputs, "phase2")
     finals = runs_by_number(prod.outputs, "phase2d")
     jobs = []
-    for job in PLANS[plan]["jobs"]:
+    for job in settings["jobs"]:
         number = job["number"]
         if only and number not in only.split(","):
             continue
         if number not in pictures or (job.get("views") == "synthetic" and number not in finals):
             print(f"[pixal3d] no phase2 run (or no phase2d final) for {number}, skipped")
             continue
-        jobs.append({**job, "plan": plan, "source": pictures[number], "finals": finals.get(number)})
-    print(f"[pixal3d] {plan}: {len(jobs)} jobs on {PLANS[plan]['weights']} weights")
-    worker = Pixal3D(weights=PLANS[plan]["weights"])
+        job = {**job, "plan": plan, "source": pictures[number], "finals": finals.get(number)}
+        if job.get("name_like_source"):  # phase2f-NN-<slug>: Phase 6's final of the phase2 picture
+            job["run_name"] = pictures[number].replace("phase2-", job["name_like_source"] + "-", 1)
+        jobs.append(job)
+    print(f"[pixal3d] {plan}: {len(jobs)} jobs on {settings['weights']} weights (level {settings.get('level', 'none')})")
+    worker = Pixal3D(weights=settings["weights"], level=settings.get("level", "none"))
     summaries = []
     failures = 0
-    for job in jobs:  # one at a time: one container, warm between jobs
-        try:
-            made = worker.make.remote(job)
-        except Exception as err:  # noqa: BLE001 - report it and go on with the next object
-            print(f"[pixal3d] {job['variant']} {job['source']}: failed: {type(err).__name__}: {err}")
-            summaries.append({"run": f"{job['variant']}-{job['source']}", "error": f"{type(err).__name__}: {err}"})
+
+    def save(job: dict, made) -> None:
+        nonlocal failures
+        name = job.get("run_name") or f"{job['variant']}-{job['source']}"
+        if isinstance(made, BaseException):
+            print(f"[pixal3d] {name}: failed: {type(made).__name__}: {made}")
+            summaries.append({"run": name, "error": f"{type(made).__name__}: {made}"})
             failures += 1
+            return
+        summary = made["summary"]
+        target = pathlib.Path(out) / plan / summary["run"]
+        for file_name, data in made["files"].items():
+            (target / file_name).parent.mkdir(parents=True, exist_ok=True)
+            (target / file_name).write_bytes(data)
+        summaries.append(summary)
+        print(f"[pixal3d] {json.dumps(summary)}")
+
+    if containers > 1:  # the jobs spread over up to that many warm containers (the class caps them at 2)
+        for job, made in zip(jobs, worker.make.map(jobs, return_exceptions=True, order_outputs=True)):
+            save(job, made)
+    else:
+        for job in jobs:  # one at a time: one container, warm between jobs
+            try:
+                made = worker.make.remote(job)
+            except Exception as err:  # noqa: BLE001 - report it and go on with the next object
+                made = err
+            save(job, made)
             if failures == 2 and len(summaries) == 2:  # the first two failed: something general, stop paying
                 print("[pixal3d] the first two jobs failed; not trying the rest")
                 break
-            continue
-        summary = made["summary"]
-        target = pathlib.Path(out) / plan / summary["run"]
-        for name, data in made["files"].items():
-            (target / name).parent.mkdir(parents=True, exist_ok=True)
-            (target / name).write_bytes(data)
-        summaries.append(summary)
-        print(f"[pixal3d] {json.dumps(summary)}")
     pathlib.Path("ops-out").mkdir(exist_ok=True)
     pathlib.Path(f"ops-out/pixal3d-{plan}.json").write_text(json.dumps(summaries, indent=2))
     ages = [s.get("container_seconds", 0) for s in summaries if "error" not in s]
