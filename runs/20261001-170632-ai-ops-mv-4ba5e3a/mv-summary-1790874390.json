@@ -1,0 +1,1667 @@
+{
+  "runs": {
+    "back/phase2-04-retro-arcade-machine": {
+      "folder": "phase6/mv/back/phase2-04-retro-arcade-machine",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 74.539,
+      "timings": {
+        "cutout_s": 0.904,
+        "views_s": 71.047,
+        "view_cutouts_s": 1.96,
+        "upload_s": 0.627
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            242,
+            35,
+            526,
+            735
+          ],
+          "coverage": 0.3319
+        },
+        "45": {
+          "bbox": [
+            156,
+            35,
+            584,
+            734
+          ],
+          "coverage": 0.447
+        },
+        "90": {
+          "bbox": [
+            209,
+            36,
+            504,
+            733
+          ],
+          "coverage": 0.2794
+        },
+        "180": {
+          "bbox": [
+            241,
+            34,
+            526,
+            734
+          ],
+          "coverage": 0.3328
+        },
+        "270": {
+          "bbox": [
+            264,
+            35,
+            560,
+            734
+          ],
+          "coverage": 0.2812
+        },
+        "315": {
+          "bbox": [
+            181,
+            34,
+            613,
+            735
+          ],
+          "coverage": 0.4512
+        }
+      }
+    },
+    "back/phase2-06-wooden-shield-with-a-lion": {
+      "folder": "phase6/mv/back/phase2-06-wooden-shield-with-a-lion",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.647,
+      "timings": {
+        "cutout_s": 0.357,
+        "views_s": 70.768,
+        "view_cutouts_s": 1.961,
+        "upload_s": 0.561
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            154,
+            40,
+            614,
+            729
+          ],
+          "coverage": 0.4255
+        },
+        "45": {
+          "bbox": [
+            204,
+            39,
+            606,
+            730
+          ],
+          "coverage": 0.3932
+        },
+        "90": {
+          "bbox": [
+            296,
+            40,
+            476,
+            730
+          ],
+          "coverage": 0.1566
+        },
+        "180": {
+          "bbox": [
+            155,
+            40,
+            614,
+            730
+          ],
+          "coverage": 0.4243
+        },
+        "270": {
+          "bbox": [
+            291,
+            39,
+            471,
+            729
+          ],
+          "coverage": 0.1551
+        },
+        "315": {
+          "bbox": [
+            162,
+            39,
+            562,
+            730
+          ],
+          "coverage": 0.3935
+        }
+      }
+    },
+    "back/phase2-08-vintage-film-camera": {
+      "folder": "phase6/mv/back/phase2-08-vintage-film-camera",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.807,
+      "timings": {
+        "cutout_s": 0.345,
+        "views_s": 70.766,
+        "view_cutouts_s": 1.962,
+        "upload_s": 0.734
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            41,
+            179,
+            725,
+            591
+          ],
+          "coverage": 0.3857
+        },
+        "45": {
+          "bbox": [
+            85,
+            189,
+            721,
+            594
+          ],
+          "coverage": 0.3816
+        },
+        "90": {
+          "bbox": [
+            69,
+            191,
+            700,
+            592
+          ],
+          "coverage": 0.3656
+        },
+        "180": {
+          "bbox": [
+            41,
+            178,
+            727,
+            591
+          ],
+          "coverage": 0.3909
+        },
+        "270": {
+          "bbox": [
+            67,
+            190,
+            699,
+            593
+          ],
+          "coverage": 0.3689
+        },
+        "315": {
+          "bbox": [
+            37,
+            189,
+            691,
+            592
+          ],
+          "coverage": 0.3876
+        }
+      }
+    },
+    "back/phase2-11-stack-of-old-books-with-a-candle": {
+      "folder": "phase6/mv/back/phase2-11-stack-of-old-books-with-a-candle",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 74.035,
+      "timings": {
+        "cutout_s": 0.352,
+        "views_s": 70.767,
+        "view_cutouts_s": 1.964,
+        "upload_s": 0.952
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            134,
+            42,
+            635,
+            727
+          ],
+          "coverage": 0.3802
+        },
+        "45": {
+          "bbox": [
+            0,
+            42,
+            768,
+            727
+          ],
+          "coverage": 0.5724
+        },
+        "90": {
+          "bbox": [
+            39,
+            42,
+            733,
+            728
+          ],
+          "coverage": 0.4904
+        },
+        "180": {
+          "bbox": [
+            132,
+            42,
+            634,
+            727
+          ],
+          "coverage": 0.3807
+        },
+        "270": {
+          "bbox": [
+            35,
+            41,
+            730,
+            728
+          ],
+          "coverage": 0.4898
+        },
+        "315": {
+          "bbox": [
+            0,
+            41,
+            768,
+            727
+          ],
+          "coverage": 0.5807
+        }
+      }
+    },
+    "back/phase2-16-green-dragon-sitting-cartoon": {
+      "folder": "phase6/mv/back/phase2-16-green-dragon-sitting-cartoon",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.658,
+      "timings": {
+        "cutout_s": 0.351,
+        "views_s": 70.763,
+        "view_cutouts_s": 1.962,
+        "upload_s": 0.582
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            74,
+            40,
+            680,
+            726
+          ],
+          "coverage": 0.3119
+        },
+        "45": {
+          "bbox": [
+            108,
+            39,
+            711,
+            713
+          ],
+          "coverage": 0.3131
+        },
+        "90": {
+          "bbox": [
+            147,
+            39,
+            622,
+            711
+          ],
+          "coverage": 0.2867
+        },
+        "180": {
+          "bbox": [
+            88,
+            40,
+            695,
+            727
+          ],
+          "coverage": 0.3125
+        },
+        "270": {
+          "bbox": [
+            147,
+            39,
+            620,
+            711
+          ],
+          "coverage": 0.2816
+        },
+        "315": {
+          "bbox": [
+            98,
+            39,
+            678,
+            710
+          ],
+          "coverage": 0.3221
+        }
+      }
+    },
+    "back/phase2-18-electric-guitar": {
+      "folder": "phase6/mv/back/phase2-18-electric-guitar",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.417,
+      "timings": {
+        "cutout_s": 0.357,
+        "views_s": 70.76,
+        "view_cutouts_s": 1.964,
+        "upload_s": 0.336
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            43,
+            83,
+            727,
+            682
+          ],
+          "coverage": 0.1707
+        },
+        "45": {
+          "bbox": [
+            51,
+            83,
+            721,
+            683
+          ],
+          "coverage": 0.1736
+        },
+        "90": {
+          "bbox": [
+            180,
+            81,
+            492,
+            682
+          ],
+          "coverage": 0.0862
+        },
+        "180": {
+          "bbox": [
+            40,
+            85,
+            725,
+            683
+          ],
+          "coverage": 0.1681
+        },
+        "270": {
+          "bbox": [
+            275,
+            81,
+            590,
+            683
+          ],
+          "coverage": 0.0868
+        },
+        "315": {
+          "bbox": [
+            275,
+            83,
+            547,
+            684
+          ],
+          "coverage": 0.114
+        }
+      }
+    },
+    "cap1/phase2-04-retro-arcade-machine": {
+      "folder": "phase6/mv/cap1/phase2-04-retro-arcade-machine",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.663,
+      "timings": {
+        "cutout_s": 0.346,
+        "views_s": 70.764,
+        "view_cutouts_s": 1.966,
+        "upload_s": 0.587
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            248,
+            35,
+            520,
+            735
+          ],
+          "coverage": 0.3134
+        },
+        "45": {
+          "bbox": [
+            185,
+            34,
+            585,
+            734
+          ],
+          "coverage": 0.4162
+        },
+        "90": {
+          "bbox": [
+            241,
+            35,
+            518,
+            734
+          ],
+          "coverage": 0.257
+        },
+        "180": {
+          "bbox": [
+            245,
+            35,
+            523,
+            734
+          ],
+          "coverage": 0.3162
+        },
+        "270": {
+          "bbox": [
+            250,
+            35,
+            527,
+            735
+          ],
+          "coverage": 0.2584
+        },
+        "315": {
+          "bbox": [
+            182,
+            34,
+            584,
+            735
+          ],
+          "coverage": 0.4164
+        }
+      }
+    },
+    "cap1/phase2-06-wooden-shield-with-a-lion": {
+      "folder": "phase6/mv/cap1/phase2-06-wooden-shield-with-a-lion",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.589,
+      "timings": {
+        "cutout_s": 0.357,
+        "views_s": 70.756,
+        "view_cutouts_s": 1.964,
+        "upload_s": 0.512
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            154,
+            40,
+            614,
+            729
+          ],
+          "coverage": 0.4255
+        },
+        "45": {
+          "bbox": [
+            214,
+            39,
+            561,
+            731
+          ],
+          "coverage": 0.3283
+        },
+        "90": {
+          "bbox": [
+            331,
+            40,
+            400,
+            730
+          ],
+          "coverage": 0.0652
+        },
+        "180": {
+          "bbox": [
+            155,
+            40,
+            613,
+            729
+          ],
+          "coverage": 0.424
+        },
+        "270": {
+          "bbox": [
+            369,
+            38,
+            436,
+            730
+          ],
+          "coverage": 0.0631
+        },
+        "315": {
+          "bbox": [
+            207,
+            38,
+            554,
+            730
+          ],
+          "coverage": 0.3302
+        }
+      }
+    },
+    "cap1/phase2-08-vintage-film-camera": {
+      "folder": "phase6/mv/cap1/phase2-08-vintage-film-camera",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.792,
+      "timings": {
+        "cutout_s": 0.343,
+        "views_s": 70.748,
+        "view_cutouts_s": 1.961,
+        "upload_s": 0.74
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            40,
+            178,
+            726,
+            591
+          ],
+          "coverage": 0.3862
+        },
+        "45": {
+          "bbox": [
+            106,
+            178,
+            730,
+            592
+          ],
+          "coverage": 0.3664
+        },
+        "90": {
+          "bbox": [
+            50,
+            179,
+            702,
+            591
+          ],
+          "coverage": 0.3656
+        },
+        "180": {
+          "bbox": [
+            41,
+            178,
+            727,
+            590
+          ],
+          "coverage": 0.3866
+        },
+        "270": {
+          "bbox": [
+            65,
+            178,
+            718,
+            594
+          ],
+          "coverage": 0.3686
+        },
+        "315": {
+          "bbox": [
+            91,
+            176,
+            687,
+            592
+          ],
+          "coverage": 0.3664
+        }
+      }
+    },
+    "cap2/phase2-04-retro-arcade-machine": {
+      "folder": "phase6/mv/cap2/phase2-04-retro-arcade-machine",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.659,
+      "timings": {
+        "cutout_s": 0.348,
+        "views_s": 70.755,
+        "view_cutouts_s": 1.966,
+        "upload_s": 0.59
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            249,
+            33,
+            519,
+            734
+          ],
+          "coverage": 0.3125
+        },
+        "45": {
+          "bbox": [
+            173,
+            34,
+            592,
+            735
+          ],
+          "coverage": 0.4371
+        },
+        "90": {
+          "bbox": [
+            228,
+            35,
+            523,
+            735
+          ],
+          "coverage": 0.2756
+        },
+        "180": {
+          "bbox": [
+            249,
+            34,
+            519,
+            734
+          ],
+          "coverage": 0.3121
+        },
+        "270": {
+          "bbox": [
+            249,
+            34,
+            541,
+            734
+          ],
+          "coverage": 0.272
+        },
+        "315": {
+          "bbox": [
+            178,
+            34,
+            595,
+            734
+          ],
+          "coverage": 0.4337
+        }
+      }
+    },
+    "cap2/phase2-06-wooden-shield-with-a-lion": {
+      "folder": "phase6/mv/cap2/phase2-06-wooden-shield-with-a-lion",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.596,
+      "timings": {
+        "cutout_s": 0.36,
+        "views_s": 70.757,
+        "view_cutouts_s": 1.959,
+        "upload_s": 0.52
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            154,
+            40,
+            614,
+            729
+          ],
+          "coverage": 0.4254
+        },
+        "45": {
+          "bbox": [
+            203,
+            39,
+            582,
+            729
+          ],
+          "coverage": 0.3654
+        },
+        "90": {
+          "bbox": [
+            321,
+            40,
+            433,
+            729
+          ],
+          "coverage": 0.1108
+        },
+        "180": {
+          "bbox": [
+            155,
+            40,
+            613,
+            730
+          ],
+          "coverage": 0.4239
+        },
+        "270": {
+          "bbox": [
+            335,
+            40,
+            448,
+            729
+          ],
+          "coverage": 0.1103
+        },
+        "315": {
+          "bbox": [
+            188,
+            40,
+            565,
+            729
+          ],
+          "coverage": 0.3653
+        }
+      }
+    },
+    "cap2/phase2-08-vintage-film-camera": {
+      "folder": "phase6/mv/cap2/phase2-08-vintage-film-camera",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.717,
+      "timings": {
+        "cutout_s": 0.344,
+        "views_s": 70.757,
+        "view_cutouts_s": 1.961,
+        "upload_s": 0.656
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            41,
+            179,
+            726,
+            591
+          ],
+          "coverage": 0.3858
+        },
+        "45": {
+          "bbox": [
+            159,
+            178,
+            706,
+            592
+          ],
+          "coverage": 0.3445
+        },
+        "90": {
+          "bbox": [
+            180,
+            178,
+            594,
+            595
+          ],
+          "coverage": 0.2531
+        },
+        "180": {
+          "bbox": [
+            41,
+            178,
+            728,
+            590
+          ],
+          "coverage": 0.3857
+        },
+        "270": {
+          "bbox": [
+            174,
+            178,
+            590,
+            595
+          ],
+          "coverage": 0.255
+        },
+        "315": {
+          "bbox": [
+            68,
+            178,
+            650,
+            593
+          ],
+          "coverage": 0.355
+        }
+      }
+    },
+    "zoom70/phase2-11-stack-of-old-books-with-a-candle": {
+      "folder": "phase6/mv/zoom70/phase2-11-stack-of-old-books-with-a-candle",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 74.013,
+      "timings": {
+        "cutout_s": 0.351,
+        "views_s": 70.758,
+        "view_cutouts_s": 1.966,
+        "upload_s": 0.938
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            134,
+            42,
+            635,
+            727
+          ],
+          "coverage": 0.38
+        },
+        "45": {
+          "bbox": [
+            0,
+            41,
+            768,
+            727
+          ],
+          "coverage": 0.5812
+        },
+        "90": {
+          "bbox": [
+            81,
+            42,
+            700,
+            728
+          ],
+          "coverage": 0.4638
+        },
+        "180": {
+          "bbox": [
+            132,
+            42,
+            634,
+            727
+          ],
+          "coverage": 0.3808
+        },
+        "270": {
+          "bbox": [
+            68,
+            42,
+            687,
+            728
+          ],
+          "coverage": 0.4633
+        },
+        "315": {
+          "bbox": [
+            0,
+            42,
+            768,
+            727
+          ],
+          "coverage": 0.5745
+        }
+      }
+    },
+    "zoom70/phase2-13-cute-cartoon-car-bright-blue": {
+      "folder": "phase6/mv/zoom70/phase2-13-cute-cartoon-car-bright-blue",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.737,
+      "timings": {
+        "cutout_s": 0.35,
+        "views_s": 70.754,
+        "view_cutouts_s": 1.961,
+        "upload_s": 0.672
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            107,
+            160,
+            660,
+            589
+          ],
+          "coverage": 0.2904
+        },
+        "45": {
+          "bbox": [
+            0,
+            160,
+            768,
+            589
+          ],
+          "coverage": 0.4145
+        },
+        "90": {
+          "bbox": [
+            24,
+            160,
+            768,
+            589
+          ],
+          "coverage": 0.3561
+        },
+        "180": {
+          "bbox": [
+            107,
+            159,
+            664,
+            589
+          ],
+          "coverage": 0.2906
+        },
+        "270": {
+          "bbox": [
+            0,
+            160,
+            744,
+            589
+          ],
+          "coverage": 0.3557
+        },
+        "315": {
+          "bbox": [
+            0,
+            160,
+            768,
+            589
+          ],
+          "coverage": 0.4145
+        }
+      }
+    },
+    "zoom70/phase2-19-small-cabin-in-a-snowy-forest": {
+      "folder": "phase6/mv/zoom70/phase2-19-small-cabin-in-a-snowy-forest",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.981,
+      "timings": {
+        "cutout_s": 0.347,
+        "views_s": 70.753,
+        "view_cutouts_s": 1.964,
+        "upload_s": 0.918
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            49,
+            123,
+            730,
+            603
+          ],
+          "coverage": 0.3424
+        },
+        "45": {
+          "bbox": [
+            0,
+            125,
+            768,
+            640
+          ],
+          "coverage": 0.5659
+        },
+        "90": {
+          "bbox": [
+            36,
+            126,
+            734,
+            641
+          ],
+          "coverage": 0.5065
+        },
+        "180": {
+          "bbox": [
+            40,
+            123,
+            719,
+            602
+          ],
+          "coverage": 0.3425
+        },
+        "270": {
+          "bbox": [
+            35,
+            126,
+            733,
+            638
+          ],
+          "coverage": 0.4862
+        },
+        "315": {
+          "bbox": [
+            0,
+            125,
+            768,
+            602
+          ],
+          "coverage": 0.536
+        }
+      }
+    },
+    "elev20/phase2-04-retro-arcade-machine": {
+      "folder": "phase6/mv/elev20/phase2-04-retro-arcade-machine",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.688,
+      "timings": {
+        "cutout_s": 0.346,
+        "views_s": 70.752,
+        "view_cutouts_s": 1.965,
+        "upload_s": 0.625
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            241,
+            35,
+            527,
+            735
+          ],
+          "coverage": 0.3352
+        },
+        "45": {
+          "bbox": [
+            155,
+            35,
+            573,
+            734
+          ],
+          "coverage": 0.4244
+        },
+        "90": {
+          "bbox": [
+            199,
+            36,
+            582,
+            734
+          ],
+          "coverage": 0.3075
+        },
+        "180": {
+          "bbox": [
+            241,
+            34,
+            527,
+            735
+          ],
+          "coverage": 0.3338
+        },
+        "270": {
+          "bbox": [
+            188,
+            35,
+            569,
+            734
+          ],
+          "coverage": 0.307
+        },
+        "315": {
+          "bbox": [
+            196,
+            34,
+            613,
+            735
+          ],
+          "coverage": 0.4255
+        }
+      }
+    },
+    "elev20/phase2-09-donut-with-pink-frosting": {
+      "folder": "phase6/mv/elev20/phase2-09-donut-with-pink-frosting",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.995,
+      "timings": {
+        "cutout_s": 0.346,
+        "views_s": 70.75,
+        "view_cutouts_s": 1.963,
+        "upload_s": 0.937
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            44,
+            144,
+            725,
+            607
+          ],
+          "coverage": 0.4288
+        },
+        "45": {
+          "bbox": [
+            19,
+            147,
+            733,
+            608
+          ],
+          "coverage": 0.4615
+        },
+        "90": {
+          "bbox": [
+            33,
+            147,
+            733,
+            607
+          ],
+          "coverage": 0.4466
+        },
+        "180": {
+          "bbox": [
+            42,
+            144,
+            727,
+            609
+          ],
+          "coverage": 0.4339
+        },
+        "270": {
+          "bbox": [
+            35,
+            146,
+            735,
+            607
+          ],
+          "coverage": 0.4472
+        },
+        "315": {
+          "bbox": [
+            35,
+            145,
+            768,
+            608
+          ],
+          "coverage": 0.4523
+        }
+      }
+    },
+    "elev20/phase2-17-bowl-of-ramen-with-an-egg": {
+      "folder": "phase6/mv/elev20/phase2-17-bowl-of-ramen-with-an-egg",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 73.833,
+      "timings": {
+        "cutout_s": 0.353,
+        "views_s": 70.756,
+        "view_cutouts_s": 1.97,
+        "upload_s": 0.754
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            88,
+            42,
+            681,
+            713
+          ],
+          "coverage": 0.349
+        },
+        "45": {
+          "bbox": [
+            11,
+            43,
+            755,
+            728
+          ],
+          "coverage": 0.432
+        },
+        "90": {
+          "bbox": [
+            30,
+            44,
+            733,
+            729
+          ],
+          "coverage": 0.3681
+        },
+        "180": {
+          "bbox": [
+            87,
+            43,
+            683,
+            721
+          ],
+          "coverage": 0.3517
+        },
+        "270": {
+          "bbox": [
+            35,
+            42,
+            738,
+            730
+          ],
+          "coverage": 0.3743
+        },
+        "315": {
+          "bbox": [
+            10,
+            43,
+            768,
+            729
+          ],
+          "coverage": 0.4421
+        }
+      }
+    },
+    "s30/phase2-01-cute-low-poly-fox-sitting-down": {
+      "folder": "phase6/mv/s30/phase2-01-cute-low-poly-fox-sitting-down",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 45.97,
+      "timings": {
+        "cutout_s": 0.358,
+        "views_s": 43.063,
+        "view_cutouts_s": 1.944,
+        "upload_s": 0.605
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            134,
+            40,
+            634,
+            726
+          ],
+          "coverage": 0.3423
+        },
+        "45": {
+          "bbox": [
+            167,
+            40,
+            663,
+            726
+          ],
+          "coverage": 0.3274
+        },
+        "90": {
+          "bbox": [
+            133,
+            42,
+            635,
+            726
+          ],
+          "coverage": 0.3139
+        },
+        "180": {
+          "bbox": [
+            132,
+            42,
+            634,
+            725
+          ],
+          "coverage": 0.3433
+        },
+        "270": {
+          "bbox": [
+            136,
+            44,
+            633,
+            727
+          ],
+          "coverage": 0.3141
+        },
+        "315": {
+          "bbox": [
+            87,
+            41,
+            620,
+            725
+          ],
+          "coverage": 0.353
+        }
+      }
+    },
+    "s30/phase2-13-cute-cartoon-car-bright-blue": {
+      "folder": "phase6/mv/s30/phase2-13-cute-cartoon-car-bright-blue",
+      "files": [
+        "raw-0.jpg",
+        "raw-180.jpg",
+        "raw-270.jpg",
+        "raw-315.jpg",
+        "raw-45.jpg",
+        "raw-90.jpg",
+        "reference.png",
+        "view-0.png",
+        "view-180.png",
+        "view-270.png",
+        "view-315.png",
+        "view-45.png",
+        "view-90.png",
+        "views.json"
+      ],
+      "seconds": 46.088,
+      "timings": {
+        "cutout_s": 0.354,
+        "views_s": 43.063,
+        "view_cutouts_s": 1.965,
+        "upload_s": 0.706
+      },
+      "vram_peak_gib": 19.07,
+      "silhouettes": {
+        "0": {
+          "bbox": [
+            105,
+            148,
+            663,
+            589
+          ],
+          "coverage": 0.304
+        },
+        "45": {
+          "bbox": [
+            0,
+            150,
+            768,
+            589
+          ],
+          "coverage": 0.434
+        },
+        "90": {
+          "bbox": [
+            16,
+            150,
+            768,
+            589
+          ],
+          "coverage": 0.3687
+        },
+        "180": {
+          "bbox": [
+            104,
+            150,
+            664,
+            589
+          ],
+          "coverage": 0.3027
+        },
+        "270": {
+          "bbox": [
+            0,
+            151,
+            752,
+            590
+          ],
+          "coverage": 0.3691
+        },
+        "315": {
+          "bbox": [
+            0,
+            150,
+            768,
+            589
+          ],
+          "coverage": 0.434
+        }
+      }
+    }
+  },
+  "load_s": 20.3,
+  "total_s": 1501.4,
+  "gpu": "NVIDIA A10G"
+}

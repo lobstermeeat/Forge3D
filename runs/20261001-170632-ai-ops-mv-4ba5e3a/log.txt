@@ -1,0 +1,80 @@
+== Second round of variants (all 20 canonical sets are done)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-YXTtgYs4SMIfHvAsiQTwBE
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/exp_mv.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/scripts/download_weights
+│   .py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/multiview_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/multiview/mvadapter
+├── ✓ Created Function download.
+└── ✓ Created Function make_views.
+multiview: already downloaded
+[mv] 20 runs x 6 variants: phase2-01-cute-low-poly-fox-sitting-down, phase2-02-red-high-top-sneaker, phase2-03-gaming-chair-black-and-purple, phase2-04-retro-arcade-machine, phase2-05-sci-fi-laser-pistol-white, phase2-06-wooden-shield-with-a-lion, phase2-07-chibi-knight-with-a-big-helmet, phase2-08-vintage-film-camera, phase2-09-donut-with-pink-frosting, phase2-10-astronaut-helmet, phase2-11-stack-of-old-books-with-a-candle, phase2-12-skateboard-with-graffiti-art, phase2-13-cute-cartoon-car-bright-blue, phase2-14-bubble-tea-with-tapioca-pearls, phase2-15-health-potion-in-a-round-glass, phase2-16-green-dragon-sitting-cartoon, phase2-17-bowl-of-ramen-with-an-egg, phase2-18-electric-guitar, phase2-19-small-cabin-in-a-snowy-forest, phase2-20-hot-air-balloon; [{'name': 'back', 'prompt': 'back', 'runs': '04+06+08+11+16+18'}, {'name': 'cap1', 'prompt': 'caption', 'seed': '1', 'runs': '04+06+08'}, {'name': 'cap2', 'prompt': 'caption', 'seed': '2', 'runs': '04+06+08'}, {'name': 'zoom70', 'extent': '0.7', 'runs': '13+11+19'}, {'name': 'elev20', 'elevation': '20', 'runs': '09+17+04'}, {'name': 's30', 'steps': '30', 'runs': '13+01'}]
+You are offline and the cache for model files in Transformers v4.22.0 has been updated while your local cache seems to be the one of a previous version. It is very likely that all your calls to any `from_pretrained()` method will fail. Remove the offline mode and enable internet connection to have your cache be updated automatically, then you can go back to offline mode.
+
+[1A0it [00:00, ?it/s]0it [00:00, ?it/s]
+
+[1ALoading pipeline components...:   0%|          | 0/7 [00:00<?, ?it/s]
+[1ALoading pipeline components...:  14%|█▍        | 1/7 [00:00<00:05,  1.03it/s]
+[1ALoading pipeline components...:  29%|██▊       | 2/7 [00:04<00:11,  2.27s/it]
+[1ALoading pipeline components...:  43%|████▎     | 3/7 [00:04<00:05,  1.38s/it]
+[1ALoading pipeline components...: 100%|██████████| 7/7 [00:04<00:00,  2.42it/s]
+[1ALoading pipeline components...: 100%|██████████| 7/7 [00:04<00:00,  1.51it/s]
+[mv] NVIDIA A10G: loaded in 20.3 s, 9.14 GiB allocated
+[mv] back/phase2-04-retro-arcade-machine: 74.539 s, peak 19.07 GiB reserved
+[mv] back/phase2-06-wooden-shield-with-a-lion: 73.647 s, peak 19.07 GiB reserved
+[mv] back/phase2-08-vintage-film-camera: 73.807 s, peak 19.07 GiB reserved
+[mv] back/phase2-11-stack-of-old-books-with-a-candle: 74.035 s, peak 19.07 GiB reserved
+[mv] back/phase2-16-green-dragon-sitting-cartoon: 73.658 s, peak 19.07 GiB reserved
+[mv] back/phase2-18-electric-guitar: 73.417 s, peak 19.07 GiB reserved
+[mv] cap1/phase2-04-retro-arcade-machine: 73.663 s, peak 19.07 GiB reserved
+[mv] cap1/phase2-06-wooden-shield-with-a-lion: 73.589 s, peak 19.07 GiB reserved
+[mv] cap1/phase2-08-vintage-film-camera: 73.792 s, peak 19.07 GiB reserved
+[mv] cap2/phase2-04-retro-arcade-machine: 73.659 s, peak 19.07 GiB reserved
+[mv] cap2/phase2-06-wooden-shield-with-a-lion: 73.596 s, peak 19.07 GiB reserved
+[mv] cap2/phase2-08-vintage-film-camera: 73.717 s, peak 19.07 GiB reserved
+[mv] zoom70/phase2-11-stack-of-old-books-with-a-candle: 74.013 s, peak 19.07 GiB reserved
+[mv] zoom70/phase2-13-cute-cartoon-car-bright-blue: 73.737 s, peak 19.07 GiB reserved
+[mv] zoom70/phase2-19-small-cabin-in-a-snowy-forest: 73.981 s, peak 19.07 GiB reserved
+[mv] elev20/phase2-04-retro-arcade-machine: 73.688 s, peak 19.07 GiB reserved
+[mv] elev20/phase2-09-donut-with-pink-frosting: 73.995 s, peak 19.07 GiB reserved
+[mv] elev20/phase2-17-bowl-of-ramen-with-an-egg: 73.833 s, peak 19.07 GiB reserved
+[mv] s30/phase2-01-cute-low-poly-fox-sitting-down: 45.97 s, peak 19.07 GiB reserved
+[mv] s30/phase2-13-cute-cartoon-car-bright-blue: 46.088 s, peak 19.07 GiB reserved
+back/phase2-04-retro-arcade-machine: 74.539
+back/phase2-06-wooden-shield-with-a-lion: 73.647
+back/phase2-08-vintage-film-camera: 73.807
+back/phase2-11-stack-of-old-books-with-a-candle: 74.035
+back/phase2-16-green-dragon-sitting-cartoon: 73.658
+back/phase2-18-electric-guitar: 73.417
+cap1/phase2-04-retro-arcade-machine: 73.663
+cap1/phase2-06-wooden-shield-with-a-lion: 73.589
+cap1/phase2-08-vintage-film-camera: 73.792
+cap2/phase2-04-retro-arcade-machine: 73.659
+cap2/phase2-06-wooden-shield-with-a-lion: 73.596
+cap2/phase2-08-vintage-film-camera: 73.717
+zoom70/phase2-11-stack-of-old-books-with-a-candle: 74.013
+zoom70/phase2-13-cute-cartoon-car-bright-blue: 73.737
+zoom70/phase2-19-small-cabin-in-a-snowy-forest: 73.981
+elev20/phase2-04-retro-arcade-machine: 73.688
+elev20/phase2-09-donut-with-pink-frosting: 73.995
+elev20/phase2-17-bowl-of-ramen-with-an-egg: 73.833
+s30/phase2-01-cute-low-poly-fox-sitting-down: 45.97
+s30/phase2-13-cute-cartoon-car-bright-blue: 46.088
+[mv] NVIDIA A10G: load 20.3 s, total 1501.4 s
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-YXTtgYs4SMIfHvAsiQTwBE
+62M	ops-out/private/views
+exit status: 0
