@@ -102,6 +102,23 @@ class _KeepCutout:
         return getattr(self.remover, name)
 
 
+# How much of a frame edge a view's object may cover before the view is left out. Upstream crops a
+# picture to its object's bounding box, so a view clipped by its frame (MV-Adapter's side views of a
+# wide object run off both edges) reads as a whole object with its ends cut off, and TRELLIS.2 builds
+# that: the car control came out crumpled with two such views. Real clipping covers a hundred pixels or
+# more of a 768-pixel edge; a frosting tip brushing the frame covers a couple of dozen.
+CLIPPED_EDGE = 0.04
+
+
+def clipped_edges(cutout: Image.Image, fraction: float = CLIPPED_EDGE) -> tuple[str, ...]:
+    """The frame edges ('left', 'right', 'top', 'bottom') the cutout's object runs off, by upstream's alpha cut."""
+    import numpy as np
+
+    alpha = np.asarray(cutout.convert("RGBA"))[..., 3] > 0.8 * 255  # upstream's bounding-box threshold
+    sides = {"left": alpha[:, 0], "right": alpha[:, -1], "top": alpha[0], "bottom": alpha[-1]}
+    return tuple(name for name, edge in sides.items() if int(edge.sum()) >= max(4, round(fraction * edge.size)))
+
+
 def is_out_of_memory(err: BaseException) -> bool:
     """A failed GPU allocation, which a run with the weights off the GPU can get past."""
     import torch
@@ -220,13 +237,23 @@ class Trellis2Runtime:
         return prepared, cutout
 
     def _prepare_views(self, views: Sequence[View]) -> list[tuple[Image.Image, float]]:
-        """Each view cut out and cropped as the picture is, with its weight; views with no object are left out."""
+        """
+        Each view cut out and cropped as the picture is, with its weight. A view with no object in it, or
+        whose object runs off the frame (see CLIPPED_EDGE), is left out.
+        """
         prepared = []
         for number, view in enumerate(views):
+            where = f"views[{number}] (azimuth {view.azimuth:g})"
             try:
-                prepared.append((self.pipeline.preprocess_image(view.image), view.weight))
+                image, cutout = self._preprocess(view.image)
             except ValueError:
-                print(f"[forge3d] views[{number}] (azimuth {view.azimuth:g}) left out: no object found in it")
+                print(f"[forge3d] {where} left out: no object found in it")
+                continue
+            edges = clipped_edges(cutout) if isinstance(cutout, Image.Image) else ()
+            if edges:
+                print(f"[forge3d] {where} left out: its object runs off the frame ({', '.join(edges)})")
+                continue
+            prepared.append((image, view.weight))
         return prepared
 
     def _weights(self, views: Sequence[tuple[Image.Image, float]]) -> list[float]:

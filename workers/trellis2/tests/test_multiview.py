@@ -514,28 +514,69 @@ def test_views_carry_through_the_out_of_memory_fallback(monkeypatch, capsys):
     assert "get_cond" not in vars(pipeline) and pipeline.low_vram is False
 
 
-def test_a_job_with_views_conditions_every_flow_and_reports_them():
-    """handle_job end to end: decoded views, cut out like the picture (one has nothing in it), every flow."""
+def cutout(size=64, box=(8, 8, 56, 56), opaque=255):
+    """An RGBA picture of one solid square (``box``) on a transparent frame."""
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    ImageDraw.Draw(image).rectangle(box, fill=(200, 10, 10, opaque))
+    return image
+
+
+@pytest.mark.parametrize(
+    "box, edges",
+    [
+        ((8, 8, 56, 56), ()),  # whole object inside the frame
+        ((0, 8, 56, 56), ("left",)),  # runs off the left edge
+        ((-5, 8, 70, 56), ("left", "right")),  # MV-Adapter's side view of a wide object
+        ((8, -3, 56, 70), ("top", "bottom")),
+        ((8, 8, 56, 63), ("bottom",)),
+        ((30, 8, 63, 9), ()),  # a 2-pixel brush of the right edge, under 4 % of it: not clipped
+    ],
+)
+def test_clipped_edges_names_the_frame_edges_the_object_runs_off(box, edges):
+    from forge3d_worker.pipeline import clipped_edges
+
+    assert clipped_edges(cutout(box=box)) == edges
+
+
+def test_a_translucent_fringe_on_the_edge_is_not_clipping():
+    from forge3d_worker.pipeline import clipped_edges
+
+    # Upstream's bounding box ignores alpha at or under 80 %, and so does this
+    assert clipped_edges(cutout(box=(0, 0, 63, 63), opaque=200)) == ()
+    assert clipped_edges(cutout(box=(0, 0, 63, 63), opaque=205)) == ("left", "right", "top", "bottom")
+
+
+def test_a_job_with_views_conditions_every_flow_and_reports_them(capsys):
+    """
+    handle_job end to end: decoded views, cut out like the picture, every flow. Of four views, one has
+    nothing in it and one's object runs off the frame: both are left out.
+    """
     import base64
     import io
-
-    from PIL import Image
 
     from forge3d_worker.service import handle_job
 
     class PicturePipeline(RuntimePipeline):
-        """A picture's number is its first pixel's red channel; a fully transparent one has no object."""
+        """A picture's number is its object's red channel over 255; a fully transparent one has no object."""
 
         def preprocess_image(self, image):
             if image.mode == "RGBA" and image.getextrema()[3][1] == 0:
                 raise ValueError("zero-size array to reduction operation minimum which has no identity")
-            value = image.convert("RGB").getpixel((0, 0))[0] / 255
+            value = image.convert("RGB").getpixel((32, 32))[0] / 255
             self.prepared.append(value)
             return value
 
-    def png(red, alpha=255):
+    def png(red, **options):
+        image = cutout(**options)
+        pixels = image.load()
+        for x in range(image.width):
+            for y in range(image.height):
+                r, g, b, a = pixels[x, y]
+                pixels[x, y] = (red, g, b, a)
         buffer = io.BytesIO()
-        Image.new("RGBA", (16, 16), (red, 10, 10, alpha)).save(buffer, "PNG")
+        image.save(buffer, "PNG")
         return base64.b64encode(buffer.getvalue()).decode()
 
     pipeline = PicturePipeline()
@@ -549,12 +590,20 @@ def test_a_job_with_views_conditions_every_flow_and_reports_them():
 
     pipeline.run = run
     runtime.export = lambda mesh, preset: (b"glb" * 10, 1234)
-    views = [{"image_base64": png(51), "azimuth": 90}, {"image_base64": png(0, alpha=0), "azimuth": 180},
-             {"image_base64": png(204), "azimuth": 270, "weight": 0.5}]  # fmt: skip
+    views = [
+        {"image_base64": png(51), "azimuth": 90},
+        {"image_base64": png(0, opaque=0), "azimuth": 180},  # nothing in it
+        {"image_base64": png(153, box=(-5, 8, 70, 56)), "azimuth": 225},  # runs off both sides
+        {"image_base64": png(204), "azimuth": 270, "weight": 0.5},
+    ]
     job = {"id": "j", "input": {"image_base64": png(102), "mode": "final", "seed": 3, "views": views}}
     out = handle_job(job, runtime, types.SimpleNamespace(put=lambda key, data, kind: {"key": key}), lambda raw, size: raw)
 
     assert "error" not in out and out["views_used"] == 2 and out["pipeline"] == "1024_cascade"
-    assert pipeline.prepared == pytest.approx([0.4, 0.2, 0.8])  # the picture, then the views with objects
+    # The picture, then every view with an object (the clipped one is cut out before it is judged)
+    assert pipeline.prepared == pytest.approx([0.4, 0.2, 0.6, 0.8])
     assert weights == [(2.0, 1.0, 0.5)]
     assert [rows for _, *rows in pipeline.sampler_calls] == [[3, 1]] * 4  # structure, both shape stages, texture
+    log = capsys.readouterr().out.splitlines()
+    assert log[0] == "[forge3d] views[1] (azimuth 180) left out: no object found in it"
+    assert log[1] == "[forge3d] views[2] (azimuth 225) left out: its object runs off the frame (left, right)"

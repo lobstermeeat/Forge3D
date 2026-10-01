@@ -102,7 +102,9 @@ fit, while TRELLIS.2's cascade has no cheaper setting for a 1024³ final (see `F
 `trellis2/forge3d_worker/pipeline.py`).
 
 `views_used` is how many of the job's `views` helped make the model: 0 without views, and fewer than
-sent when a view has no object in it (it is left out).
+sent when a view is left out: one with no object in it, or one whose object runs off the frame
+(TRELLIS.2 crops to the object, so a view clipped at its edge reads as a whole object with a side cut
+off, and the model comes out crumpled; `CLIPPED_EDGE` in `pipeline.py`).
 
 Finals also carry `projection`, whether the picture was painted onto the model (see above); its
 time is part of `export_s`.
