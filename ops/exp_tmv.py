@@ -34,9 +34,9 @@ from typing import Any, Optional
 import modal
 
 HERE = pathlib.Path(__file__).resolve()
-for candidate in (HERE.parents[1] / "workers", pathlib.Path("/root")):
-    if (candidate / "modal_app.py").exists() and str(candidate) not in sys.path:
-        sys.path.insert(0, str(candidate))
+# Here: the checkout's workers/. In the container: /root, where the image puts modal_app.py
+CHECKOUT = HERE.parents[1] / "workers"
+sys.path.insert(0, str(CHECKOUT) if (CHECKOUT / "modal_app.py").is_file() else "/root")
 from modal_app import CACHE, MODELS, OUTPUTS, WORKERS, cache, models, outputs, trellis2_image  # noqa: E402
 
 app = modal.App("orainge-exp-tmv")
