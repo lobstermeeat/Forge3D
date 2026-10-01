@@ -11,8 +11,10 @@ and marker as modal_app.download_models). Each Phase 2 run's picture is read fro
 progress.json -> "input") and goes through the worker's own handle_job. The views land in
 /outputs/phase6/views/<run>/ (view-<azimuth>.png, views.json, reference.png, raw-<azimuth>.jpg);
 a variant other than "views" lands in /outputs/phase6/mv/<variant>/<run>/. Everything is copied
-to ops-out/private/views/... for local use. Variant keys: prompt (default | caption), steps,
-guidance, fill, seed (an offset added to the run's seed).
+to ops-out/private/views/... for local use. Variant keys: prompt (default | caption, the Phase 2
+prompt | back, BACK_PROMPTS below), steps, guidance, fill, seed (an offset added to the run's seed),
+elevation (degrees, every view), extent (the orthographic half-extent, 0.55 trained), negative
+(replaces the negative prompt; spaces as _), runs (a subset of --only for this variant, 04+06).
 """
 
 from __future__ import annotations
@@ -41,6 +43,15 @@ from modal_app import MODELS, MULTIVIEW_GPU, OUTPUTS, WORKERS, download_image, m
 
 app = modal.App("orainge-exp-mv")
 CANONICAL = "views"
+# prompt=back: the Phase 2 prompt plus what the hidden side should look like, by run number
+BACK_PROMPTS = {
+    "04": "a retro arcade machine, a plain flat back panel, smooth sides",
+    "06": "a wooden shield with a lion painted on the front, the back is plain wooden planks",
+    "08": "a vintage film camera; the back is a flat film door with a small viewfinder eyepiece, the lens only on the front",
+    "11": "a stack of old books with a candle on top; spines on one side, page edges on the others",
+    "16": "a green cartoon dragon sitting, seen from all sides, its back has wings and a spiky spine",
+    "18": "an electric guitar; the back of the body is plain painted wood, pickups only on the front",
+}
 # The production images (this checkout's worker code), plus modal_app itself, which this file imports
 # again in the container
 gpu_image = multiview_image.add_local_file(WORKERS / "modal_app.py", "/root/modal_app.py")
@@ -118,8 +129,9 @@ def make_views(runs: list, variants: list, pins: dict) -> dict:
     import torch
     from PIL import Image
 
-    from multiview_worker.cameras import camera_to_world
-    from multiview_worker.generator import FILL, GUIDANCE, STEPS, MultiViewGenerator
+    import multiview_worker.generator as generator_module
+    from multiview_worker.cameras import ELEVATION, HALF_EXTENT, IMAGE_SIZE, camera_to_world
+    from multiview_worker.generator import FILL, GUIDANCE, NEGATIVE_PROMPT, STEPS, MultiViewGenerator, control_images
     from multiview_worker.service import handle_job
 
     started = time.monotonic()
@@ -129,15 +141,29 @@ def make_views(runs: list, variants: list, pins: dict) -> dict:
     load_s = round(time.monotonic() - started, 1)
     loaded_gb = round(torch.cuda.memory_allocated() / 2**30, 2)
     print(f"[mv] {torch.cuda.get_device_name()}: loaded in {load_s} s, {loaded_gb} GiB allocated", flush=True)
+    trained_control = generator.control
 
     class Variant:
         def __init__(self, spec: dict) -> None:
             self.steps = int(spec.get("steps", STEPS))
             self.guidance = float(spec.get("guidance", GUIDANCE))
             self.fill = float(spec.get("fill", FILL))
+            self.elevation = float(spec.get("elevation", ELEVATION))
+            self.extent = float(spec.get("extent", HALF_EXTENT))
+            self.negative = spec.get("negative", "").replace("_", " ") or NEGATIVE_PROMPT
+            self.control = trained_control
+            if self.elevation != ELEVATION or self.extent != HALF_EXTENT:
+                self.control = control_images(generator.device, elevation=self.elevation, half_extent=self.extent)
 
         def __call__(self, image, seed, prompt):
-            return generator(image, seed, prompt, steps=self.steps, guidance=self.guidance, fill=self.fill)
+            # Experiment-only knobs: the camera maps and the negative prompt are the worker's constants
+            generator.control = self.control
+            generator_module.NEGATIVE_PROMPT = self.negative
+            try:
+                return generator(image, seed, prompt, steps=self.steps, guidance=self.guidance, fill=self.fill)
+            finally:
+                generator.control = trained_control
+                generator_module.NEGATIVE_PROMPT = NEGATIVE_PROMPT
 
         @property
         def last_timings(self):
@@ -147,7 +173,10 @@ def make_views(runs: list, variants: list, pins: dict) -> dict:
     for spec in variants:  # the canonical views first: other lines of work wait for them
         name = spec["name"]
         variant = Variant(spec)
+        wanted = {number.zfill(2) for number in spec.get("runs", "").split("+") if number}
         for run in runs:
+            if wanted and run.split("-")[1] not in wanted:
+                continue
             source = pathlib.Path(OUTPUTS) / run
             state = json.loads((source / "progress.json").read_text())
             seed = (int(state["seed"]) + int(spec.get("seed", 0))) % 2**31
@@ -158,6 +187,8 @@ def make_views(runs: list, variants: list, pins: dict) -> dict:
             }
             if spec.get("prompt") == "caption" and state.get("prompt"):
                 job["prompt"] = state["prompt"]
+            elif spec.get("prompt") == "back":
+                job["prompt"] = BACK_PROMPTS.get(run.split("-")[1], state.get("prompt", "high quality"))
             torch.cuda.reset_peak_memory_stats()
             storage = Capture()
             out = handle_job({"id": run, "input": job}, variant, storage)
@@ -177,10 +208,13 @@ def make_views(runs: list, variants: list, pins: dict) -> dict:
                 views.append(
                     {
                         "azimuth": azimuth,
-                        "elevation": entry["elevation"],
+                        "elevation": variant.elevation,
                         "file": f"view-{azimuth}.png",
                         "raw": f"raw-{azimuth}.jpg",
-                        "c2w": [[round(value, 6) for value in row] for row in camera_to_world(azimuth).tolist()],
+                        "c2w": [
+                            [round(value, 6) for value in row]
+                            for row in camera_to_world(azimuth, variant.elevation).tolist()
+                        ],
                         "silhouette": silhouette(Image.open(io.BytesIO(data))),
                     }
                 )
@@ -190,9 +224,21 @@ def make_views(runs: list, variants: list, pins: dict) -> dict:
                 "picture": f"/outputs/{run}/{state['input']}",
                 "seed": seed,
                 "prompt": job.get("prompt", "high quality"),
-                "settings": {"steps": variant.steps, "guidance": variant.guidance, "fill": variant.fill},
+                "settings": {
+                    "steps": variant.steps,
+                    "guidance": variant.guidance,
+                    "fill": variant.fill,
+                    "elevation": variant.elevation,
+                    "half_extent": variant.extent,
+                    "negative_prompt": variant.negative,
+                },
                 "models": pins,
-                "camera": out["camera"],
+                "camera": {
+                    **out["camera"],
+                    "elevation": variant.elevation,
+                    "half_extent": variant.extent,
+                    "pixels_per_unit": round(IMAGE_SIZE / (2 * variant.extent), 3),
+                },
                 "views": views,
                 "reference": "reference.png: the 768 x 768 picture the views were conditioned on",
                 "background": (
@@ -228,7 +274,7 @@ def parse_variants(text: str) -> list[dict]:
         spec: dict = {"name": name}
         for item in filter(None, (piece.strip() for piece in settings.split(","))):
             key, _, value = item.partition("=")
-            if key not in {"prompt", "steps", "guidance", "fill", "seed"}:
+            if key not in {"prompt", "steps", "guidance", "fill", "seed", "elevation", "extent", "negative", "runs"}:
                 raise SystemExit(f"unknown variant setting {key!r}")
             spec[key] = value
         variants.append(spec)
