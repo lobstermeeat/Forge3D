@@ -6,13 +6,12 @@
 # Phase 6, PIXAL3D line: its own ephemeral app (orainge-exp-pixal3d) through `modal run`, never
 # `modal deploy workers/modal_app.py`, which would replace the production app orainge-ai.
 #
-# Run 4b: production's recipe (TRELLIS.2 '512' preview -> the picture's camera -> Pixal3D's multi-view
-# weights on the picture alone -> levelled -> full export) on the fifteen prompts run 4a didn't make
-# (04 08 10 13 20 are done and kept).
+# Run 4c: the same production recipe on the single-view weights for the two flat objects the multi-view
+# weights broke (06 shield: a hollow tray; 12 skateboard: a doubled deck), for the per-object comparison.
 set -euo pipefail
 
 echo "== Pixal3D's weights (CPU; already there, so only the marker is checked)"
 modal run ops/exp_pixal3d.py::download
-echo "== final20 on the other fifteen"
-modal run ops/exp_pixal3d.py::experiment --plan final20 --only 01,02,03,05,06,07,09,11,12,14,15,16,17,18,19 --out ops-out/private
+echo "== final20single on 06 12"
+modal run ops/exp_pixal3d.py::experiment --plan final20single --only 06,12 --out ops-out/private
 du -sh ops-out/private/* || true
