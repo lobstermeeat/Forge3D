@@ -1,0 +1,155 @@
+== The other sixteen Phase 2 pictures, default settings (04, 06, 08 and 11 are done)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-wMWAZ3xFgk4h2dhj3RQQMg
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/exp_mv.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/scripts/download_weights
+│   .py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/multiview_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/multiview/mvadapter
+├── ✓ Created Function download.
+└── ✓ Created Function make_views.
+multiview: already downloaded
+[mv] 16 runs x 1 variants: phase2-01-cute-low-poly-fox-sitting-down, phase2-02-red-high-top-sneaker, phase2-03-gaming-chair-black-and-purple, phase2-05-sci-fi-laser-pistol-white, phase2-07-chibi-knight-with-a-big-helmet, phase2-09-donut-with-pink-frosting, phase2-10-astronaut-helmet, phase2-12-skateboard-with-graffiti-art, phase2-13-cute-cartoon-car-bright-blue, phase2-14-bubble-tea-with-tapioca-pearls, phase2-15-health-potion-in-a-round-glass, phase2-16-green-dragon-sitting-cartoon, phase2-17-bowl-of-ramen-with-an-egg, phase2-18-electric-guitar, phase2-19-small-cabin-in-a-snowy-forest, phase2-20-hot-air-balloon; [{'name': 'views'}]
+You are offline and the cache for model files in Transformers v4.22.0 has been updated while your local cache seems to be the one of a previous version. It is very likely that all your calls to any `from_pretrained()` method will fail. Remove the offline mode and enable internet connection to have your cache be updated automatically, then you can go back to offline mode.
+
+[1A0it [00:00, ?it/s]
+[1A0it [00:00, ?it/s]
+
+[1ALoading pipeline components...:   0%|          | 0/7 [00:00<?, ?it/s]
+[1ALoading pipeline components...:  29%|██▊       | 2/7 [00:02<00:05,  1.09s/it]
+[1ALoading pipeline components...:  57%|█████▋    | 4/7 [00:02<00:01,  1.59it/s]
+[1ALoading pipeline components...:  86%|████████▌ | 6/7 [00:02<00:00,  2.70it/s]
+[1ALoading pipeline components...: 100%|██████████| 7/7 [00:03<00:00,  2.87it/s]
+[1ALoading pipeline components...: 100%|██████████| 7/7 [00:03<00:00,  2.19it/s]
+[mv] NVIDIA A10: loaded in 16.9 s, 9.14 GiB allocated
+[mv] views/phase2-01-cute-low-poly-fox-sitting-down: 74.891 s, peak 19.06 GiB reserved
+[mv] views/phase2-02-red-high-top-sneaker: 75.571 s, peak 19.06 GiB reserved
+[mv] views/phase2-03-gaming-chair-black-and-purple: 75.864 s, peak 19.06 GiB reserved
+[mv] views/phase2-05-sci-fi-laser-pistol-white: 75.929 s, peak 19.06 GiB reserved
+[mv] views/phase2-07-chibi-knight-with-a-big-helmet: 76.388 s, peak 19.06 GiB reserved
+[mv] views/phase2-09-donut-with-pink-frosting: 76.517 s, peak 19.06 GiB reserved
+[mv] views/phase2-10-astronaut-helmet: 76.393 s, peak 19.06 GiB reserved
+[mv] views/phase2-12-skateboard-with-graffiti-art: 75.902 s, peak 19.06 GiB reserved
+[mv] views/phase2-13-cute-cartoon-car-bright-blue: 76.429 s, peak 19.06 GiB reserved
+[mv] views/phase2-14-bubble-tea-with-tapioca-pearls: 76.391 s, peak 19.06 GiB reserved
+[mv] views/phase2-15-health-potion-in-a-round-glass: 76.413 s, peak 19.06 GiB reserved
+[mv] views/phase2-16-green-dragon-sitting-cartoon: 76.39 s, peak 19.06 GiB reserved
+[mv] views/phase2-17-bowl-of-ramen-with-an-egg: 76.486 s, peak 19.06 GiB reserved
+[mv] views/phase2-18-electric-guitar: 76.189 s, peak 19.06 GiB reserved
+[mv] views/phase2-19-small-cabin-in-a-snowy-forest: 76.745 s, peak 19.06 GiB reserved
+[mv] views/phase2-20-hot-air-balloon: 76.487 s, peak 19.06 GiB reserved
+views/phase2-01-cute-low-poly-fox-sitting-down: 74.891
+views/phase2-02-red-high-top-sneaker: 75.571
+views/phase2-03-gaming-chair-black-and-purple: 75.864
+views/phase2-05-sci-fi-laser-pistol-white: 75.929
+views/phase2-07-chibi-knight-with-a-big-helmet: 76.388
+views/phase2-09-donut-with-pink-frosting: 76.517
+views/phase2-10-astronaut-helmet: 76.393
+views/phase2-12-skateboard-with-graffiti-art: 75.902
+views/phase2-13-cute-cartoon-car-bright-blue: 76.429
+views/phase2-14-bubble-tea-with-tapioca-pearls: 76.391
+views/phase2-15-health-potion-in-a-round-glass: 76.413
+views/phase2-16-green-dragon-sitting-cartoon: 76.39
+views/phase2-17-bowl-of-ramen-with-an-egg: 76.486
+views/phase2-18-electric-guitar: 76.189
+views/phase2-19-small-cabin-in-a-snowy-forest: 76.745
+views/phase2-20-hot-air-balloon: 76.487
+[mv] NVIDIA A10: load 16.9 s, total 1267.5 s
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-wMWAZ3xFgk4h2dhj3RQQMg
+== Simple input changes on the four back failures
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-f0ZZiOEbfExcIbv6Nhej49
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/exp_mv.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/scripts/download_weights
+│   .py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/multiview_worker
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/multiview/mvadapter
+├── ✓ Created Function download.
+└── ✓ Created Function make_views.
+multiview: already downloaded
+[mv] 4 runs x 5 variants: phase2-04-retro-arcade-machine, phase2-06-wooden-shield-with-a-lion, phase2-08-vintage-film-camera, phase2-11-stack-of-old-books-with-a-candle; [{'name': 'caption', 'prompt': 'caption'}, {'name': 'seed1', 'seed': '1'}, {'name': 'g5', 'guidance': '5'}, {'name': 'fill80', 'fill': '0.8'}, {'name': 's30', 'steps': '30'}]
+You are offline and the cache for model files in Transformers v4.22.0 has been updated while your local cache seems to be the one of a previous version. It is very likely that all your calls to any `from_pretrained()` method will fail. Remove the offline mode and enable internet connection to have your cache be updated automatically, then you can go back to offline mode.
+
+[1A0it [00:00, ?it/s]
+[1A0it [00:00, ?it/s]
+
+[1ALoading pipeline components...:   0%|          | 0/7 [00:00<?, ?it/s]
+[1ALoading pipeline components...:  14%|█▍        | 1/7 [00:00<00:02,  2.79it/s]
+[1ALoading pipeline components...:  29%|██▊       | 2/7 [00:01<00:04,  1.14it/s]
+[1ALoading pipeline components...:  57%|█████▋    | 4/7 [00:01<00:01,  2.79it/s]
+[1ALoading pipeline components...:  71%|███████▏  | 5/7 [00:12<00:07,  3.54s/it]
+[1ALoading pipeline components...:  86%|████████▌ | 6/7 [00:12<00:02,  2.49s/it]
+[1ALoading pipeline components...: 100%|██████████| 7/7 [00:12<00:00,  1.77s/it]
+[1ALoading pipeline components...: 100%|██████████| 7/7 [00:12<00:00,  1.80s/it]
+[mv] NVIDIA A10G: loaded in 48.2 s, 9.14 GiB allocated
+[mv] caption/phase2-04-retro-arcade-machine: 76.303 s, peak 19.1 GiB reserved
+[mv] caption/phase2-06-wooden-shield-with-a-lion: 73.658 s, peak 19.1 GiB reserved
+[mv] caption/phase2-08-vintage-film-camera: 73.78 s, peak 19.1 GiB reserved
+[mv] caption/phase2-11-stack-of-old-books-with-a-candle: 74.046 s, peak 19.1 GiB reserved
+[mv] seed1/phase2-04-retro-arcade-machine: 73.742 s, peak 19.1 GiB reserved
+[mv] seed1/phase2-06-wooden-shield-with-a-lion: 73.987 s, peak 19.1 GiB reserved
+[mv] seed1/phase2-08-vintage-film-camera: 73.889 s, peak 19.1 GiB reserved
+[mv] seed1/phase2-11-stack-of-old-books-with-a-candle: 73.97 s, peak 19.1 GiB reserved
+[mv] g5/phase2-04-retro-arcade-machine: 73.717 s, peak 19.1 GiB reserved
+[mv] g5/phase2-06-wooden-shield-with-a-lion: 73.745 s, peak 19.1 GiB reserved
+[mv] g5/phase2-08-vintage-film-camera: 73.859 s, peak 19.1 GiB reserved
+[mv] g5/phase2-11-stack-of-old-books-with-a-candle: 74.069 s, peak 19.1 GiB reserved
+[mv] fill80/phase2-04-retro-arcade-machine: 73.783 s, peak 19.1 GiB reserved
+[mv] fill80/phase2-06-wooden-shield-with-a-lion: 73.684 s, peak 19.1 GiB reserved
+[mv] fill80/phase2-08-vintage-film-camera: 73.904 s, peak 19.1 GiB reserved
+[mv] fill80/phase2-11-stack-of-old-books-with-a-candle: 74.13 s, peak 19.1 GiB reserved
+[mv] s30/phase2-04-retro-arcade-machine: 46.063 s, peak 19.1 GiB reserved
+[mv] s30/phase2-06-wooden-shield-with-a-lion: 45.994 s, peak 19.1 GiB reserved
+[mv] s30/phase2-08-vintage-film-camera: 46.139 s, peak 19.1 GiB reserved
+[mv] s30/phase2-11-stack-of-old-books-with-a-candle: 46.404 s, peak 19.1 GiB reserved
+caption/phase2-04-retro-arcade-machine: 76.303
+caption/phase2-06-wooden-shield-with-a-lion: 73.658
+caption/phase2-08-vintage-film-camera: 73.78
+caption/phase2-11-stack-of-old-books-with-a-candle: 74.046
+seed1/phase2-04-retro-arcade-machine: 73.742
+seed1/phase2-06-wooden-shield-with-a-lion: 73.987
+seed1/phase2-08-vintage-film-camera: 73.889
+seed1/phase2-11-stack-of-old-books-with-a-candle: 73.97
+g5/phase2-04-retro-arcade-machine: 73.717
+g5/phase2-06-wooden-shield-with-a-lion: 73.745
+g5/phase2-08-vintage-film-camera: 73.859
+g5/phase2-11-stack-of-old-books-with-a-candle: 74.069
+fill80/phase2-04-retro-arcade-machine: 73.783
+fill80/phase2-06-wooden-shield-with-a-lion: 73.684
+fill80/phase2-08-vintage-film-camera: 73.904
+fill80/phase2-11-stack-of-old-books-with-a-candle: 74.13
+s30/phase2-04-retro-arcade-machine: 46.063
+s30/phase2-06-wooden-shield-with-a-lion: 45.994
+s30/phase2-08-vintage-film-camera: 46.139
+s30/phase2-11-stack-of-old-books-with-a-candle: 46.404
+[mv] NVIDIA A10G: load 48.2 s, total 1451.6 s
+Stopping app - local entrypoint completed.
+Runner terminated.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-f0ZZiOEbfExcIbv6Nhej49
+116M	ops-out/private/views
+exit status: 0
