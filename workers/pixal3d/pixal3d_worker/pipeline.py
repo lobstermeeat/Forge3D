@@ -29,7 +29,18 @@ from forge3d_worker.pipeline import CUTOUT, Trellis2Runtime, _configure_environm
 from forge3d_worker.settings import Preset
 
 from . import cameras, neighborhood
-from .views import MAIN_PICTURE, MAIN_VIEW, View, ViewCamera, bundle, has_cutout, order, place_like, touches_edge
+from .views import (
+    MAIN_PICTURE,
+    MAIN_VIEW,
+    View,
+    ViewCamera,
+    bundle,
+    fit_camera,
+    has_cutout,
+    order,
+    place_like,
+    touches_edge,
+)
 
 MODEL_DIR = os.environ.get("PIXAL3D_MODEL_DIR", "/models/pixal3d")
 DINO_DIR = os.environ.get("PIXAL3D_DINO_DIR", "/models/dinov3-vitl16")
@@ -149,6 +160,31 @@ def load_naf(naf_dir: str = NAF_DIR, weights: str = NAF_WEIGHTS) -> Any:
     model.eval()
     model.requires_grad_(False)
     return model
+
+
+def clear_cuda_error() -> Optional[str]:
+    """
+    Resets the CUDA runtime's sticky "last error", returning the message it held, or None.
+
+    CuMesh checks its own cudaMalloc calls and raises a RuntimeError when one fails, but never calls
+    cudaGetLastError, which is what resets the runtime's per-thread error flag. Torch's next kernel
+    launch check then reports that stale flag as "CUDA error: out of memory" with the GPU all but
+    empty, and a retry with the models off the GPU dies on its first tensor op (the 11 books' export
+    in the first run; the same pattern in Phase 5's logs, where only the second retry got through,
+    because the first had consumed the flag). A tiny launch here consumes it instead: the check
+    raises, the flag is clear, and the error is swallowed. Nothing to do without CUDA.
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        return None
+    try:
+        torch.cuda.synchronize()
+        torch.zeros(1, device="cuda").fill_(1)  # the launch check is what reads and resets the flag
+        torch.cuda.synchronize()
+        return None
+    except RuntimeError as err:
+        return _one_line(err)
 
 
 def estimate_fov(moge: Any, picture: Image.Image) -> float:
@@ -354,9 +390,13 @@ class Pixal3DRuntime(Trellis2Runtime):
         for (azimuth, elevation), picture in zip(angles, images):
             if touches_edge(picture):
                 print(f"[pixal3d] the view at azimuth {azimuth:g}, elevation {elevation:g} reaches its frame's edge")
+        # The object must fill Pixal3D's cube as its training objects did: the views' world is
+        # rescaled by what their silhouettes show (fit_camera)
+        camera, fit = fit_camera(images, angles, camera)
         self.pipeline_used, self.views_used = f"pixal3d-mv-{pipeline_type}", used
-        self.last_camera = {"views": [list(a) for a in angles], "half_extent": camera.half_extent}
+        self.last_camera = {"views": [list(a) for a in angles], **fit}
         print(f"[pixal3d] {len(images)} views (main: {'view' if used == len(images) else 'picture'}): {angles}")
+        print(f"[pixal3d] the views' frame: {json.dumps(fit)}")
         packed = bundle(images, angles, camera)
         return self._attempt(lambda: self._run(packed, pipeline_type, seed, cutout))
 
@@ -396,10 +436,17 @@ class Pixal3DRuntime(Trellis2Runtime):
 
     @staticmethod
     def _free_gpu_memory() -> None:
+        """
+        Production's (reference cycles collected, torch's cached blocks handed back to CUDA), plus the
+        runtime's stale error flag cleared, so a retry after CuMesh ran out of memory can run at all.
+        """
         import torch
 
         gc.collect()
         torch.cuda.empty_cache()
+        stale = clear_cuda_error()
+        if stale:
+            print(f"[pixal3d] cleared a stale CUDA error before going on: {stale}")
 
 
 def runtime_from_env() -> Pixal3DRuntime:

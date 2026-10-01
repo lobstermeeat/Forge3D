@@ -36,6 +36,9 @@ MAIN_CHOICES = (MAIN_VIEW, MAIN_PICTURE)
 OBJECT_ALPHA = 0.5
 # MV-Adapter's framing of the picture when no 0-degree view says otherwise
 DEFAULT_FILL = 0.9
+# How much of Pixal3D's unit cube an object's longest side spans (its training data: 0.99999 of it,
+# data_toolkit/dual_grid.py; MV-Adapter's 0.9 fill of a +-0.55 frame is 0.99)
+TARGET_EXTENT = 0.99
 
 
 @dataclass(frozen=True)
@@ -191,6 +194,53 @@ def touches_edge(image: Image.Image, margin: int = 1) -> bool:
         return False
     x0, y0, x1, y1 = box
     return x0 < margin or y0 < margin or x1 > image.width - margin or y1 > image.height - margin
+
+
+def fit_camera(
+    images: Sequence[Image.Image], angles: Sequence[tuple[float, float]], camera: ViewCamera
+) -> tuple[ViewCamera, dict]:
+    """
+    The views' camera rescaled so the object fills Pixal3D's cube the way its training data did.
+
+    Pixal3D builds inside [-0.5, 0.5]^3, and every training object had its longest side scaled to 1
+    (data_toolkit/dual_grid.py); its own multi-view rig frames +-0.55, like MV-Adapter's. The views'
+    camera says how big the object is in their world: MV-Adapter puts the 0-degree view's longer
+    side at 0.99 of a unit, which is right unless the object is deeper than it is wide or tall (a
+    car seen from the front), when the side views show more than a unit and the model is asked for a
+    shape that doesn't fit, and squashes it (the synthetic car's sides matched at IoU 0.85 against
+    0.97 for the front). So the object's axis-aligned extents are read off the silhouettes: width
+    from the front and back views, depth from the side views, height from any, in pixels, all one
+    scale; the frame is then ``TARGET_EXTENT`` divided by the longest. Diagonal views (45, 315)
+    only vote on height, since their width mixes two axes. A view the object is cut off in gives a
+    lower bound; the note says so. Returns the camera to use and a note for the result.
+    """
+    best, clipped = 0.0, []
+    size = None
+    for image, (azimuth, elevation) in zip(images, angles):
+        box = object_box(alpha_of(image))
+        if box is None:
+            continue
+        size = size or image.width
+        x0, y0, x1, y1 = box
+        width, height = (x1 - x0) / image.width, (y1 - y0) / image.height  # fractions of the frame
+        if abs(elevation) <= 1e-6 and abs(azimuth % 90.0) <= 1e-6:
+            best = max(best, width)
+        best = max(best, height)
+        if touches_edge(image):
+            clipped.append(azimuth)
+    if best <= 0:
+        return camera, {"half_extent": camera.half_extent, "given_half_extent": camera.half_extent}
+    extent = best * 2 * camera.half_extent  # the longest extent in the views' world units
+    half_extent = TARGET_EXTENT / (2 * best)  # the frame that makes that extent TARGET_EXTENT
+    note = {
+        "half_extent": round(half_extent, 4),
+        "given_half_extent": camera.half_extent,
+        "extent": round(extent, 3),
+        "rescaled": abs(half_extent - camera.half_extent) > 1e-6,
+    }
+    if clipped:
+        note["cut_off"] = clipped  # extent is a lower bound: those views can't show all of it
+    return ViewCamera(half_extent=half_extent), note
 
 
 def cond_tensor(image: Image.Image, size: int):

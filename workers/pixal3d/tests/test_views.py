@@ -141,3 +141,35 @@ def test_bundle_is_run_mvs_layout():
     assert packed["mesh_scale"] == 1.0
     with pytest.raises(ValueError):
         views.bundle(images, angles[:2], views.ViewCamera())
+
+
+def test_fit_camera_keeps_mv_adapters_framing_when_the_front_is_the_longest_side():
+    # The 0-degree view's longer side at 0.9 of the frame (MV-Adapter's fill): 0.99 of a +-0.55 frame
+    front = cutout(size=100, box=(30, 5, 70, 95))  # 40 wide, 90 tall
+    side = cutout(size=100, box=(35, 5, 65, 95))  # 30 deep
+    camera, note = views.fit_camera([front, side, front, side], [(0, 0), (90, 0), (180, 0), (270, 0)], views.ViewCamera())
+    assert camera.half_extent == pytest.approx(0.55)
+    assert note["extent"] == pytest.approx(0.99) and not note["rescaled"] and "cut_off" not in note
+
+
+def test_fit_camera_shrinks_an_object_deeper_than_its_front():
+    # A car seen from the front: 0.9 of the frame wide, but 1.2 times that deep in the side views
+    front = cutout(size=100, box=(5, 30, 95, 70))  # 90 wide, 40 tall
+    side = cutout(size=100, box=(0, 30, 100, 70))  # 100 deep: cut off at both edges
+    camera, note = views.fit_camera([front, side, front, side], [(0, 0), (90, 0), (180, 0), (270, 0)], views.ViewCamera())
+    assert note["extent"] == pytest.approx(1.1) and note["rescaled"] and note["cut_off"] == [90, 270]
+    assert camera.half_extent == pytest.approx(0.99 / 2)  # the side views' full frame is now 0.99 of a unit
+    # A frame given in other units changes the reported extent, not the rig: the object fills the cube either way
+    other, note = views.fit_camera([front, side], [(0, 0), (90, 0)], views.ViewCamera(half_extent=1.0))
+    assert other.half_extent == pytest.approx(camera.half_extent) and note["extent"] == pytest.approx(2.0)
+
+
+def test_fit_camera_ignores_diagonal_widths_and_empty_views():
+    front = cutout(size=100, box=(30, 10, 70, 90))  # 40 wide, 80 tall: the height sets the scale
+    diagonal = cutout(size=100, box=(0, 10, 100, 90))  # wider than the box's sides, as a diagonal view is
+    empty = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+    camera, note = views.fit_camera([front, diagonal, empty], [(0, 0), (45, 0), (90, 0)], views.ViewCamera())
+    assert camera.half_extent == pytest.approx(0.99 / 1.6) and note["extent"] == pytest.approx(0.88)
+    assert note["cut_off"] == [45]  # reported, but its width never counted
+    same, note = views.fit_camera([empty], [(0, 0)], views.ViewCamera())
+    assert same.half_extent == 0.55 and "extent" not in note
