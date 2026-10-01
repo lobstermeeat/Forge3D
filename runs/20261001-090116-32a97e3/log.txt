@@ -1,0 +1,121 @@
+== Deploy Phase 5: smoothed normals, the out-of-memory fallback and the picture painted on
+✓ App deployed in 45.143s! 🎉
+
+View Deployment: https://modal.com/apps/lobstermeeat/main/deployed/orainge-ai
+
+== Smoke test: the shield on its Phase 4 seed, to see the projection work on a GPU
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-UsEQq7jHM3Ky3xakNGHVbd
+✓ Created objects.
+1 runs in phase2
+Starting 1 runs
+phase2d-06-wooden-shield-with-a-lion: preview-1654818878.glb, final-1654818878.glb, input-wooden-shield-with-a-lion.png
+Done: 1 of 1 runs finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-UsEQq7jHM3Ky3xakNGHVbd
+phase2d-06-wooden-shield-with-a-lion: done pipeline=1024_cascade painted=True (applied) iou=0.9919 projection_s=1.122 gpu_s=31.1
+
+== Phase 2 again from the same pictures: phase2d on Phase 4's seeds, phase2e on the next ones
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-AxyzazhVsWBmBfUivwly0A
+✓ Created objects.
+20 runs in phase2
+Starting 40 runs
+phase2d-01-cute-low-poly-fox-sitting-down: preview-783047822.glb, final-783047822.glb, input-cute-low-poly-fox-sitting-down.png
+phase2d-02-red-high-top-sneaker: preview-1459276374.glb, final-1459276374.glb, input-red-high-top-sneaker.png
+phase2d-03-gaming-chair-black-and-purple: preview-1971291685.glb, final-1971291685.glb, input-gaming-chair-black-and-purple.png
+phase2d-04-retro-arcade-machine: preview-949054593.glb, final-949054593.glb, input-retro-arcade-machine.png
+phase2d-05-sci-fi-laser-pistol-white: preview-1127065796.glb, final-1127065796.glb, input-sci-fi-laser-pistol-white.png
+phase2d-06-wooden-shield-with-a-lion: preview-1654818878.glb, final-1654818878.glb, input-wooden-shield-with-a-lion.png
+phase2d-07-chibi-knight-with-a-big-helmet: preview-25018956.glb, final-25018956.glb, input-chibi-knight-with-a-big-helmet.png
+phase2d-08-vintage-film-camera: preview-849334850.glb, final-849334850.glb, input-vintage-film-camera.png
+phase2d-09-donut-with-pink-frosting: preview-591143680.glb, final-591143680.glb, input-donut-with-pink-frosting.png
+phase2d-10-astronaut-helmet: preview-806417096.glb, final-806417096.glb, input-astronaut-helmet.png
+phase2d-11-stack-of-old-books-with-a-candle: preview-8026098.glb, final-8026098.glb, input-stack-of-old-books-with-a-candle.png
+phase2d-12-skateboard-with-graffiti-art: preview-821889765.glb, final-821889765.glb, input-skateboard-with-graffiti-art.png
+phase2d-13-cute-cartoon-car-bright-blue: preview-207648777.glb, final-207648777.glb, input-cute-cartoon-car-bright-blue.png
+phase2d-14-bubble-tea-with-tapioca-pearls: preview-1688237652.glb, final-1688237652.glb, input-bubble-tea-with-tapioca-pearls.png
+phase2d-15-health-potion-in-a-round-glass: preview-914790488.glb, final-914790488.glb, input-health-potion-in-a-round-glass.png
+phase2d-16-green-dragon-sitting-cartoon: preview-2113616975.glb, final-2113616975.glb, input-green-dragon-sitting-cartoon.png
+phase2d-17-bowl-of-ramen-with-an-egg: preview-136916256.glb, final-136916256.glb, input-bowl-of-ramen-with-an-egg.png
+phase2d-18-electric-guitar: preview-1903607997.glb, final-1903607997.glb, input-electric-guitar.png
+phase2d-19-small-cabin-in-a-snowy-forest: preview-1435273127.glb, final-1435273127.glb, input-small-cabin-in-a-snowy-forest.png
+phase2d-20-hot-air-balloon: preview-1521877271.glb, final-1521877271.glb, input-hot-air-balloon.png
+phase2e-01-cute-low-poly-fox-sitting-down: preview-783047823.glb, final-783047823.glb, input-cute-low-poly-fox-sitting-down.png
+phase2e-02-red-high-top-sneaker: preview-1459276375.glb, final-1459276375.glb, input-red-high-top-sneaker.png
+phase2e-03-gaming-chair-black-and-purple: preview-1971291686.glb, final-1971291686.glb, input-gaming-chair-black-and-purple.png
+phase2e-04-retro-arcade-machine: preview-949054594.glb, final-949054594.glb, input-retro-arcade-machine.png
+phase2e-05-sci-fi-laser-pistol-white: preview-1127065797.glb, final-1127065797.glb, input-sci-fi-laser-pistol-white.png
+phase2e-06-wooden-shield-with-a-lion: preview-1654818879.glb, final-1654818879.glb, input-wooden-shield-with-a-lion.png
+phase2e-07-chibi-knight-with-a-big-helmet: preview-25018957.glb, final-25018957.glb, input-chibi-knight-with-a-big-helmet.png
+phase2e-08-vintage-film-camera: preview-849334851.glb, final-849334851.glb, input-vintage-film-camera.png
+phase2e-09-donut-with-pink-frosting: preview-591143681.glb, final-591143681.glb, input-donut-with-pink-frosting.png
+phase2e-10-astronaut-helmet: preview-806417097.glb, final-806417097.glb, input-astronaut-helmet.png
+phase2e-11-stack-of-old-books-with-a-candle: preview-8026099.glb, final-8026099.glb, input-stack-of-old-books-with-a-candle.png
+phase2e-12-skateboard-with-graffiti-art: preview-821889766.glb, final-821889766.glb, input-skateboard-with-graffiti-art.png
+phase2e-13-cute-cartoon-car-bright-blue: preview-207648778.glb, final-207648778.glb, input-cute-cartoon-car-bright-blue.png
+phase2e-14-bubble-tea-with-tapioca-pearls: preview-1688237653.glb, final-1688237653.glb, input-bubble-tea-with-tapioca-pearls.png
+phase2e-15-health-potion-in-a-round-glass: preview-914790489.glb, final-914790489.glb, input-health-potion-in-a-round-glass.png
+phase2e-16-green-dragon-sitting-cartoon: preview-2113616976.glb, final-2113616976.glb, input-green-dragon-sitting-cartoon.png
+phase2e-17-bowl-of-ramen-with-an-egg: failed (RuntimeError: generation failed: RuntimeError: CUDA error: out of memory)
+phase2e-18-electric-guitar: preview-1903607998.glb, final-1903607998.glb, input-electric-guitar.png
+phase2e-19-small-cabin-in-a-snowy-forest: preview-1435273128.glb, final-1435273128.glb, input-small-cabin-in-a-snowy-forest.png
+phase2e-20-hot-air-balloon: preview-1521877272.glb, final-1521877272.glb, input-hot-air-balloon.png
+Done: 39 of 40 runs finished
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-AxyzazhVsWBmBfUivwly0A
+phase2d-01-cute-low-poly-fox-sitting-down: done pipeline=1024_cascade painted=True (applied) iou=0.9708 projection_s=0.322 gpu_s=60.1
+phase2d-02-red-high-top-sneaker: done pipeline=1024_cascade painted=True (applied) iou=0.9739 projection_s=1.075 gpu_s=36.7
+phase2d-03-gaming-chair-black-and-purple: done pipeline=1024_cascade painted=False (the silhouettes don't match well enough (IoU 0.912 < 0.93)) iou=0.9116 projection_s=0.178 gpu_s=30.4
+phase2d-04-retro-arcade-machine: done pipeline=1024_cascade painted=True (applied) iou=0.985 projection_s=1.091 gpu_s=44.7
+phase2d-05-sci-fi-laser-pistol-white: done pipeline=1024_cascade painted=True (applied) iou=0.9401 projection_s=0.316 gpu_s=32.2
+phase2d-06-wooden-shield-with-a-lion: done pipeline=1024_cascade painted=True (applied) iou=0.9919 projection_s=1.122 gpu_s=31.1
+phase2d-07-chibi-knight-with-a-big-helmet: done pipeline=1024_cascade painted=True (applied) iou=0.9746 projection_s=0.835 gpu_s=67.6
+phase2d-08-vintage-film-camera: done pipeline=1024_cascade painted=True (applied) iou=0.9617 projection_s=0.291 gpu_s=51.6
+phase2d-09-donut-with-pink-frosting: done pipeline=1024_cascade painted=True (applied) iou=0.9819 projection_s=0.341 gpu_s=69.3
+phase2d-10-astronaut-helmet: done pipeline=1024_cascade painted=True (applied) iou=0.9826 projection_s=0.327 gpu_s=125.0
+phase2d-11-stack-of-old-books-with-a-candle: done pipeline=512 painted=True (applied) iou=0.956 projection_s=1.168 gpu_s=144.3
+phase2d-12-skateboard-with-graffiti-art: done pipeline=1024_cascade painted=True (applied) iou=0.9466 projection_s=0.31 gpu_s=23.4
+phase2d-13-cute-cartoon-car-bright-blue: done pipeline=1024_cascade painted=True (applied) iou=0.9785 projection_s=0.34 gpu_s=51.7
+phase2d-14-bubble-tea-with-tapioca-pearls: done pipeline=1024_cascade painted=True (applied) iou=0.987 projection_s=0.343 gpu_s=53.8
+phase2d-15-health-potion-in-a-round-glass: done pipeline=1024_cascade painted=True (applied) iou=0.987 projection_s=0.311 gpu_s=55.6
+phase2d-16-green-dragon-sitting-cartoon: done pipeline=1024_cascade painted=True (applied) iou=0.9371 projection_s=0.307 gpu_s=34.7
+phase2d-17-bowl-of-ramen-with-an-egg: done pipeline=1024_cascade painted=True (applied) iou=0.9322 projection_s=0.347 gpu_s=71.2
+phase2d-18-electric-guitar: done pipeline=1024_cascade painted=False (the silhouettes don't match well enough (IoU 0.656 < 0.93)) iou=0.6558 projection_s=0.184 gpu_s=45.0
+phase2d-19-small-cabin-in-a-snowy-forest: done pipeline=1024_cascade painted=True (applied) iou=0.9725 projection_s=0.318 gpu_s=71.8
+phase2d-20-hot-air-balloon: done pipeline=1024_cascade painted=True (applied) iou=0.986 projection_s=0.343 gpu_s=50.7
+phase2e-01-cute-low-poly-fox-sitting-down: done pipeline=1024_cascade painted=True (applied) iou=0.9597 projection_s=0.816 gpu_s=41.2
+phase2e-02-red-high-top-sneaker: done pipeline=1024_cascade painted=True (applied) iou=0.9732 projection_s=0.318 gpu_s=44.0
+phase2e-03-gaming-chair-black-and-purple: done pipeline=1024_cascade painted=False (the silhouettes don't match well enough (IoU 0.907 < 0.93)) iou=0.907 projection_s=0.185 gpu_s=36.4
+phase2e-04-retro-arcade-machine: done pipeline=1024_cascade painted=True (applied) iou=0.9803 projection_s=0.324 gpu_s=49.9
+phase2e-05-sci-fi-laser-pistol-white: done pipeline=1024_cascade painted=True (applied) iou=0.938 projection_s=0.34 gpu_s=29.1
+phase2e-06-wooden-shield-with-a-lion: done pipeline=1024_cascade painted=False (ambiguous camera: a view 155 degrees away fits as well but sees a different shape) iou=0.9938 projection_s=0.216 gpu_s=34.5
+phase2e-07-chibi-knight-with-a-big-helmet: done pipeline=1024_cascade painted=True (applied) iou=0.9641 projection_s=0.316 gpu_s=67.2
+phase2e-08-vintage-film-camera: done pipeline=1024_cascade painted=True (applied) iou=0.9731 projection_s=0.307 gpu_s=76.0
+phase2e-09-donut-with-pink-frosting: done pipeline=1024_cascade painted=True (applied) iou=0.9868 projection_s=0.317 gpu_s=74.4
+phase2e-10-astronaut-helmet: done pipeline=1024_cascade painted=True (applied) iou=0.988 projection_s=0.303 gpu_s=88.0
+phase2e-11-stack-of-old-books-with-a-candle: done pipeline=1024_cascade painted=False (ambiguous camera: a view 100 degrees away fits as well but sees a different shape) iou=0.9395 projection_s=0.202 gpu_s=49.5
+phase2e-12-skateboard-with-graffiti-art: done pipeline=1024_cascade painted=True (applied) iou=0.9571 projection_s=0.356 gpu_s=28.7
+phase2e-13-cute-cartoon-car-bright-blue: done pipeline=1024_cascade painted=True (applied) iou=0.9762 projection_s=0.316 gpu_s=57.8
+phase2e-14-bubble-tea-with-tapioca-pearls: done pipeline=1024_cascade painted=True (applied) iou=0.988 projection_s=0.325 gpu_s=48.5
+phase2e-15-health-potion-in-a-round-glass: done pipeline=1024_cascade painted=True (applied) iou=0.9859 projection_s=0.324 gpu_s=61.7
+phase2e-16-green-dragon-sitting-cartoon: done pipeline=1024_cascade painted=True (applied) iou=0.9385 projection_s=0.304 gpu_s=33.6
+phase2e-17-bowl-of-ramen-with-an-egg: failed pipeline=None painted=None () iou=None projection_s=None gpu_s=None
+phase2e-18-electric-guitar: done pipeline=1024_cascade painted=True (applied) iou=0.9305 projection_s=0.335 gpu_s=24.4
+phase2e-19-small-cabin-in-a-snowy-forest: done pipeline=1024_cascade painted=True (applied) iou=0.9776 projection_s=0.334 gpu_s=63.1
+phase2e-20-hot-air-balloon: done pipeline=1024_cascade painted=True (applied) iou=0.9863 projection_s=0.347 gpu_s=54.5
+95M	ops-out/private/all
+
+== Worker log: memory fallbacks and failed steps in the last three hours
+[forge3d] projection: {"applied": false, "reason": "the silhouettes don't match well enough (IoU 0.912 < 0.93)", "iou": 0.9116, "colour": 0.1221, "pose": {"azimuth": 311.2, "elevation": 1.2, "roll": 0.0, "fov": 23.1, "scale": 0.993, "shift": [-0.0044, -0.0003]}, "seconds": 0.178}
+[forge3d] projection: {"applied": false, "reason": "the silhouettes don't match well enough (IoU 0.656 < 0.93)", "iou": 0.6558, "colour": 0.6365, "pose": {"azimuth": 330.0, "elevation": -5.0, "roll": 4.0, "fov": 0.0, "scale": 1.127, "shift": [0.0, -0.035]}, "seconds": 0.184}
+[forge3d] out of GPU memory in 1024_cascade, retrying in low-VRAM mode: [CuMesh] CUDA error: File: /tmp/CuMesh/src/utils.h Line: 43 Error code: 2 Error text: out of memory
+[forge3d] out of GPU memory in 1024_cascade even in low-VRAM mode, falling back to 512: CUDA error: out of memory CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect. For debugging consider passing CUDA_LAUNCH_BLOCKING=1 Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+[forge3d] projection: {"applied": false, "reason": "the silhouettes don't match well enough (IoU 0.907 < 0.93)", "iou": 0.907, "colour": 0.1088, "pose": {"azimuth": 310.0, "elevation": 2.5, "roll": 0.2, "fov": 29.0, "scale": 1.016, "shift": [-0.0019, 0.0059]}, "seconds": 0.185}
+[forge3d] projection: {"applied": false, "reason": "ambiguous camera: a view 180 degrees away fits as well but sees a different shape", "iou": 0.9944, "colour": 0.3977, "pose": {"azimuth": 12.5, "elevation": 3.8, "roll": 0.0, "fov": 5.7, "scale": 1.004, "shift": [0.0, 0.0041]}, "seconds": 0.217}
+[forge3d] projection: {"applied": false, "reason": "ambiguous camera: a view 100 degrees away fits as well but sees a different shape", "iou": 0.9395, "colour": 0.7098, "pose": {"azimuth": 100.0, "elevation": 8.8, "roll": 0.0, "fov": 44.0, "scale": 1.023, "shift": [0.0031, 0.0231]}, "seconds": 0.202}
+[forge3d] projection: {"applied": false, "reason": "ambiguous camera: a view 155 degrees away fits as well but sees a different shape", "iou": 0.9938, "colour": 0.6038, "pose": {"azimuth": 167.5, "elevation": 5.0, "roll": 0.0, "fov": 2.9, "scale": 1.004, "shift": [0.0002, 0.0037]}, "seconds": 0.216}
+[forge3d] out of GPU memory exporting, retrying with the models off the GPU: [CuMesh] CUDA error: File: /tmp/CuMesh/src/utils.h Line: 43 Error code: 2 Error text: out of memory
+exit status: 0
