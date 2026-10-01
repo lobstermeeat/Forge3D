@@ -1,0 +1,469 @@
+[
+  {
+    "run": "posed-phase2-09-donut-with-pink-frosting",
+    "variant": "posed",
+    "seed": 591143680,
+    "given_tilt": [
+      28.8,
+      0.0
+    ],
+    "posed": true,
+    "seconds": 65.3,
+    "timings": {
+      "generate_s": 31.543,
+      "export_s": 32.549,
+      "compress_s": 1.146,
+      "upload_s": 0.002
+    },
+    "triangles": 94892,
+    "views_used": 0,
+    "pipeline": "pixal3d-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9909,
+      "colour": 0.691,
+      "coverage": 0.1289,
+      "pose": {
+        "azimuth": 357.5,
+        "elevation": 27.5,
+        "roll": 0.0,
+        "fov": 26.0,
+        "scale": 1.008,
+        "shift": [
+          0.0037,
+          0.0009
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#ca571c",
+          "to": "#bb7427",
+          "share": 0.217
+        },
+        {
+          "from": "#e89d68",
+          "to": "#c2ae81",
+          "share": 0.063
+        }
+      ],
+      "decals": 104,
+      "seconds": 0.925
+    },
+    "camera": {
+      "fov_deg": 21.47,
+      "tilt": {
+        "elevation": 28.8,
+        "roll": 0.0,
+        "source": "given"
+      },
+      "posed": {
+        "elevation": 28.8,
+        "distance": 2.6372
+      }
+    },
+    "pose": null,
+    "level": {
+      "applied": false,
+      "elevation": 0.0,
+      "roll": 0.0
+    },
+    "peak_gpu_gb": 28.5,
+    "load_seconds": 88.8,
+    "container_seconds": 162.1,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "posed-phase2-10-astronaut-helmet",
+    "variant": "posed",
+    "seed": 806417096,
+    "given_tilt": [
+      21.2,
+      0.5
+    ],
+    "posed": true,
+    "seconds": 72.1,
+    "timings": {
+      "generate_s": 46.457,
+      "export_s": 24.455,
+      "compress_s": 1.158,
+      "upload_s": 0.002
+    },
+    "triangles": 96324,
+    "views_used": 0,
+    "pipeline": "pixal3d-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9903,
+      "colour": 0.7624,
+      "coverage": 0.0746,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": 22.5,
+        "roll": 0.5,
+        "fov": 29.0,
+        "scale": 1.0,
+        "shift": [
+          -0.0003,
+          0.0006
+        ]
+      },
+      "mode": "detail only",
+      "decals": 52,
+      "seconds": 0.361
+    },
+    "camera": {
+      "fov_deg": 30.41,
+      "tilt": {
+        "elevation": 21.2,
+        "roll": 0.5,
+        "source": "given"
+      },
+      "posed": {
+        "elevation": 21.2,
+        "distance": 1.84
+      }
+    },
+    "pose": null,
+    "level": {
+      "applied": false,
+      "elevation": 0.0,
+      "roll": 0.0
+    },
+    "peak_gpu_gb": 28.5,
+    "load_seconds": 88.8,
+    "container_seconds": 236.8,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "posed-phase2-17-bowl-of-ramen-with-an-egg",
+    "variant": "posed",
+    "seed": 136916256,
+    "given_tilt": [
+      45.0,
+      -7.9
+    ],
+    "posed": true,
+    "seconds": 51.7,
+    "timings": {
+      "generate_s": 28.021,
+      "export_s": 22.402,
+      "compress_s": 1.225,
+      "upload_s": 0.003
+    },
+    "triangles": 95739,
+    "views_used": 0,
+    "pipeline": "pixal3d-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9761,
+      "colour": 0.6892,
+      "coverage": 0.1051,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": 47.5,
+        "roll": -0.5,
+        "fov": 60.0,
+        "scale": 0.99,
+        "shift": [
+          -0.0012,
+          -0.0137
+        ]
+      },
+      "mode": "detail only",
+      "decals": 97,
+      "seconds": 0.386
+    },
+    "camera": {
+      "fov_deg": 40.94,
+      "tilt": {
+        "elevation": 45.0,
+        "roll": -7.9,
+        "source": "given"
+      },
+      "posed": {
+        "elevation": 45.0,
+        "distance": 1.3395
+      }
+    },
+    "pose": null,
+    "level": {
+      "applied": false,
+      "elevation": 0.0,
+      "roll": 0.0
+    },
+    "peak_gpu_gb": 28.5,
+    "load_seconds": 88.8,
+    "container_seconds": 291.1,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "posed-phase2-04-retro-arcade-machine",
+    "variant": "posed",
+    "seed": 949054593,
+    "given_tilt": [
+      5.6,
+      0.0
+    ],
+    "posed": true,
+    "seconds": 49.8,
+    "timings": {
+      "generate_s": 30.207,
+      "export_s": 18.573,
+      "compress_s": 1.042,
+      "upload_s": 0.001
+    },
+    "triangles": 97960,
+    "views_used": 0,
+    "pipeline": "pixal3d-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9926,
+      "colour": 0.5392,
+      "coverage": 0.0979,
+      "pose": {
+        "azimuth": 1.2,
+        "elevation": 5.0,
+        "roll": 0.0,
+        "fov": 26.0,
+        "scale": 1.005,
+        "shift": [
+          -0.0002,
+          -0.0016
+        ]
+      },
+      "mode": "detail only",
+      "decals": 67,
+      "seconds": 0.391
+    },
+    "camera": {
+      "fov_deg": 26.27,
+      "tilt": {
+        "elevation": 5.6,
+        "roll": 0.0,
+        "source": "given"
+      },
+      "posed": {
+        "elevation": 5.6,
+        "distance": 2.1423
+      }
+    },
+    "pose": null,
+    "level": {
+      "applied": false,
+      "elevation": 0.0,
+      "roll": 0.0
+    },
+    "peak_gpu_gb": 28.5,
+    "load_seconds": 88.8,
+    "container_seconds": 344.0,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "posed-phase2-13-cute-cartoon-car-bright-blue",
+    "variant": "posed",
+    "seed": 207648777,
+    "given_tilt": [
+      10.0,
+      -1.5
+    ],
+    "posed": true,
+    "seconds": 63.3,
+    "timings": {
+      "generate_s": 40.266,
+      "export_s": 21.775,
+      "compress_s": 1.208,
+      "upload_s": 0.002
+    },
+    "triangles": 95352,
+    "views_used": 0,
+    "pipeline": "pixal3d-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9892,
+      "colour": 0.52,
+      "coverage": 0.079,
+      "pose": {
+        "azimuth": 358.8,
+        "elevation": 8.8,
+        "roll": 0.0,
+        "fov": 27.5,
+        "scale": 0.998,
+        "shift": [
+          -0.0019,
+          0.0003
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#20848d",
+          "to": "#3f85ab",
+          "share": 0.2
+        }
+      ],
+      "decals": 356,
+      "seconds": 0.369
+    },
+    "camera": {
+      "fov_deg": 25.89,
+      "tilt": {
+        "elevation": 10.0,
+        "roll": -1.5,
+        "source": "given"
+      },
+      "posed": {
+        "elevation": 10.0,
+        "distance": 2.1751
+      }
+    },
+    "pose": null,
+    "level": {
+      "applied": false,
+      "elevation": 0.0,
+      "roll": 0.0
+    },
+    "peak_gpu_gb": 28.5,
+    "load_seconds": 88.8,
+    "container_seconds": 409.4,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mvlevel-phase2-09-donut-with-pink-frosting",
+    "variant": "mvlevel",
+    "seed": 591143680,
+    "given_tilt": [
+      28.8,
+      0.0
+    ],
+    "seconds": 60.0,
+    "timings": {
+      "generate_s": 31.23,
+      "export_s": 27.585,
+      "compress_s": 1.173,
+      "upload_s": 0.002
+    },
+    "triangles": 99324,
+    "views_used": 0,
+    "pipeline": "pixal3d-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.99,
+      "colour": 0.7267,
+      "coverage": 0.1282,
+      "pose": {
+        "azimuth": 357.5,
+        "elevation": 27.5,
+        "roll": 0.0,
+        "fov": 29.0,
+        "scale": 1.006,
+        "shift": [
+          0.0025,
+          0.0019
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#d77e39",
+          "to": "#d08923",
+          "share": 0.113
+        }
+      ],
+      "decals": 41,
+      "seconds": 0.956
+    },
+    "camera": {
+      "fov_deg": 21.47,
+      "tilt": {
+        "elevation": 28.8,
+        "roll": 0.0,
+        "source": "given"
+      }
+    },
+    "pose": null,
+    "level": {
+      "applied": true,
+      "elevation": 28.8,
+      "roll": 0.0,
+      "recentred": [
+        -0.0022,
+        -0.0302,
+        0.0255
+      ]
+    },
+    "peak_gpu_gb": 28.5,
+    "load_seconds": 88.8,
+    "container_seconds": 472.2,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mvlevel-phase2-17-bowl-of-ramen-with-an-egg",
+    "variant": "mvlevel",
+    "seed": 136916256,
+    "given_tilt": [
+      45.0,
+      -7.9
+    ],
+    "seconds": 46.4,
+    "timings": {
+      "generate_s": 28.007,
+      "export_s": 17.289,
+      "compress_s": 1.113,
+      "upload_s": 0.002
+    },
+    "triangles": 99562,
+    "views_used": 0,
+    "pipeline": "pixal3d-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9809,
+      "colour": 0.8727,
+      "coverage": 0.122,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": 47.5,
+        "roll": -8.0,
+        "fov": 50.3,
+        "scale": 1.009,
+        "shift": [
+          -0.0041,
+          -0.0062
+        ]
+      },
+      "mode": "detail only",
+      "decals": 119,
+      "seconds": 1.116
+    },
+    "camera": {
+      "fov_deg": 40.94,
+      "tilt": {
+        "elevation": 45.0,
+        "roll": -7.9,
+        "source": "given"
+      }
+    },
+    "pose": null,
+    "level": {
+      "applied": true,
+      "elevation": 45.0,
+      "roll": -7.9,
+      "recentred": [
+        -0.0184,
+        0.1085,
+        0.0129
+      ]
+    },
+    "peak_gpu_gb": 28.5,
+    "load_seconds": 88.8,
+    "container_seconds": 520.9,
+    "gpu": "NVIDIA L40S"
+  }
+]
