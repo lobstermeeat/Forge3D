@@ -1,0 +1,839 @@
+[
+  {
+    "run": "mv6-phase2-11-stack-of-old-books-with-a-candle",
+    "variant": "mv6",
+    "seed": 8026098,
+    "views_from": "phase6/views/phase2-11-stack-of-old-books-with-a-candle",
+    "silhouette_iou": {
+      "0": 0.957,
+      "45": 0.938,
+      "90": 0.954,
+      "180": 0.955,
+      "270": 0.954,
+      "315": 0.939
+    },
+    "seconds": 199.6,
+    "timings": {
+      "generate_s": 117.069,
+      "export_s": 80.875,
+      "compress_s": 1.506,
+      "upload_s": 0.002
+    },
+    "triangles": 97229,
+    "views_used": 6,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.954,
+      "colour": 0.5212,
+      "coverage": 0.0253,
+      "pose": {
+        "azimuth": 357.5,
+        "elevation": -6.2,
+        "roll": 0.0,
+        "fov": 0.0,
+        "scale": 1.001,
+        "shift": [
+          -0.0025,
+          -0.002
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#373b2e",
+          "to": "#a5704a",
+          "share": 0.111
+        }
+      ],
+      "decals": 70,
+      "seconds": 0.925
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.5542,
+      "given_half_extent": 0.55,
+      "extent": 0.983,
+      "rescaled": true,
+      "cut_off": [
+        45.0,
+        315.0
+      ]
+    },
+    "peak_gpu_gb": 42.4,
+    "load_seconds": 122.9,
+    "container_seconds": 346.4,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "syn6fit-phase2-13-cute-cartoon-car-bright-blue",
+    "variant": "syn6fit",
+    "seed": 207648777,
+    "views_from": "phase2d-13-cute-cartoon-car-bright-blue/final-207648777.glb (framed by its cube)",
+    "silhouette_iou": {
+      "0": 0.96,
+      "45": 0.967,
+      "90": 0.955,
+      "180": 0.96,
+      "270": 0.955,
+      "315": 0.967
+    },
+    "seconds": 76.7,
+    "timings": {
+      "generate_s": 52.781,
+      "export_s": 22.347,
+      "compress_s": 1.503,
+      "upload_s": 0.003
+    },
+    "triangles": 95269,
+    "views_used": 6,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9768,
+      "colour": 0.4677,
+      "coverage": 0.1105,
+      "pose": {
+        "azimuth": 35.0,
+        "elevation": 10.6,
+        "roll": -1.5,
+        "fov": 29.0,
+        "scale": 1.003,
+        "shift": [
+          -0.0006,
+          -0.005
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#3797aa",
+          "to": "#4c92b9",
+          "share": 0.289
+        }
+      ],
+      "decals": 408,
+      "seconds": 0.927
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.5494,
+      "given_half_extent": 0.55,
+      "extent": 0.991,
+      "rescaled": true
+    },
+    "peak_gpu_gb": 30.8,
+    "load_seconds": 122.9,
+    "container_seconds": 437.8,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv4-phase2-04-retro-arcade-machine",
+    "variant": "mv4",
+    "seed": 949054593,
+    "views_from": "phase6/views/phase2-04-retro-arcade-machine",
+    "silhouette_iou": {
+      "0": 0.989,
+      "90": 0.96,
+      "180": 0.988,
+      "270": 0.96
+    },
+    "seconds": 75.9,
+    "timings": {
+      "generate_s": 47.19,
+      "export_s": 27.062,
+      "compress_s": 1.543,
+      "upload_s": 0.002
+    },
+    "triangles": 95964,
+    "views_used": 4,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9646,
+      "colour": 0.624,
+      "coverage": 0.0988,
+      "pose": {
+        "azimuth": 338.8,
+        "elevation": 2.5,
+        "roll": -1.0,
+        "fov": 29.0,
+        "scale": 1.013,
+        "shift": [
+          -0.0059,
+          0.0041
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#724239",
+          "to": "#5b565a",
+          "share": 0.113
+        },
+        {
+          "from": "#a42f2d",
+          "to": "#a33f3d",
+          "share": 0.095
+        }
+      ],
+      "decals": 70,
+      "seconds": 1.126
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.5423,
+      "given_half_extent": 0.55,
+      "extent": 1.004,
+      "rescaled": true
+    },
+    "peak_gpu_gb": 30.8,
+    "load_seconds": 122.9,
+    "container_seconds": 526.9,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv4-phase2-06-wooden-shield-with-a-lion",
+    "variant": "mv4",
+    "seed": 1654818878,
+    "views_from": "phase6/views/phase2-06-wooden-shield-with-a-lion",
+    "silhouette_iou": {
+      "0": 0.983,
+      "90": 0.955,
+      "180": 0.985,
+      "270": 0.95
+    },
+    "seconds": 61.8,
+    "timings": {
+      "generate_s": 39.743,
+      "export_s": 20.464,
+      "compress_s": 1.5,
+      "upload_s": 0.002
+    },
+    "triangles": 95646,
+    "views_used": 4,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9922,
+      "colour": 0.5717,
+      "coverage": 0.1081,
+      "pose": {
+        "azimuth": 358.8,
+        "elevation": 0.0,
+        "roll": 0.0,
+        "fov": 41.0,
+        "scale": 1.002,
+        "shift": [
+          0.0006,
+          0.0009
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#ac7b5a",
+          "to": "#c27539",
+          "share": 0.319
+        },
+        {
+          "from": "#a96e45",
+          "to": "#be7439",
+          "share": 0.18
+        }
+      ],
+      "decals": 2019,
+      "seconds": 0.343
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.551,
+      "given_half_extent": 0.55,
+      "extent": 0.988,
+      "rescaled": true
+    },
+    "peak_gpu_gb": 30.7,
+    "load_seconds": 122.9,
+    "container_seconds": 608.5,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv4-phase2-08-vintage-film-camera",
+    "variant": "mv4",
+    "seed": 849334850,
+    "views_from": "phase6/views/phase2-08-vintage-film-camera",
+    "silhouette_iou": {
+      "0": 0.97,
+      "90": 0.963,
+      "180": 0.961,
+      "270": 0.96
+    },
+    "seconds": 79.8,
+    "timings": {
+      "generate_s": 52.985,
+      "export_s": 25.2,
+      "compress_s": 1.535,
+      "upload_s": 0.002
+    },
+    "triangles": 95415,
+    "views_used": 4,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9841,
+      "colour": 0.7592,
+      "coverage": 0.0638,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": 0.6,
+        "roll": 0.0,
+        "fov": 2.1,
+        "scale": 1.011,
+        "shift": [
+          0.0,
+          0.0044
+        ]
+      },
+      "mode": "detail only",
+      "decals": 162,
+      "seconds": 0.322
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.555,
+      "given_half_extent": 0.55,
+      "extent": 0.981,
+      "rescaled": true
+    },
+    "peak_gpu_gb": 30.8,
+    "load_seconds": 122.9,
+    "container_seconds": 702.4,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv4-phase2-11-stack-of-old-books-with-a-candle",
+    "variant": "mv4",
+    "seed": 8026098,
+    "views_from": "phase6/views/phase2-11-stack-of-old-books-with-a-candle",
+    "silhouette_iou": {
+      "0": 0.954,
+      "90": 0.956,
+      "180": 0.952,
+      "270": 0.957
+    },
+    "seconds": 284.5,
+    "timings": {
+      "generate_s": 218.829,
+      "export_s": 64.137,
+      "compress_s": 1.477,
+      "upload_s": 0.003
+    },
+    "triangles": 96509,
+    "views_used": 4,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9634,
+      "colour": 0.7209,
+      "coverage": 0.0267,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": 3.8,
+        "roll": 0.0,
+        "fov": 11.5,
+        "scale": 0.987,
+        "shift": [
+          -0.0012,
+          0.005
+        ]
+      },
+      "mode": "detail only",
+      "decals": 112,
+      "seconds": 0.356
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.5542,
+      "given_half_extent": 0.55,
+      "extent": 0.983,
+      "rescaled": true
+    },
+    "peak_gpu_gb": 41.6,
+    "load_seconds": 122.9,
+    "container_seconds": 998.4,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv6pic-phase2-04-retro-arcade-machine",
+    "variant": "mv6pic",
+    "seed": 949054593,
+    "views_from": "phase6/views/phase2-04-retro-arcade-machine",
+    "silhouette_iou": {
+      "0": 0.935,
+      "45": 0.866,
+      "90": 0.951,
+      "180": 0.933,
+      "270": 0.952,
+      "315": 0.965
+    },
+    "seconds": 83.1,
+    "timings": {
+      "generate_s": 59.74,
+      "export_s": 21.734,
+      "compress_s": 1.465,
+      "upload_s": 0.002
+    },
+    "triangles": 93040,
+    "views_used": 5,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9745,
+      "colour": 0.3442,
+      "coverage": 0.0846,
+      "pose": {
+        "azimuth": 344.4,
+        "elevation": -2.2,
+        "roll": 0.0,
+        "fov": 29.7,
+        "scale": 1.015,
+        "shift": [
+          0.0016,
+          -0.0047
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#99484c",
+          "to": "#ac8188",
+          "share": 0.07
+        }
+      ],
+      "decals": 69,
+      "seconds": 0.33
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.5423,
+      "given_half_extent": 0.55,
+      "extent": 1.004,
+      "rescaled": true
+    },
+    "peak_gpu_gb": 31.0,
+    "load_seconds": 122.9,
+    "container_seconds": 1106.2,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv6pic-phase2-06-wooden-shield-with-a-lion",
+    "variant": "mv6pic",
+    "seed": 1654818878,
+    "views_from": "phase6/views/phase2-06-wooden-shield-with-a-lion",
+    "silhouette_iou": {
+      "0": 0.981,
+      "45": 0.984,
+      "90": 0.951,
+      "180": 0.984,
+      "270": 0.95,
+      "315": 0.983
+    },
+    "seconds": 81.5,
+    "timings": {
+      "generate_s": 57.089,
+      "export_s": 22.799,
+      "compress_s": 1.48,
+      "upload_s": 0.002
+    },
+    "triangles": 99949,
+    "views_used": 5,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9898,
+      "colour": 0.6032,
+      "coverage": 0.0746,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": -1.2,
+        "roll": 0.0,
+        "fov": 23.1,
+        "scale": 1.004,
+        "shift": [
+          0.0,
+          0.0002
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#b38f64",
+          "to": "#c97335",
+          "share": 0.481
+        }
+      ],
+      "decals": 2147,
+      "seconds": 0.336
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.5494,
+      "given_half_extent": 0.55,
+      "extent": 0.991,
+      "rescaled": true
+    },
+    "peak_gpu_gb": 31.0,
+    "load_seconds": 122.9,
+    "container_seconds": 1200.6,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv6pic-phase2-08-vintage-film-camera",
+    "variant": "mv6pic",
+    "seed": 849334850,
+    "views_from": "phase6/views/phase2-08-vintage-film-camera",
+    "silhouette_iou": {
+      "0": 0.976,
+      "45": 0.974,
+      "90": 0.952,
+      "180": 0.969,
+      "270": 0.949,
+      "315": 0.971
+    },
+    "seconds": 86.0,
+    "timings": {
+      "generate_s": 59.932,
+      "export_s": 24.373,
+      "compress_s": 1.564,
+      "upload_s": 0.003
+    },
+    "triangles": 95248,
+    "views_used": 5,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9833,
+      "colour": 0.7299,
+      "coverage": 0.0771,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": -0.3,
+        "roll": 0.0,
+        "fov": 5.7,
+        "scale": 1.009,
+        "shift": [
+          0.0025,
+          0.005
+        ]
+      },
+      "mode": "detail only",
+      "decals": 223,
+      "seconds": 0.321
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.555,
+      "given_half_extent": 0.55,
+      "extent": 0.981,
+      "rescaled": true
+    },
+    "peak_gpu_gb": 31.0,
+    "load_seconds": 122.9,
+    "container_seconds": 1305.6,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "mv6pic-phase2-11-stack-of-old-books-with-a-candle",
+    "variant": "mv6pic",
+    "seed": 8026098,
+    "views_from": "phase6/views/phase2-11-stack-of-old-books-with-a-candle",
+    "silhouette_iou": {
+      "0": 0.947,
+      "45": 0.937,
+      "90": 0.957,
+      "180": 0.946,
+      "270": 0.96,
+      "315": 0.934
+    },
+    "seconds": 221.7,
+    "timings": {
+      "generate_s": 130.81,
+      "export_s": 89.247,
+      "compress_s": 1.469,
+      "upload_s": 0.002
+    },
+    "triangles": 99286,
+    "views_used": 5,
+    "pipeline": "pixal3d-mv-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.976,
+      "colour": 0.6588,
+      "coverage": 0.0247,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": 3.8,
+        "roll": 0.0,
+        "fov": 11.5,
+        "scale": 1.003,
+        "shift": [
+          0.0006,
+          -0.0025
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#3c2119",
+          "to": "#5d2b1b",
+          "share": 0.229
+        }
+      ],
+      "decals": 146,
+      "seconds": 0.361
+    },
+    "camera": {
+      "views": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          45.0,
+          0.0
+        ],
+        [
+          90.0,
+          0.0
+        ],
+        [
+          180.0,
+          0.0
+        ],
+        [
+          270.0,
+          0.0
+        ],
+        [
+          315.0,
+          0.0
+        ]
+      ],
+      "half_extent": 0.5542,
+      "given_half_extent": 0.55,
+      "extent": 0.983,
+      "rescaled": true,
+      "cut_off": [
+        45.0,
+        315.0
+      ]
+    },
+    "peak_gpu_gb": 41.9,
+    "load_seconds": 122.9,
+    "container_seconds": 1539.7,
+    "gpu": "NVIDIA L40S"
+  }
+]
