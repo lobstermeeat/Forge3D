@@ -385,9 +385,15 @@ again (give or take the GPU's own nondeterminism) and stores them under the same
       "bytes": 1550172,
       "raw_bytes": 8915432,
       "triangles": 96205,
-      "projection": { "applied": true, "reason": "applied", "iou": 0.9755, "…": "…" }
+      "projection": { "applied": true, "reason": "applied", "iou": 0.9755, "…": "…" },
+      "export": { "path": "to_glb", "seconds": "…", "captured": true }
     },
-    { "texture_seed": 4234, "glb": { "key": "ai/gen_42/final-1234-texture-3.glb", "…": "…" }, "…": "…" }
+    {
+      "texture_seed": 4234,
+      "glb": { "key": "ai/gen_42/final-1234-texture-3.glb", "…": "…" },
+      "export": { "path": "rebake", "seconds": "…" },
+      "…": "…"
+    }
   ],
   "texture_errors": [{ "texture_seed": 3234, "error": "ConnectionError: R2 unreachable" }],
   "pipeline": "1024_cascade",
@@ -400,6 +406,14 @@ again (give or take the GPU's own nondeterminism) and stores them under the same
 
 - Each texture has a final's fields: `glb`, `bytes`, `raw_bytes`, `triangles` and `projection` (and
   `floaters`, with a preset that drops them). `texture_seed` is the seed its noise came from.
+- `export` says how the texture's model was made. TRELLIS.2's `to_glb` does the same geometry work for
+  every texture of one shape (filling holes, remeshing, unwrapping UVs, finding where each texel lies on the
+  surface); only the texture changes. So the first texture runs it in full and keeps that work, the
+  texture layout (`"path": "to_glb"`, `"captured": true`), and the others only sample their texture at the
+  kept texels and build the material as `to_glb` does (`"path": "rebake"`;
+  `trellis2/forge3d_worker/rebake.py`). `seconds` is that step's time. A layout serves one shape in one job:
+  when it doesn't fit (other voxels, say) or the rebake fails, `to_glb` runs in full and `fallback` says why.
+  Finals and previews always run `to_glb` in full, as before, and keep nothing.
 - A texture that fails doesn't lose the others: it is listed in `texture_errors` (present only then), and
   the job completes with the rest, in order. When none is made, the job fails as other jobs do (`{"error":
   "generation failed: none of the 3 textures was made: …"}`), and so it does when the shape can't be made.
@@ -417,7 +431,9 @@ again (give or take the GPU's own nondeterminism) and stores them under the same
 
 **Cost:** one shape generation (Phase 5's finals: a median of 28 s on an L40S) plus about 30 s of GPU per
 texture. In the rolls, sampling a texture took a median of 10 s and exporting it 24 s; packing adds about
-1.5 s. Three textures come to about 2 minutes of the TRELLIS.2 container, about $0.09 (Cost, below).
+1.5 s. Three textures come to about 2 minutes of the TRELLIS.2 container, about $0.09 (Cost, below). The
+cached texture layout should take most of `to_glb`'s share of the export off the second and later textures;
+`ops/exp_rebake.py` measures it on a GPU.
 
 ### The views' cameras
 
@@ -964,8 +980,9 @@ python -m pytest workers/multiview/tests       # torch for the camera checks; no
 
 Run the folders separately: they share test file names. Each suite also runs from inside its folder
 (`cd workers/pixal3d && python -m pytest`). With `TRELLIS2_SRC` pointing at a TRELLIS.2 checkout, the
-trellis2 tests also run the views through TRELLIS.2's own samplers, not only a reduction of them;
-without diffusers installed, one multiview camera check is skipped.
+trellis2 tests also run the views through TRELLIS.2's own samplers, not only a reduction of them, and
+the cached texture layout through TRELLIS.2's own `to_glb` (skipped without it); without diffusers
+installed, one multiview camera check is skipped.
 
 The tests cover input validation, job handling, the out-of-memory retry and fallback, shading
 normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API, the
@@ -975,7 +992,9 @@ the fall-backs), the floater cleanup (synthetic donuts, bowls, balloons, cabins 
 apart goes, what touches or is big stays, UVs and texture kept), retexturing (the texture flow alone
 on the generation's shape, its noise drawn again bit for bit, views, the low-VRAM retry), texture options
 (the final's shape once, the rolls' seeds, the count, the keys, one texture or all of them failing, the
-refusal where the finals aren't TRELLIS.2's, the timings) and the views' bake (MV-Adapter's ig2mv cameras held to its code, the control maps of
+refusal where the finals aren't TRELLIS.2's, the timings), the cached texture layout (TRELLIS.2's own
+`to_glb` on CPU stand-ins for CuMesh and FlexGEMM, with `TRELLIS2_SRC`: what the capture sees, a rebake
+equal to `to_glb` bit for bit, the fallbacks, finals untouched) and the views' bake (MV-Adapter's ig2mv cameras held to its code, the control maps of
 a box, boxes baked from views painted per side: hidden sides, the background, the fades, the colour
 match, the gutters). For the recipe they cover, on fakes, the default (TRELLIS.2's finals) and the choice
 of model, the container's model pool, the fallbacks to TRELLIS.2 and what they report, the weights a

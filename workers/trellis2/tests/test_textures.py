@@ -383,6 +383,30 @@ def test_a_gpu_fault_while_projecting_keeps_the_texture_but_replaces_the_worker(
     assert out["refresh_worker"] is True
 
 
+class Rebaking(FakeRuntime):
+    """Notes how each export ran, as Trellis2Runtime does: to_glb in full for the first texture, then rebakes."""
+
+    def export(self, mesh, preset):
+        if mesh.texture in ("final", 2234):
+            self.last_export = {"path": "to_glb", "seconds": 14.2, "captured": True}
+        else:
+            self.last_export = {"path": "rebake", "seconds": 1.3}
+        return super().export(mesh, preset)
+
+
+def test_each_texture_says_how_its_export_ran():
+    out = handle_job(textures_job(), Rebaking(), FakeStorage(), Packer())
+    assert [texture["export"] for texture in out["textures"]] == [
+        {"path": "to_glb", "seconds": 14.2, "captured": True},
+        {"path": "rebake", "seconds": 1.3},
+        {"path": "rebake", "seconds": 1.3},
+    ]
+    assert json.loads(json.dumps(out)) == out
+    # A final's result says nothing of it: a final always runs to_glb in full, as it always has
+    final = handle_job({"id": "f", "input": payload(mode="final")}, Rebaking(), FakeStorage(), Packer())
+    assert "error" not in final and "export" not in final
+
+
 def test_timings_sum_each_step_over_the_textures(monkeypatch):
     now = [0.0]
     monkeypatch.setattr(service, "time", types.SimpleNamespace(perf_counter=lambda: now[0]))
