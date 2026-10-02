@@ -62,8 +62,8 @@ recipe on, Pixal3D's finals go through the same export, after they are levelled 
 Phase 5's finals, made by TRELLIS.2 alone, invented wrong backs: the arcade machine's back was a dark
 smear with a ghost of its front, the camera's back caved in or sprouted parts a camera doesn't have,
 and the shield's back carried a crude ghost of its lion. In the Phase 6 experiments, Pixal3D
-(TencentARC; TRELLIS.2 with pixel-aligned image features) fixed those backs when it was given the
-picture as its one view and its model was levelled afterwards. That is the recipe below. Phase 6's
+(TencentARC; TRELLIS.2 with pixel-aligned image features) fixed most of those backs when it was
+given the picture as its one view and its model was levelled afterwards. That is the recipe below. Phase 6's
 re-test then found it no better overall, so **finals stay TRELLIS.2's by default**. The recipe stays
 in the code, off, for the objects it helps and for further work; `ORAINGE_FINAL_MODEL=pixal3d` turns
 it on (Turning it on, below).
@@ -77,11 +77,12 @@ next seed (0.09).
 - Graded independently with the rubric of Phases 4 and 5 (four reviewers): 11 of 20 publishable on
   Phase 4's seeds (Phase 5: 12), 10 on the next seeds (Phase 5: 11), and 13 with a second try
   (Phase 5: 13).
-- Blinded side by side, by the same reviewers, each pair made from the same picture and seed and shown
-  in random order: Phase 5's TRELLIS.2 final was preferred in 24 of 40 pairs, Pixal3D's in 16. With
-  those reviewers, Phase 5 had 15 of 20 publishable with a second try, against Pixal3D's 11.
-- Pixal3D won on the made-up backs (the arcade machine, the shield, the skateboard) and on polish (the
-  pistol, the knight, the fox).
+- Blinded side by side, by four more reviewers who each judged both finals of a pair, made from the
+  same picture and seed and shown in random order: Phase 5's TRELLIS.2 final was preferred in 24 of 40
+  pairs, Pixal3D's in 16. With those reviewers, Phase 5 had 15 of 20 publishable with a second try,
+  against Pixal3D's 11.
+- Pixal3D won on the made-up backs of the arcade machine and the shield, on the skateboard's print, and
+  on polish (the pistol, the knight, the fox). The camera's back stayed wrong.
 - It lost on the picture's highlights and shadows baked into the texture (the chair's white glare, the
   ramen bowl's near-black bottom), on duller or blotchy colour (the sneaker, the car, the balloon, the
   books), on loose floating bits (the donut's sprinkles, the dragon's tail tip, debris under the
