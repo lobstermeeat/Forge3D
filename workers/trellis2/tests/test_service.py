@@ -358,6 +358,39 @@ def test_a_runtime_that_does_not_count_views_is_taken_to_use_them_all():
     assert out["views_used"] == 3
 
 
+def test_a_runtime_that_takes_no_views_gets_the_picture_alone():
+    """A runtime from before views, or one that binds a job's views itself (the Pixal3D worker's)."""
+    runtime = FakeRuntime()  # generate(image, preset, seed)
+    payload = {"image_base64": b64(png_bytes()), "mode": "final", "seed": 3, "views": [view(90), view(180)]}
+    out = handle_job({"id": "p", "input": payload}, runtime, FakeStorage(), pack)
+    assert "error" not in out
+    assert runtime.calls[0] == ("generate", "1024_cascade", 3, (64, 48))
+    assert out["views_used"] == 0  # it said nothing about views, so none were used
+
+
+def test_a_runtime_that_binds_views_itself_reports_what_it_used():
+    class Bound(FakeRuntime):
+        def generate(self, image, preset, seed):
+            self.views_used = 2  # the Pixal3D service's wrapper: views bound before production's handle_job
+            return super().generate(image, preset, seed)
+
+    payload = {"image_base64": b64(png_bytes()), "views": [view(90), view(180)]}
+    out = handle_job({"id": "p", "input": payload}, Bound(), FakeStorage(), pack)
+    assert out["views_used"] == 2
+
+
+def test_takes_views_reads_the_signature():
+    from forge3d_worker.service import takes_views
+
+    class Keywords:
+        def generate(self, image, preset, seed, **extra):
+            return "mesh"
+
+    assert takes_views(ViewRuntime()) and takes_views(Keywords())
+    assert not takes_views(FakeRuntime())
+    assert not takes_views(type("Opaque", (), {"generate": 3})())
+
+
 def test_bad_views_are_reported_without_running_the_model():
     runtime = ViewRuntime()
     payload = {"image_base64": b64(png_bytes()), "views": [view(azimuth="left")]}

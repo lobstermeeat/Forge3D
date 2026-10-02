@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import time
 import traceback
 from typing import Any, Callable, Optional, Protocol, Sequence
@@ -15,8 +16,8 @@ class Runtime(Protocol):
     """
     The GPU side. After generate() it may set ``pipeline_used`` to the TRELLIS.2 pipeline that actually
     made the mesh (a final that runs out of GPU memory falls back to the preview's); without it, the
-    preset's pipeline is reported. It gets ``views`` only when the job has some, and may then set
-    ``views_used`` to how many it used (all of them, if it doesn't say).
+    preset's pipeline is reported. It gets ``views`` only when the job has some and its generate() takes
+    them (takes_views), and may then set ``views_used`` to how many it used (all of them, if it doesn't say).
     """
 
     def generate(self, image: Any, preset: Preset, seed: int, views: Sequence[View] = ()) -> Any: ...
@@ -25,6 +26,19 @@ class Runtime(Protocol):
 
 
 Pack = Callable[[bytes, int], bytes]
+
+
+def takes_views(runtime: Any) -> bool:
+    """
+    Whether the runtime's generate() accepts ``views``. A runtime from before views, or one that binds a
+    job's views itself (the Pixal3D worker's service wraps its runtime that way), is called as it always
+    was, with the picture alone.
+    """
+    try:
+        parameters = inspect.signature(runtime.generate).parameters
+    except (TypeError, ValueError):  # a callable the inspector can't read
+        return False
+    return "views" in parameters or any(p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters.values())
 
 _GPU_FAULTS = ("cuda", "out of memory", "outofmemory", "cublas", "cudnn", "device-side assert")
 
@@ -64,13 +78,14 @@ def handle_job(
         clock = now
 
     try:
-        if spec.views:
+        if spec.views and takes_views(runtime):
             mesh = runtime.generate(spec.image, preset, spec.seed, views=spec.views)
             views_used = getattr(runtime, "views_used", len(spec.views))
         else:
-            # Exactly as before views existed (and for runtimes that don't take them)
+            # Exactly as before views existed. A runtime that doesn't take views gets the picture alone and
+            # reports the views it used itself, if it bound them some other way (else none)
             mesh = runtime.generate(spec.image, preset, spec.seed)
-            views_used = 0
+            views_used = int(getattr(runtime, "views_used", 0) or 0) if spec.views else 0
         pipeline = getattr(runtime, "pipeline_used", None) or preset.pipeline_type
         lap("generate_s")
         raw, triangles = runtime.export(mesh, preset)
