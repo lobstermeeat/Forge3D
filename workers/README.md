@@ -488,8 +488,8 @@ alike (with the recipe on, its container makes the finals with Pixal3D).
    ```
 
    A run first downloads any weights it needs that the `orainge-models` volume doesn't have yet
-   (Pixal3D's only for a final with the recipe on, also when a run is continued with `--final`;
-   `make_set` fetches all four sets when the set has prompts); later runs start within a couple of
+   (FLUX's for a prompt, Pixal3D's only for a final with the recipe on, also when a run is continued
+   with `--final`; `make_set` fetches what its runs need once, up front); later runs start within a couple of
    minutes. Each step is saved in the `orainge-outputs` volume under the run's name: the reference
    images, `preview-<seed>.glb`, `final-<seed>.glb` and `progress.json`. If you are still connected
    at the end, they are also copied to `orainge-outputs/<run>/` here. `progress.json` keeps each

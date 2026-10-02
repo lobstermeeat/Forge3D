@@ -820,9 +820,11 @@ def test_make_set_runs_every_line_and_reports_failures(tmp_path, monkeypatch, ca
     monkeypatch.chdir(tmp_path)
     modal_app.make_set.info.raw_f(prompts=str(listing), final=True, name="s")
 
-    # Weights once, up front (all of them: prompts need FLUX, finals Pixal3D), then every run in one map
+    # Weights once, up front (prompts need FLUX's too; finals by TRELLIS.2 nothing more), then every run
+    # in one map
     assert calls == [
-        ("download", "all"),
+        ("download", "trellis2"),
+        ("download", "reference"),
         ("starmap", [("s-01-lamp", "a lamp"), ("s-02-chair", "a chair")], True),
     ]
     assert (tmp_path / "orainge-outputs" / "s" / "s-01-lamp" / "final-1.glb").read_bytes() == b"glb"

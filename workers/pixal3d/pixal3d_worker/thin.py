@@ -1,8 +1,9 @@
 """
 Thin, flat objects get Pixal3D's single-view weights.
 
-The production recipe builds a picture with Pixal3D's multi-view weights and the picture as their one
-view: on the side the picture doesn't show they invent far less than the single-view weights (a plain
+The recipe (finals, when the app is deployed with ORAINGE_FINAL_MODEL=pixal3d) builds a picture with
+Pixal3D's multi-view weights and the picture as their one view: on the side the picture doesn't show
+they invent far less than the single-view weights (a plain
 back on the helmet, a proper rear on the car, a white bowl all round the ramen). On a thin, flat object
 they fail instead: the shield came out as a hollow tray and the skateboard as two decks, where the
 single-view weights built a thin clean shield and a clean skateboard.

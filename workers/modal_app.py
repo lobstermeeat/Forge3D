@@ -1096,12 +1096,15 @@ def make_set(prompts: str, final: bool = True, name: str = "", pictures_only: bo
         existing = set()
     print(f"[orainge] {name}: {len(runs)} runs, saved in the orainge-outputs volume as {names[0]} to {names[-1]}")
     print("  Progress, any time:  python workers/modal_app.py status")
-    # Any missing weights are fetched once here, not by every run at the same time
+    # Any missing weights are fetched once here, not by every run at the same time: TRELLIS.2's, FLUX's
+    # for prompts, and Pixal3D's for finals when it makes them
+    needed = ["trellis2"]
     if any("prompt" in run for run in runs):
-        download_models.remote(which="all")
-    else:
-        for which in ["trellis2", *FINAL_WEIGHTS] if final else ["trellis2"]:
-            download_models.remote(which=which)
+        needed.append("reference")
+    if final:
+        needed.extend(FINAL_WEIGHTS)
+    for which in needed:
+        download_models.remote(which=which)
     # All at once, so every run finishes before the copies start and the map closes cleanly
     arguments = set_arguments(names, runs, existing, final, chosen, pictures_only)
     outcomes = list(make_model.starmap(arguments, return_exceptions=True))
