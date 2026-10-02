@@ -1,6 +1,7 @@
 """Pixal3DRuntime on a fake pipeline: which pictures and cameras Pixal3D gets, and the GLB's frame."""
 
 import io
+import json
 import math
 import types
 
@@ -68,6 +69,7 @@ class FakePipeline:
         self.low_vram = False
         self._device = torch.device("cuda")
         self.runs = []
+        self.devices_at_run = []
         self.failures = list(failures)
 
     @property
@@ -88,6 +90,7 @@ class FakePipeline:
 
     def _run(self, kind, payload, kwargs):
         self.runs.append((kind, payload, kwargs, self.low_vram))
+        self.devices_at_run.append({name: module.device for name, module in self.models.items()})
         if self.failures:
             raise self.failures.pop(0)
         return [types.SimpleNamespace(kind=kind)]
@@ -99,11 +102,22 @@ class FakePipeline:
         return self._run("single", (image, camera_params), kwargs)
 
 
-def runtime(multiview=True, main=MAIN_VIEW, azimuths=None, failures=()) -> Pixal3DRuntime:
+def runtime(multiview=True, main=MAIN_VIEW, azimuths=None, failures=(), thin=False, single_failures=()) -> Pixal3DRuntime:
     rt = Pixal3DRuntime.__new__(Pixal3DRuntime)
     rt.pipeline = FakePipeline(failures)
     rt.multiview, rt.main, rt.azimuths = multiview, main, azimuths
     rt.moge, rt.fov = None, math.radians(30)
+    rt.single, rt.swapped, rt.thin_ratio = None, (), None
+    if thin:  # the single-view flow models beside the multi-view ones, as __init__ loads them
+        rt.thin_ratio = pipeline.THIN_RATIO
+        rt.single = FakePipeline(single_failures)
+        rt.single.models["tex_slat_decoder"] = rt.pipeline.models["tex_slat_decoder"]  # the same file: shared
+        rt.single.rembg_model = rt.pipeline.rembg_model
+        rt.swapped = ("sparse_structure_flow_model",)
+        for name in pipeline.STAGES:
+            getattr(rt.single, name).cuda()
+        rt.pipeline.to(torch.device("cuda"))
+        rt.single.models["sparse_structure_flow_model"].cpu()  # off the GPU between thin objects
     return rt
 
 
@@ -399,3 +413,127 @@ def test_a_posed_picture_puts_the_elevation_in_the_camera(monkeypatch):
     rt.generate(photo(), PRESETS["final"], seed=3)
     front = cameras.front_camera(distance)
     np.testing.assert_allclose(rt.pipeline.runs[1][1]["transform_matrix"][0, 0].numpy(), front, atol=1e-6)
+
+
+# --- Thin objects: which weights ------------------------------------------------------------------------
+
+
+def preview_runtime(glb, elevation=2.5, thin=True, multiview=True, **kwargs) -> Pixal3DRuntime:
+    """A runtime whose TRELLIS.2 preview is ``glb`` and whose pose search finds ``elevation``."""
+    from pixal3d_worker import level
+
+    rt = runtime(multiview=multiview, thin=thin, **kwargs)
+    rt.level, rt.trellis2 = pipeline.LEVEL_PREVIEW, FakeTrellis2(glb)
+    level.estimate_pose = lambda glb, picture, device=None: {
+        "applied": True, "reason": "found", "pose": {"elevation": elevation, "roll": 0.0}, "iou": 0.98
+    }  # fmt: skip
+    return rt
+
+
+@pytest.fixture()
+def real_estimate_pose():
+    from pixal3d_worker import level
+
+    original = level.estimate_pose
+    yield
+    level.estimate_pose = original
+
+
+def test_a_thin_preview_picks_the_single_view_weights(real_estimate_pose):
+    rt = preview_runtime(tilted_plate(0.0))  # extents (1.0, 0.05, 1.0): ratio 0.05
+    mesh = rt.generate(photo(), PRESETS["final"], seed=3)
+    assert rt.pipeline.runs == []  # the multi-view weights never ran
+    kind, (image, camera), kwargs, low = rt.single.runs[0]
+    assert kind == "single" and kwargs["seed"] == 3 and kwargs["preprocess_image"] is False and low is False
+    assert camera["distance"] == pytest.approx(0.5 / math.tan(math.radians(15)))
+    assert rt.last_weights == "single" and rt.pipeline_used == "pixal3d-1024_cascade"
+    assert rt.last_thin["thin"] is True and rt.last_thin["ratio"] == pytest.approx(0.05)
+    assert rt.last_thin["extents"] == pytest.approx([0.05, 1.0, 1.0]) and rt.last_thin["decided"] is True
+    assert rt.last_thin["threshold"] == pipeline.THIN_RATIO and rt.last_thin["source"] == "preview"
+    assert getattr(mesh, pipeline.TILT) == (2.5, 0.0)  # still levelled by the preview's pose
+    # The swap: the single-view flow models on the GPU while they ran, the multi-view ones off it...
+    assert rt.single.devices_at_run[0]["sparse_structure_flow_model"] == "cuda"
+    assert rt.pipeline.models["sparse_structure_flow_model"].device == "cuda"  # ...and back afterwards
+    assert rt.single.models["sparse_structure_flow_model"].device == "cpu"
+    assert rt.single.models["tex_slat_decoder"] is rt.pipeline.models["tex_slat_decoder"]
+    assert rt.pipeline.models["tex_slat_decoder"].device == "cuda"
+
+
+def test_a_boxy_preview_keeps_the_multi_view_weights(real_estimate_pose):
+    cube = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
+    rt = preview_runtime(cube)
+    rt.generate(photo(), PRESETS["final"], seed=3)
+    assert rt.single.runs == [] and rt.pipeline.runs[0][0] == "mv"
+    assert rt.last_weights == "multiview"
+    assert rt.last_thin["thin"] is False and rt.last_thin["ratio"] == pytest.approx(1.0)
+    assert rt.single.models["sparse_structure_flow_model"].device == "cpu"  # never moved
+
+
+def test_the_threshold_is_honoured(real_estimate_pose):
+    pistol = trimesh.creation.box(extents=(1.0, 0.15, 0.86))  # the pistol's preview, about
+    rt = preview_runtime(pistol)
+    rt.generate(photo(), PRESETS["final"], seed=3)
+    assert rt.last_weights == "single" and rt.last_thin["ratio"] == pytest.approx(0.15)
+    rt = preview_runtime(pistol)
+    rt.thin_ratio = 0.10  # stricter: the pistol stays with the multi-view weights
+    rt.generate(photo(), PRESETS["final"], seed=3)
+    assert rt.last_weights == "multiview" and rt.last_thin["threshold"] == 0.10 and rt.last_thin["thin"] is False
+    rt = preview_runtime(pistol)
+    rt.thin_ratio = 0.15  # at the threshold counts as thin
+    rt.generate(photo(), PRESETS["final"], seed=3)
+    assert rt.last_weights == "single"
+
+
+def test_without_a_preview_or_the_rule_the_multi_view_weights_build(real_estimate_pose):
+    rt = preview_runtime(tilted_plate(0.0))
+    rt.level, rt.given_tilt = pipeline.LEVEL_GIVEN, (5.0, 0.0)  # no preview: nothing measured
+    rt.generate(photo(), PRESETS["final"], seed=3)
+    assert rt.last_weights == "multiview" and rt.last_thin is None and rt.pipeline.runs[0][0] == "mv"
+    rt = preview_runtime(tilted_plate(0.0))
+    rt.single, rt.swapped = None, ()  # the rule off (thin_ratio None): the preview is still measured
+    rt.thin_ratio = None
+    rt.generate(photo(), PRESETS["final"], seed=3)
+    assert rt.last_weights == "multiview" and rt.pipeline.runs[0][0] == "mv"
+    assert rt.last_thin["thin"] is True and rt.last_thin["decided"] is False
+    # A runtime with the single-view weights alone reports them, and measures without deciding
+    rt = preview_runtime(trimesh.creation.box(extents=(1.0, 1.0, 1.0)), thin=False, multiview=False)
+    rt.thin_ratio = pipeline.THIN_RATIO
+    rt.generate(photo(), PRESETS["final"], seed=3)
+    assert rt.last_weights == "single" and rt.pipeline.runs[0][0] == "single"
+    assert rt.last_thin["thin"] is False and rt.last_thin["decided"] is False
+
+
+def test_views_always_use_the_multi_view_weights():
+    rt = runtime(thin=True)
+    rt.generate_views(photo(), six_views(), PRESETS["final"], seed=1)
+    assert rt.last_weights == "multiview" and rt.last_thin is None and rt.single.runs == []
+
+
+def test_out_of_memory_on_the_single_view_weights_retries_and_swaps_back(real_estimate_pose):
+    rt = preview_runtime(tilted_plate(0.0), single_failures=[torch.OutOfMemoryError("CUDA out of memory")])
+    rt.generate(photo(), PRESETS["final"], seed=3)
+    assert [low for *_, low in rt.single.runs] == [False, True]
+    assert rt.single.devices_at_run[1]["sparse_structure_flow_model"] == "cpu"  # low-VRAM: off the GPU between stages
+    assert rt.pipeline.low_vram is False and rt.single.low_vram is False  # both back to normal
+    assert rt.pipeline.models["sparse_structure_flow_model"].device == "cuda"
+    assert rt.single.models["sparse_structure_flow_model"].device == "cpu"
+    assert all(getattr(rt.single, name).device == "cuda" for name in pipeline.STAGES)
+    assert rt.last_weights == "single"
+
+
+def test_own_checkpoints_are_the_flow_models(tmp_path):
+    decoders = {"sparse_structure_decoder": "/models/TRELLIS.2-4B/ckpts/ss_dec", "shape_slat_decoder": "/models/TRELLIS.2-4B/ckpts/shape_dec"}
+    for config, suffix in (("pipeline.json", ""), ("pipeline_mv.json", "_mv")):
+        models = {**decoders, "sparse_structure_flow_model": f"ckpts/ss_flow{suffix}", "tex_slat_flow_model_1024": f"ckpts/tex_flow{suffix}"}
+        (tmp_path / config).write_text(json.dumps({"args": {"models": models}}))
+    own = pipeline.own_checkpoints(str(tmp_path), "pipeline.json", "pipeline_mv.json")
+    assert own == {"sparse_structure_flow_model", "tex_slat_flow_model_1024"}
+
+
+def test_the_thin_ratio_comes_from_the_environment():
+    assert pipeline.thin_ratio_from_env(None) == pipeline.THIN_RATIO
+    assert pipeline.thin_ratio_from_env("") == pipeline.THIN_RATIO
+    assert pipeline.thin_ratio_from_env("none") is None and pipeline.thin_ratio_from_env("off") is None
+    assert pipeline.thin_ratio_from_env("0.25") == 0.25
+    with pytest.raises(ValueError):
+        pipeline.thin_ratio_from_env("thin")

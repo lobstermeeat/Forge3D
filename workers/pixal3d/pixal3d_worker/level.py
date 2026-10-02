@@ -40,6 +40,11 @@ MAX_ROLL_DEG = 25.0
 # of objects are taken from above or level, and levelling by the wrong sign doubles the tilt instead of
 # removing it. Phase 5's twenty pictures were placed between -5 and +48 degrees
 MIN_ELEVATION_DEG = -10.0
+# The projection gives up when a camera far from the winner fits as well but sees a different shape,
+# because it must know which side it paints. Levelling only needs the elevation and roll: such a rival
+# that agrees on both within this many degrees leaves the tilt unambiguous (the stack of books: the
+# winner at azimuth 275 and a rival at 357, elevations 8.8 and 5.0)
+TILT_AGREEMENT_DEG = 5.0
 
 
 def camera_axes(elevation_deg: float, roll_deg: float = 0.0, azimuth_deg: float = 0.0) -> np.ndarray:
@@ -136,12 +141,18 @@ def estimate_pose(glb: Any, picture: Any, device: Optional[Any] = None) -> dict:
             )
             if iou < P.MIN_IOU:
                 raise P._Skip(f"the silhouettes don't match well enough (IoU {iou:.3f} < {P.MIN_IOU})")
+            report["rivals"] = []
             for rival in pose.rivals:
                 angle = float(P._angle_between(params, rival[None])[0])
                 difference = P._shape_difference(zbuf, P._render_depth(model, pic, rival[None])[1])
-                if difference > P.SAME_SHAPE:
+                tilt_gap = max(abs(float(rival[1] - params[0, 1])), abs(float(rival[2] - params[0, 2])))
+                report["rivals"].append(
+                    {"angle": round(angle, 1), "shape_difference": round(difference, 3), "tilt_gap": round(tilt_gap, 1)}
+                )
+                if difference > P.SAME_SHAPE and tilt_gap > TILT_AGREEMENT_DEG:
                     raise P._Skip(
-                        f"ambiguous camera: a view {angle:.0f} degrees away fits as well but sees a different shape"
+                        f"ambiguous camera: a view {angle:.0f} degrees away fits as well but sees a different "
+                        f"shape from {tilt_gap:.0f} degrees of tilt away"
                     )
             elevation = float(report["pose"]["elevation"])
             if elevation < MIN_ELEVATION_DEG:

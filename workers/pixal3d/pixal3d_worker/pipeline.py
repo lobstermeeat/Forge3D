@@ -13,7 +13,8 @@ The decoders are TRELLIS.2's own files. Pixal3D's meshes come out in a camera-al
 levels by the picture's camera elevation (``level.py``): Pixal3D has no notion of gravity, so an object
 pictured from above would otherwise lean towards the viewer by that angle. The elevation comes from
 TRELLIS.2's '512' preview of the same picture and seed (the preview the user approves), against which
-the projection's camera search places the picture.
+the projection's camera search places the picture. The same preview's bounding box decides the weights
+(``thin.py``): a thin, flat object gets the single-view weights, which the multi-view ones break on.
 """
 
 from __future__ import annotations
@@ -35,7 +36,8 @@ from forge3d_worker.pipeline import CUTOUT, Trellis2Runtime, _configure_environm
 from forge3d_worker.pipeline import MODEL_DIR as TRELLIS2_MODEL_DIR
 from forge3d_worker.settings import PRESETS, Preset
 
-from . import cameras, level, neighborhood
+from . import cameras, level, neighborhood, thin
+from .thin import THIN_RATIO  # noqa: F401 - the rule's threshold, re-exported
 from .views import (
     MAIN_PICTURE,
     MAIN_VIEW,
@@ -93,6 +95,9 @@ LEVEL_CHOICES = (LEVEL_PREVIEW, LEVEL_GIVEN, LEVEL_NONE)
 # (elevation, roll) travels from generate() to export() on the mesh, like the cutout
 TILT = "forge3d_tilt"
 NO_TILT = (0.0, 0.0)
+# Which of Pixal3D's weights built a model (the result's "weights")
+WEIGHTS_SINGLE = "single"
+WEIGHTS_MULTIVIEW = "multiview"
 
 
 class WeightMismatchError(RuntimeError):
@@ -104,6 +109,15 @@ def checkpoint_paths(model_dir: str, config_file: str) -> dict[str, str]:
     with open(os.path.join(model_dir, config_file)) as f:
         paths = json.load(f)["args"]["models"]
     return {name: path if os.path.isabs(path) else os.path.join(model_dir, path) for name, path in paths.items()}
+
+
+def own_checkpoints(model_dir: str, config_file: str, shared_config_file: str) -> set[str]:
+    """
+    The models of ``config_file`` whose checkpoints are not ``shared_config_file``'s: the flow models,
+    between Pixal3D's single-view and multi-view configs (their decoders are the same files).
+    """
+    mine, theirs = checkpoint_paths(model_dir, config_file), checkpoint_paths(model_dir, shared_config_file)
+    return {name for name, path in mine.items() if theirs.get(name) != path}
 
 
 def verify_weights(models: dict[str, Any], model_dir: str, config_file: str) -> list[str]:
@@ -263,6 +277,12 @@ class Pixal3DRuntime(Trellis2Runtime):
     model is turned by its elevation at export; with LEVEL_GIVEN the caller sets ``given_tilt``. With
     ``posed`` (an experiment, multi-view weights only) the elevation goes into the picture's camera
     instead, as an absolute pose, and nothing is turned afterwards.
+
+    ``thin_ratio`` (None: off) is the rule for thin, flat objects (``thin.py``): a multi-view runtime
+    then loads the single-view flow models too (``single``; the decoders, the background remover,
+    DINOv3 and NAF are shared), keeps them on the CPU, and swaps them onto the GPU for a picture whose
+    preview's bounding box is at least that flat. ``last_weights`` says which weights built the last
+    model, ``last_thin`` what the preview measured.
     """
 
     pipeline_used: Optional[str] = None
@@ -271,10 +291,15 @@ class Pixal3DRuntime(Trellis2Runtime):
     posed: bool = False
     trellis2: Optional[Trellis2Runtime] = None  # loaded with LEVEL_PREVIEW; without it, nothing is levelled
     given_tilt: tuple[float, float] = NO_TILT
+    thin_ratio: Optional[float] = THIN_RATIO
+    single: Optional[Any] = None  # the single-view weights beside the multi-view ones (thin objects)
+    swapped: tuple[str, ...] = ()  # the models ``single`` owns (its flow models), swapped on and off the GPU
     last_camera: Optional[dict] = None
     last_pose: Optional[dict] = None  # level.estimate_pose's report for the last single picture
     last_level: Optional[dict] = None  # level.level's note for the last export
     last_preview: Optional[bytes] = None  # the TRELLIS.2 preview GLB the pose was found against (unpacked)
+    last_thin: Optional[dict] = None  # thin.measure's report for the last single picture's preview
+    last_weights: Optional[str] = None  # WEIGHTS_*: which weights built the last model
 
     def __init__(
         self,
@@ -287,6 +312,7 @@ class Pixal3DRuntime(Trellis2Runtime):
         level: str = LEVEL_PREVIEW,
         trellis2_model_dir: str = TRELLIS2_MODEL_DIR,
         posed: bool = False,
+        thin_ratio: Optional[float] = THIN_RATIO,
     ) -> None:
         if main not in (MAIN_VIEW, MAIN_PICTURE):
             raise ValueError(f"main must be {MAIN_VIEW!r} or {MAIN_PICTURE!r}")
@@ -294,36 +320,28 @@ class Pixal3DRuntime(Trellis2Runtime):
             raise ValueError(f"level must be one of {LEVEL_CHOICES}")
         if posed and not multiview:
             raise ValueError("a posed picture needs the multi-view weights (the single-view camera is fixed)")
+        if thin_ratio is not None and not (0.0 <= thin_ratio <= 1.0):
+            raise ValueError(f"thin_ratio must be within [0, 1] or None, got {thin_ratio}")
         _configure_environment()
         neighborhood.install()
         import o_voxel  # noqa: F401 - after the nvdiffrast stand-in is installed
         import torch
-        from pixal3d.pipelines import Pixal3DImageTo3DPipeline, Pixal3DMVImageTo3DPipeline
         from pixal3d.trainers.flow_matching.mixins import image_conditioned_proj as proj
 
         started = time.perf_counter()
         self.multiview, self.main, self.level, self.posed = multiview, main, level, posed
+        self.thin_ratio = thin_ratio
         self.azimuths = None if azimuths is None else tuple(float(a) % 360 for a in azimuths)
         config = CONFIG_MULTIVIEW if multiview else CONFIG_SINGLE
-        pipeline_class = Pixal3DMVImageTo3DPipeline if multiview else Pixal3DImageTo3DPipeline
-        pipeline = pipeline_class.from_pretrained(model_dir, config)
-        for note in verify_weights(pipeline.models, model_dir, config):
-            print(f"[pixal3d] {note}")
-
-        extractor = proj.DinoV3ProjMultiViewFeatureExtractor if multiview else proj.DinoV3ProjFeatureExtractor
-        fusion = {"multiview_fusion": "average"} if multiview else {}
         shared = _SharedPretrained(proj.DINOv3ViTModel, DINO_DIR)
-        proj.DINOv3ViTModel = shared
-        try:
-            for name, args in STAGES.items():
-                setattr(pipeline, name, extractor(model_name=DINO_DIR, **args, **fusion).eval())
-        finally:
-            proj.DINOv3ViTModel = shared.cls
         naf = load_naf()
-        for name in STAGES:
-            stage = getattr(pipeline, name)
-            if stage.use_naf_upsample:
-                stage.naf_model = naf
+        pipeline = self._load(model_dir, config, multiview, shared, naf)
+        self.single, self.swapped = None, ()
+        if multiview and thin_ratio is not None:
+            # The single-view weights for thin objects: only their flow models are loaded (the other
+            # models are the same files), and those stay on the CPU until _weights() swaps them in
+            self.swapped = tuple(sorted(own_checkpoints(model_dir, CONFIG_SINGLE, config)))
+            self.single = self._load(model_dir, CONFIG_SINGLE, False, shared, naf, like=pipeline, only=self.swapped)
 
         self.moge = None
         self.fov = math.radians(fov_deg) if fov_deg else None
@@ -336,12 +354,17 @@ class Pixal3DRuntime(Trellis2Runtime):
         self.pipeline = pipeline
         if low_vram is None:
             low_vram = os.environ.get("PIXAL3D_LOW_VRAM", "0") == "1"
-        pipeline._device = torch.device("cuda")
+        for each in self._pipelines():
+            each._device = torch.device("cuda")
         if low_vram:
-            pipeline.low_vram = True
+            for each in self._pipelines():
+                each.low_vram = True
         else:
             self._restore()
-        print(f"[pixal3d] loaded {config} in {time.perf_counter() - started:.1f} s (low VRAM: {low_vram})")
+        print(
+            f"[pixal3d] loaded {config}{' and ' + CONFIG_SINGLE + ' for thin objects' if self.single else ''} "
+            f"in {time.perf_counter() - started:.1f} s (low VRAM: {low_vram})"
+        )
 
         self.trellis2: Optional[Trellis2Runtime] = None
         if level == LEVEL_PREVIEW:
@@ -352,31 +375,129 @@ class Pixal3DRuntime(Trellis2Runtime):
             self.trellis2._offload()
             print(f"[pixal3d] loaded TRELLIS.2 for previews in {time.perf_counter() - started:.1f} s")
 
+    # --- Loading ----------------------------------------------------------------------------------
+
+    @staticmethod
+    def _load(
+        model_dir: str,
+        config: str,
+        multiview: bool,
+        shared: "_SharedPretrained",
+        naf: Any,
+        like: Any = None,
+        only: Sequence[str] = (),
+    ) -> Any:
+        """
+        A Pixal3D pipeline from ``config`` with its stage extractors (DINOv3 through ``shared``, NAF
+        given), on the CPU. With ``like``, only the models in ``only`` are loaded; the rest, and the
+        background remover, are ``like``'s own modules (the same checkpoint files).
+        """
+        from pixal3d.pipelines import Pixal3DImageTo3DPipeline, Pixal3DMVImageTo3DPipeline
+        from pixal3d.trainers.flow_matching.mixins import image_conditioned_proj as proj
+
+        pipeline_class = Pixal3DMVImageTo3DPipeline if multiview else Pixal3DImageTo3DPipeline
+        if like is None:
+            pipeline = pipeline_class.from_pretrained(model_dir, config)
+        else:
+            # Pipeline.from_pretrained skips models outside model_names_to_load; the background
+            # remover it would build again is ``like``'s instead
+            from pixal3d.pipelines import rembg
+
+            pipeline_class = type(pipeline_class.__name__, (pipeline_class,), {"model_names_to_load": set(only)})
+            with open(os.path.join(model_dir, config)) as f:
+                remover = json.load(f)["args"]["rembg_model"]["name"]
+            original = getattr(rembg, remover)
+            setattr(rembg, remover, lambda **kwargs: like.rembg_model)
+            try:
+                pipeline = pipeline_class.from_pretrained(model_dir, config)
+            finally:
+                setattr(rembg, remover, original)
+            for name, module in like.models.items():
+                if name not in pipeline.models:
+                    pipeline.models[name] = module
+        own = {name: pipeline.models[name] for name in (only if like is not None else pipeline.models)}
+        for note in verify_weights(own, model_dir, config):
+            print(f"[pixal3d] {note}")
+
+        extractor = proj.DinoV3ProjMultiViewFeatureExtractor if multiview else proj.DinoV3ProjFeatureExtractor
+        fusion = {"multiview_fusion": "average"} if multiview else {}
+        proj.DINOv3ViTModel = shared
+        try:
+            for name, args in STAGES.items():
+                setattr(pipeline, name, extractor(model_name=DINO_DIR, **args, **fusion).eval())
+        finally:
+            proj.DINOv3ViTModel = shared.cls
+        for name in STAGES:
+            stage = getattr(pipeline, name)
+            if stage.use_naf_upsample:
+                stage.naf_model = naf
+        return pipeline
+
     # --- Device placement -------------------------------------------------------------------------
+
+    def _pipelines(self) -> list[Any]:
+        return [pipeline for pipeline in (self.pipeline, self.single) if pipeline is not None]
 
     def _modules(self) -> list[Any]:
         pipeline = self.pipeline
         modules = [*pipeline.models.values(), pipeline.rembg_model, self.moge]
         modules += [getattr(pipeline, name) for name in STAGES]
+        if self.single is not None:
+            modules += [self.single.models[name] for name in self.swapped]
+            modules += [getattr(self.single, name) for name in STAGES]
         return [module for module in modules if module is not None]
 
     def _offload(self) -> None:
         """Upstream's low-VRAM mode: each model on the GPU only while its stage runs."""
         for module in self._modules():
             module.cpu()
-        self.pipeline.low_vram = True
+        for pipeline in self._pipelines():
+            pipeline.low_vram = True
         self._free_gpu_memory()
 
     def _restore(self) -> None:
-        """Every model on the GPU, the way inference.py's standard mode puts them."""
+        """
+        Every model on the GPU, the way inference.py's standard mode puts them, except the single-view
+        flow models kept for thin objects, which stay where they are (``_weights`` moves them).
+        """
         import torch
 
         self.pipeline.low_vram = False
         self.pipeline.to(torch.device("cuda"))  # flow models, decoders and the background remover
         for name in STAGES:
             getattr(self.pipeline, name).cuda()  # DINOv3 (shared) and NAF move with each stage
+        if self.single is not None:
+            self.single.low_vram = False
+            self.single._device = torch.device("cuda")
+            for name in STAGES:
+                getattr(self.single, name).cuda()
         if self.moge is not None:
             self.moge.cuda()
+
+    def _swap(self, out: Any, into: Any) -> None:
+        """``out``'s own flow models to the CPU, ``into``'s to the GPU; what they share stays."""
+        import torch
+
+        for name in self.swapped:
+            out.models[name].cpu()
+        self._free_gpu_memory()
+        if not into.low_vram:  # in low-VRAM mode each stage moves its own model
+            for name in self.swapped:
+                into.models[name].to(torch.device("cuda"))
+
+    @contextlib.contextmanager
+    def _weights(self, pipeline: Any):
+        """The pipeline whose weights build this picture, its flow models on the GPU while this is active."""
+        if pipeline is not self.single or self.single is None:
+            yield self.pipeline
+            return
+        started = time.perf_counter()
+        self._swap(self.pipeline, self.single)
+        print(f"[pixal3d] single-view weights swapped in ({time.perf_counter() - started:.1f} s)")
+        try:
+            yield self.single
+        finally:
+            self._swap(self.single, self.pipeline)
 
     # --- Generation -------------------------------------------------------------------------------
 
@@ -428,14 +549,16 @@ class Pixal3DRuntime(Trellis2Runtime):
         """
         pipeline_type = self._pixal3d_type(preset)
         self.pipeline_used, self.views_used = f"pixal3d-{pipeline_type}", 0
-        self.last_pose, self.last_preview = None, None
+        self.last_pose, self.last_preview, self.last_thin, self.last_weights = None, None, None, None
         prepared, cutout = self._prepare(image)
         fov = self.picture_fov(prepared)
         self.last_camera = {"fov_deg": round(math.degrees(fov), 2)}
         print(f"[pixal3d] picture's field of view: {math.degrees(fov):.1f} degrees")
         tilt = self._tilt(image, seed)
         self.last_camera["tilt"] = {"elevation": round(tilt[0], 1), "roll": round(tilt[1], 1), "source": self.level}
-        if self.multiview:
+        weights = self._choose_weights()
+        self.last_weights = weights
+        if weights == WEIGHTS_MULTIVIEW:
             # The multi-view weights with the picture as the only view: the single-view camera (its
             # frame spans [-0.5, 0.5] at the origin, cameras.single_view_distance)
             frame = ViewCamera(half_extent=0.5)
@@ -453,7 +576,32 @@ class Pixal3DRuntime(Trellis2Runtime):
                 return self._attempt(lambda: self._run(views, pipeline_type, seed, cutout, absolute=True))
             return self._attempt(lambda: self._run(views, pipeline_type, seed, cutout, tilt=tilt))
         camera = {"camera_angle_x": fov, "distance": cameras.single_view_distance(fov), "mesh_scale": 1.0}
-        return self._attempt(lambda: self._run_single(prepared, camera, pipeline_type, seed, cutout, tilt))
+        # The single-view weights: this runtime's own, or the set kept beside the multi-view ones
+        with self._weights(self.single if self.multiview else self.pipeline) as pipeline:
+            return self._attempt(
+                lambda: self._run_single(prepared, camera, pipeline_type, seed, cutout, tilt, pipeline=pipeline)
+            )
+
+    def _choose_weights(self) -> str:
+        """
+        Which weights build this picture: the single-view ones when the preview measured thin
+        (``thin_ratio``, with the single-view set loaded), otherwise the runtime's own.
+        """
+        own = WEIGHTS_MULTIVIEW if self.multiview else WEIGHTS_SINGLE
+        report = self.last_thin
+        decides = self.single is not None and self.thin_ratio is not None and report is not None
+        if report is not None:
+            report["decided"] = bool(decides)
+        if not decides:
+            if self.multiview and self.thin_ratio is not None and report is None:
+                print("[pixal3d] no preview to measure: the multi-view weights")
+            return own
+        chosen = WEIGHTS_SINGLE if report["thin"] else own
+        print(
+            f"[pixal3d] the preview's thin ratio is {report['ratio']} (extents {report['extents']}, "
+            f"threshold {report['threshold']}): the {chosen} weights"
+        )
+        return chosen
 
     def _tilt(self, image: Any, seed: int) -> tuple[float, float]:
         """(elevation, roll) the single picture's model is levelled by, per ``level``."""
@@ -494,6 +642,8 @@ class Pixal3DRuntime(Trellis2Runtime):
         del mesh
         self.last_preview = raw
         glb = trimesh.load(io.BytesIO(raw), file_type="glb", force="mesh")
+        # The preview is level and upright: its bounding box says whether the object is thin and flat
+        self.last_thin = {**thin.measure(glb, THIN_RATIO if self.thin_ratio is None else self.thin_ratio), "source": "preview"}
         report = level.estimate_pose(glb, cutout)
         report["preview"] = {"pipeline": self.trellis2.pipeline_used or preset.pipeline_type, "bytes": len(raw)}
         return report
@@ -532,6 +682,7 @@ class Pixal3DRuntime(Trellis2Runtime):
         # rescaled by what their silhouettes show (fit_camera)
         camera, fit = fit_camera(images, angles, camera)
         self.pipeline_used, self.views_used = f"pixal3d-mv-{pipeline_type}", used
+        self.last_weights, self.last_thin = WEIGHTS_MULTIVIEW, None  # views need the multi-view weights
         self.last_camera = {"views": [list(a) for a in angles], **fit}
         print(f"[pixal3d] {len(images)} views (main: {'view' if used == len(images) else 'picture'}): {angles}")
         print(f"[pixal3d] the views' frame: {json.dumps(fit)}")
@@ -575,8 +726,9 @@ class Pixal3DRuntime(Trellis2Runtime):
         seed: int,
         cutout: Optional[Image.Image],
         tilt: tuple[float, float] = NO_TILT,
+        pipeline: Any = None,
     ) -> Any:
-        mesh = self.pipeline.run(
+        mesh = (pipeline or self.pipeline).run(
             prepared, camera_params=camera, seed=seed, pipeline_type=pipeline_type, preprocess_image=False
         )[0]
         return self._keep(mesh, cutout, tilt)
@@ -622,6 +774,15 @@ class Pixal3DRuntime(Trellis2Runtime):
             print(f"[pixal3d] cleared a stale CUDA error before going on: {stale}")
 
 
+def thin_ratio_from_env(value: Optional[str]) -> Optional[float]:
+    """PIXAL3D_THIN_RATIO: unset or empty is the default, "none" (or "off") turns the rule off."""
+    if value is None or value.strip() == "":
+        return THIN_RATIO
+    if value.strip().lower() in ("none", "off"):
+        return None
+    return float(value)
+
+
 def runtime_from_env() -> Pixal3DRuntime:
     """The runtime a worker container builds, configured by PIXAL3D_* variables."""
     azimuths = os.environ.get("PIXAL3D_AZIMUTHS")
@@ -633,4 +794,5 @@ def runtime_from_env() -> Pixal3DRuntime:
         fov_deg=float(fov) if fov else None,
         level=os.environ.get("PIXAL3D_LEVEL", LEVEL_PREVIEW),
         trellis2_model_dir=os.environ.get("TRELLIS2_MODEL_DIR", TRELLIS2_MODEL_DIR),
+        thin_ratio=thin_ratio_from_env(os.environ.get("PIXAL3D_THIN_RATIO")),
     )
