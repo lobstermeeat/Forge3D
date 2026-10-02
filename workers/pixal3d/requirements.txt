@@ -1,0 +1,7 @@
+# On top of the TRELLIS.2 worker's environment (../trellis2/requirements.txt: torch 2.6 cu124,
+# flash-attn, CuMesh, FlexGEMM, o-voxel). Pixal3D, NAF, MoGe and utils3d come from pinned git commits
+# (see trellis2_image in ../modal_app.py); NATTEN is not installed (neighborhood.py).
+# The version Pixal3D pins: its DINOv3 extractor calls the model's embedding and layers directly
+transformers==4.57.3
+# MoGe-2
+scipy>=1.11,<2

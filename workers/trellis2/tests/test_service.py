@@ -240,3 +240,160 @@ def test_fetch_errors_become_input_errors(monkeypatch):
     monkeypatch.setattr(inputs, "_OPENER", Broken())
     with pytest.raises(InputError, match="^image_url could not be fetched$"):
         inputs.fetch_url("https://assets.forge3d.app/x.png")
+
+
+# --- Extra views of the object ----------------------------------------------------------------------
+
+
+def view(azimuth=90, **extra) -> dict:
+    return {"image_base64": b64(png_bytes(mode="RGBA")), "azimuth": azimuth, "elevation": 0, **extra}
+
+
+def test_views_are_parsed_with_their_camera_and_weight():
+    job = parse_job(
+        {"image_base64": b64(png_bytes()), "views": [view(90), view(-90, elevation=15.5, weight=0.5), view(450)]},
+        fallback_id="job",
+    )
+    assert [(v.azimuth, v.elevation, v.weight) for v in job.views] == [(90, 0, 1.0), (270, 15.5, 0.5), (90, 0, 1.0)]
+    assert all(v.image.mode == "RGBA" and v.image.size == (64, 48) for v in job.views)  # cutouts keep alpha
+    assert job.image.mode == "RGB"
+
+
+@pytest.mark.parametrize("views", [None, []])
+def test_no_views_is_a_single_picture_job(views):
+    assert parse_job({"image_base64": b64(png_bytes()), "views": views}, fallback_id="job").views == ()
+
+
+def test_a_view_without_elevation_is_level():
+    level = {"image_base64": b64(png_bytes()), "azimuth": 180}
+    job = parse_job({"image_base64": b64(png_bytes()), "views": [level]}, "job")
+    assert job.views[0].elevation == 0
+
+
+@pytest.mark.parametrize(
+    "views, message",
+    [
+        ("not a list", "^views must be a list$"),
+        ([view()] * 9, "^views can have at most 8 images$"),
+        (["x"], r"^views\[0\]: must be an object$"),
+        ([view(), {"azimuth": 0}], r"^views\[1\]: provide exactly one of image_url or image_base64$"),
+        ([{**view(), "image_url": "https://a/x.png"}], r"^views\[0\]: provide exactly one"),
+        ([view(image_base64="!!!")], r"^views\[0\]: image_base64 is not valid base64$"),
+        ([view(image_base64=b64(b"not an image"))], r"^views\[0\]: image could not be decoded$"),
+        ([view(image_base64=b64(png_bytes(size=(4097, 8))))], r"^views\[0\]: image is larger than 4096px on a side$"),
+        ([view(image_base64=7)], r"^views\[0\]: image_base64 must be a string$"),
+        ([view(image_url="http://a.example.com/x.png", image_base64=None)], r"^views\[0\]: image_url must be an https"),
+        ([view(azimuth=None)], r"^views\[0\]: azimuth must be a number of degrees$"),
+        ([view(azimuth=True)], "azimuth must be a number"),
+        ([view(azimuth="90")], "azimuth must be a number"),
+        ([view(azimuth=float("inf"))], "azimuth must be a number"),
+        ([view(elevation=91)], r"^views\[0\]: elevation must be a number of degrees between -90 and 90$"),
+        ([view(elevation=float("nan"))], "elevation must be a number"),
+        ([view(weight=0)], r"^views\[0\]: weight must be a number above 0 and at most 100$"),
+        ([view(weight=101)], "weight must be a number above 0"),
+        ([view(weight=False)], "weight must be a number above 0"),
+    ],
+)
+def test_rejects_bad_views(views, message):
+    with pytest.raises(InputError, match=message):
+        parse_job({"image_base64": b64(png_bytes()), "views": views}, fallback_id="job")
+
+
+def test_view_size_is_checked_like_the_picture(monkeypatch):
+    monkeypatch.setattr(inputs, "MAX_IMAGE_BYTES", 1000)
+    assert len(png_bytes()) < 1000
+    with pytest.raises(InputError, match=r"^views\[0\]: image is larger than 20 MB$"):
+        parse_job({"image_base64": b64(png_bytes()), "views": [view(image_base64=b64(b"x" * 1001))]}, fallback_id="job")
+
+
+def test_view_urls_use_the_fetcher():
+    seen = []
+
+    def fetch(url):
+        seen.append(url)
+        return png_bytes(size=(32, 32))
+
+    back = {"image_url": "https://assets.forge3d.app/v.png", "azimuth": 180}
+    payload = {"image_base64": b64(png_bytes()), "views": [back]}
+    job = parse_job(payload, fallback_id="job", fetch=fetch)
+    assert seen == ["https://assets.forge3d.app/v.png"] and job.views[0].image.size == (32, 32)
+
+
+class ViewRuntime(FakeRuntime):
+    """A runtime that takes views and says how many it used."""
+
+    def __init__(self, left_out: int = 0):
+        super().__init__()
+        self.left_out = left_out
+
+    def generate(self, image, preset, seed, views=()):
+        self.calls.append(("generate", preset.pipeline_type, seed, image.size, [(v.azimuth, v.weight) for v in views]))
+        self.views_used = len(views) - self.left_out
+        return "mesh"
+
+
+@pytest.mark.parametrize("mode", ["preview", "final"])
+def test_views_go_to_the_runtime_for_previews_and_finals(mode):
+    runtime = ViewRuntime(left_out=1)
+    payload = {"image_base64": b64(png_bytes()), "mode": mode, "seed": 3, "views": [view(90), view(180, weight=2)]}
+    job = {"id": "v", "input": payload}
+    out = handle_job(job, runtime, FakeStorage(), pack)
+    assert "error" not in out and out["views_used"] == 1
+    assert runtime.calls[0] == ("generate", PRESETS[mode].pipeline_type, 3, (64, 48), [(90, 1.0), (180, 2.0)])
+
+
+def test_jobs_without_views_call_the_runtime_as_before_and_report_none():
+    runtime = FakeRuntime()  # generate(image, preset, seed): no views parameter
+    out = handle_job({"id": "s", "input": {"image_base64": b64(png_bytes())}}, runtime, FakeStorage(), pack)
+    assert out["views_used"] == 0 and runtime.calls[0] == ("generate", "1024_cascade", out["seed"], (64, 48))
+
+
+def test_a_runtime_that_does_not_count_views_is_taken_to_use_them_all():
+    class Silent(FakeRuntime):
+        def generate(self, image, preset, seed, views=()):
+            return super().generate(image, preset, seed)
+
+    payload = {"image_base64": b64(png_bytes()), "views": [view()] * 3}
+    out = handle_job({"id": "s", "input": payload}, Silent(), FakeStorage(), pack)
+    assert out["views_used"] == 3
+
+
+def test_a_runtime_that_takes_no_views_gets_the_picture_alone():
+    """A runtime from before views, or one that binds a job's views itself (the Pixal3D worker's)."""
+    runtime = FakeRuntime()  # generate(image, preset, seed)
+    payload = {"image_base64": b64(png_bytes()), "mode": "final", "seed": 3, "views": [view(90), view(180)]}
+    out = handle_job({"id": "p", "input": payload}, runtime, FakeStorage(), pack)
+    assert "error" not in out
+    assert runtime.calls[0] == ("generate", "1024_cascade", 3, (64, 48))
+    assert out["views_used"] == 0  # it said nothing about views, so none were used
+
+
+def test_a_runtime_that_binds_views_itself_reports_what_it_used():
+    class Bound(FakeRuntime):
+        def generate(self, image, preset, seed):
+            self.views_used = 2  # the Pixal3D service's wrapper: views bound before production's handle_job
+            return super().generate(image, preset, seed)
+
+    payload = {"image_base64": b64(png_bytes()), "views": [view(90), view(180)]}
+    out = handle_job({"id": "p", "input": payload}, Bound(), FakeStorage(), pack)
+    assert out["views_used"] == 2
+
+
+def test_takes_views_reads_the_signature():
+    from forge3d_worker.service import takes_views
+
+    class Keywords:
+        def generate(self, image, preset, seed, **extra):
+            return "mesh"
+
+    assert takes_views(ViewRuntime()) and takes_views(Keywords())
+    assert not takes_views(FakeRuntime())
+    assert not takes_views(type("Opaque", (), {"generate": 3})())
+
+
+def test_bad_views_are_reported_without_running_the_model():
+    runtime = ViewRuntime()
+    payload = {"image_base64": b64(png_bytes()), "views": [view(azimuth="left")]}
+    out = handle_job({"id": "x", "input": payload}, runtime, FakeStorage(), pack)
+    assert out == {"error": "invalid input: views[0]: azimuth must be a number of degrees"}
+    assert runtime.calls == []

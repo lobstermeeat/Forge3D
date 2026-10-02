@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import contextlib
 import gc
 import json
 import os
 import traceback
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from PIL import Image
 
-from . import normals, projection, uv_raster
-from .inputs import InputError
-from .settings import Preset
+from . import multiview, normals, projection, uv_raster
+from .inputs import InputError, View
+from .settings import MULTIVIEW, MultiView, Preset
 
 MODEL_DIR = os.environ.get("TRELLIS2_MODEL_DIR", "/models/TRELLIS.2-4B")
 # The background-removed picture (RGBA, full frame) travels from generate() to export() on the mesh
@@ -101,6 +102,23 @@ class _KeepCutout:
         return getattr(self.remover, name)
 
 
+# How much of a frame edge a view's object may cover before the view is left out. Upstream crops a
+# picture to its object's bounding box, so a view clipped by its frame (MV-Adapter's side views of a
+# wide object run off both edges) reads as a whole object with its ends cut off, and TRELLIS.2 builds
+# that: the car control came out crumpled with two such views. Real clipping covers a hundred pixels or
+# more of a 768-pixel edge; a frosting tip brushing the frame covers a couple of dozen.
+CLIPPED_EDGE = 0.04
+
+
+def clipped_edges(cutout: Image.Image, fraction: float = CLIPPED_EDGE) -> tuple[str, ...]:
+    """The frame edges ('left', 'right', 'top', 'bottom') the cutout's object runs off, by upstream's alpha cut."""
+    import numpy as np
+
+    alpha = np.asarray(cutout.convert("RGBA"))[..., 3] > 0.8 * 255  # upstream's bounding-box threshold
+    sides = {"left": alpha[:, 0], "right": alpha[:, -1], "top": alpha[0], "bottom": alpha[-1]}
+    return tuple(name for name, edge in sides.items() if int(edge.sum()) >= max(4, round(fraction * edge.size)))
+
+
 def is_out_of_memory(err: BaseException) -> bool:
     """A failed GPU allocation, which a run with the weights off the GPU can get past."""
     import torch
@@ -123,11 +141,45 @@ def is_out_of_memory(err: BaseException) -> bool:
 FALLBACK_PIPELINE = {"1024_cascade": "512"}
 
 
+def clear_cuda_error() -> Optional[str]:
+    """
+    Resets the CUDA runtime's sticky "last error", returning the message it held, or None.
+
+    CuMesh checks its own cudaMalloc calls and raises a RuntimeError when one fails, but never calls
+    cudaGetLastError, which is what resets the runtime's per-thread error flag. Torch's next kernel
+    launch check then reports that stale flag as "CUDA error: out of memory" with the GPU all but
+    empty, so a retry or a fallback after it dies on its first tensor op (Phase 5's logs: only the
+    second retry got through, because the first had consumed the flag). A tiny launch here consumes it
+    instead: the check raises, the flag is clear, and the error is swallowed. Nothing to do without CUDA.
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        return None
+    try:
+        torch.cuda.synchronize()
+        torch.zeros(1, device="cuda").fill_(1)  # the launch check is what reads and resets the flag
+        torch.cuda.synchronize()
+        return None
+    except RuntimeError as err:
+        return _one_line(err)
+
+
 class Trellis2Runtime:
     """Holds the loaded pipeline between jobs (one per worker process)."""
 
     # The TRELLIS.2 pipeline that made the mesh the last generate() returned: the preset's, or its fallback
     pipeline_used: Optional[str] = None
+    # How many of the job's extra views helped make that mesh (a view with no object in it is left out)
+    views_used: int = 0
+    # How extra views steer the flows; the same for previews and finals (experiments set their own)
+    multiview: MultiView = MULTIVIEW
+    # Asleep: every model off the GPU and upstream's low-VRAM mode for good, because another runtime has
+    # the GPU (production's container runs Pixal3D's finals beside this; see sleep())
+    asleep: bool = False
+    # Deployed in low-VRAM mode (TRELLIS2_LOW_VRAM=1, an A10): the models live off the GPU from the start,
+    # and a retry's restore leaves them there
+    low_vram_configured: bool = False
 
     def __init__(self, model_dir: str = MODEL_DIR) -> None:
         _configure_environment()
@@ -141,44 +193,67 @@ class Trellis2Runtime:
         pipeline.low_vram = os.environ.get("TRELLIS2_LOW_VRAM", "1") == "1"
         pipeline.cuda()
         self.pipeline = pipeline
+        self.low_vram_configured = pipeline.low_vram
 
-    def generate(self, image: Any, preset: Preset, seed: int) -> Any:
+    def generate(self, image: Any, preset: Preset, seed: int, views: Sequence[View] = ()) -> Any:
         """
-        Image to mesh. Running out of GPU memory gets one retry in low-VRAM mode, and a final that still
-        runs out is made once more, still in low-VRAM mode, with the preview's pipeline (see
-        FALLBACK_PIPELINE). pipeline_used then says which pipeline made the mesh.
+        Image to mesh. ``views``, other pictures of the object (its sides and back), steer every flow
+        along with the image (see multiview.py); each is cut out and cropped like the image, and
+        views_used then says how many were used. The image alone is the cutout the projection paints.
+
+        Running out of GPU memory gets one retry in low-VRAM mode, and a final that still runs out is
+        made once more, still in low-VRAM mode, with the preview's pipeline (see FALLBACK_PIPELINE); a
+        final that runs out while the models are already off the GPU (an A10, or asleep beside Pixal3D)
+        goes to that pipeline at once. pipeline_used then says which pipeline made the mesh.
         """
         self.pipeline_used = preset.pipeline_type
+        self.views_used = 0
         try:
             # Background removal and cropping; fails when nothing stands out from the background
             prepared, cutout = self._preprocess(image)
         except ValueError as err:
             raise InputError("no object found in the image: use one object on a plain background") from err
+        extra = self._prepare_views(views)
+        self.views_used = len(extra)
+        if extra:
+            weights = ", ".join(f"{weight:g}" for weight in self._weights(extra))
+            print(f"[forge3d] {len(extra)} views besides the picture ({self.multiview.mode}; weights {weights})")
+        fallback = FALLBACK_PIPELINE.get(preset.pipeline_type)
         try:
-            return self._run(prepared, preset.pipeline_type, seed, cutout)
+            return self._run(prepared, preset.pipeline_type, seed, cutout, extra)
         except Exception as err:
-            if self.pipeline.low_vram or not is_out_of_memory(err):
+            if not is_out_of_memory(err):
+                raise
+            retry = not self.pipeline.low_vram  # with the models off the GPU there may be room
+            if not retry and fallback is None:
                 raise
             reason = _one_line(err)
-            print(f"[forge3d] out of GPU memory in {preset.pipeline_type}, retrying in low-VRAM mode: {reason}")
+            if retry:
+                print(f"[forge3d] out of GPU memory in {preset.pipeline_type}, retrying in low-VRAM mode: {reason}")
+            else:
+                print(
+                    f"[forge3d] out of GPU memory in {preset.pipeline_type} with the models already off the GPU, "
+                    f"falling back to {fallback}: {reason}"
+                )
+                traceback.clear_frames(err.__traceback__)
         # Retried out here: inside the except block the traceback keeps the failed run's tensors,
         # and so their GPU memory, alive
         try:
-            self._offload()
-            try:
-                return self._run(prepared, preset.pipeline_type, seed, cutout)
-            except Exception as err:
-                fallback = FALLBACK_PIPELINE.get(preset.pipeline_type)
-                if fallback is None or not is_out_of_memory(err):
-                    raise
-                print(
-                    f"[forge3d] out of GPU memory in {preset.pipeline_type} even in low-VRAM mode, "
-                    f"falling back to {fallback}: {_one_line(err)}"
-                )
-                # The retry's traceback holds its tensors the same way: drop them before the cheaper run
-                traceback.clear_frames(err.__traceback__)
+            if retry:
+                self._offload()
+                try:
+                    return self._run(prepared, preset.pipeline_type, seed, cutout, extra)
+                except Exception as err:
+                    if fallback is None or not is_out_of_memory(err):
+                        raise
+                    print(
+                        f"[forge3d] out of GPU memory in {preset.pipeline_type} even in low-VRAM mode, "
+                        f"falling back to {fallback}: {_one_line(err)}"
+                    )
+                    # The retry's traceback holds its tensors the same way: drop them before the cheaper run
+                    traceback.clear_frames(err.__traceback__)
             self._free_gpu_memory()
-            mesh = self._run(prepared, fallback, seed, cutout)
+            mesh = self._run(prepared, fallback, seed, cutout, extra)
             self.pipeline_used = fallback
             return mesh
         except BaseException as err:
@@ -204,12 +279,49 @@ class Trellis2Runtime:
             cutout = image  # upstream skips background removal when the picture has its own alpha
         return prepared, cutout
 
+    def _prepare_views(self, views: Sequence[View]) -> list[tuple[Image.Image, float]]:
+        """
+        Each view cut out and cropped as the picture is, with its weight. A view with no object in it, or
+        whose object runs off the frame (see CLIPPED_EDGE), is left out.
+        """
+        prepared = []
+        for number, view in enumerate(views):
+            where = f"views[{number}] (azimuth {view.azimuth:g})"
+            try:
+                image, cutout = self._preprocess(view.image)
+            except ValueError:
+                print(f"[forge3d] {where} left out: no object found in it")
+                continue
+            edges = clipped_edges(cutout) if isinstance(cutout, Image.Image) else ()
+            if edges:
+                print(f"[forge3d] {where} left out: its object runs off the frame ({', '.join(edges)})")
+                continue
+            prepared.append((image, view.weight))
+        return prepared
+
+    def _weights(self, views: Sequence[tuple[Image.Image, float]]) -> list[float]:
+        return [self.multiview.picture_weight, *(weight for _, weight in views)]
+
     def _run(
-        self, prepared: Image.Image, pipeline_type: str, seed: int, cutout: Optional[Image.Image] = None
+        self,
+        prepared: Image.Image,
+        pipeline_type: str,
+        seed: int,
+        cutout: Optional[Image.Image] = None,
+        views: Sequence[tuple[Image.Image, float]] = (),
     ) -> Any:
-        # Same seed, same sparse structure: the final keeps the shape of the preview the user approved.
-        # Its texture is sampled afresh at the higher resolution, so details can differ
-        mesh = self.pipeline.run(prepared, seed=seed, pipeline_type=pipeline_type, preprocess_image=False)[0]
+        # Without views, upstream's single-picture run exactly
+        conditions = (
+            multiview.conditioned_on(
+                self.pipeline, [prepared, *(image for image, _ in views)], self._weights(views), self.multiview.mode
+            )
+            if views
+            else contextlib.nullcontext()
+        )
+        # Same seed (and views), same sparse structure: the final keeps the shape of the preview the user
+        # approved. Its texture is sampled afresh at the higher resolution, so details can differ
+        with conditions:
+            mesh = self.pipeline.run(prepared, seed=seed, pipeline_type=pipeline_type, preprocess_image=False)[0]
         if cutout is not None:
             try:
                 setattr(mesh, CUTOUT, cutout)
@@ -232,17 +344,44 @@ class Trellis2Runtime:
     def _free_gpu_memory() -> None:
         """
         Frees what a failed run left in reference cycles, then hands torch's cached blocks (the weights'
-        old ones included, after an offload) back to CUDA: CuMesh allocates outside that cache.
+        old ones included, after an offload) back to CUDA: CuMesh allocates outside that cache. Then
+        clears CUDA's stale error flag (clear_cuda_error), so the run after a CuMesh failure can start.
         """
         import torch
 
         gc.collect()
         torch.cuda.empty_cache()
+        stale = clear_cuda_error()
+        if stale:
+            print(f"[forge3d] cleared a stale CUDA error before going on: {stale}")
 
     def _restore(self) -> None:
-        """Every model back on the GPU, the way __init__ put them there."""
+        """
+        Every model back where __init__ put them: on the GPU, unless the runtime is deployed in low-VRAM mode
+        (TRELLIS2_LOW_VRAM=1) or asleep. Then everything goes back to the CPU instead: upstream's low-VRAM
+        stages move their model to the GPU and back without a ``finally``, so a stage that failed leaves
+        its model on the GPU.
+        """
+        if self.asleep or self.low_vram_configured:
+            self._offload()
+            return
         self.pipeline.low_vram = False
         self.pipeline.cuda()
+
+    def sleep(self) -> None:
+        """
+        Every model off the GPU, for good, in upstream's low-VRAM mode (each model visits the GPU for its
+        stage): another runtime has the GPU from now on. Production's container does this to TRELLIS.2 when
+        Pixal3D takes its first final; previews then run this way, as the Pixal3D recipe's own '512'
+        preview does. wake() undoes it.
+        """
+        self.asleep = True
+        self._offload()
+
+    def wake(self) -> None:
+        """After sleep(), every model back where __init__ put them (on the GPU, unless deployed in low-VRAM mode)."""
+        self.asleep = False
+        self._restore()
 
     def export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]:
         """

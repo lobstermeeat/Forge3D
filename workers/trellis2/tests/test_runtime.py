@@ -91,6 +91,10 @@ class FakePipeline:
         activations = Activations()
         self.activations.append(weakref.ref(activations))
         outcome = self.outcomes[len(self.runs) - 1]
+        if outcome.startswith("stranded-"):
+            # Upstream's low-VRAM stage moved its model to the GPU, then failed before moving it back
+            self.models["shape_slat_flow_model_1024"].to("cuda")
+            outcome = outcome[len("stranded-"):]
         if outcome != "mesh":
             raise failure(outcome, len(self.runs))
         return [outcome]
@@ -100,6 +104,7 @@ def runtime_around(pipeline: FakePipeline) -> Trellis2Runtime:
     """A Trellis2Runtime holding a fake pipeline; __init__ would load the real one onto a GPU."""
     runtime = Trellis2Runtime.__new__(Trellis2Runtime)
     runtime.pipeline = pipeline
+    runtime.low_vram_configured = pipeline.low_vram  # as __init__ records TRELLIS2_LOW_VRAM
     return runtime
 
 
@@ -216,13 +221,88 @@ def test_other_errors_are_not_retried(kind, capsys):
     assert capsys.readouterr().out == ""
 
 
-def test_out_of_memory_in_low_vram_mode_is_not_retried(capsys):
+def test_a_preview_out_of_memory_in_low_vram_mode_is_not_retried(capsys):
     pipeline = FakePipeline(outcomes=["oom", "mesh"], low_vram=True)
     with pytest.raises(torch.cuda.OutOfMemoryError, match=r"\(run 1\)$"):
-        runtime_around(pipeline).generate(cutout(), PRESETS["final"], seed=7)
+        runtime_around(pipeline).generate(cutout(), PRESETS["preview"], seed=7)
 
+    # Nothing cheaper to fall back to, and no retry: the models are already off the GPU
     assert len(pipeline.runs) == 1 and pipeline.low_vram is True and pipeline.weights() == {"cpu"}
     assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("kind", ["oom", "cumesh-oom"])
+@pytest.mark.parametrize("why", ["deployed in low-VRAM mode", "asleep"])
+def test_a_final_out_of_memory_in_low_vram_mode_goes_straight_to_the_preview_pipeline(kind, why, capsys):
+    """An A10 deployment (TRELLIS2_LOW_VRAM=1), or TRELLIS.2 asleep beside Pixal3D in production's container."""
+    if why == "asleep":
+        pipeline = FakePipeline(outcomes=[kind, "mesh"])
+        runtime = runtime_around(pipeline)
+        runtime.sleep()
+    else:
+        pipeline = FakePipeline(outcomes=[kind, "mesh"], low_vram=True)
+        runtime = runtime_around(pipeline)
+
+    assert runtime.generate(cutout(), PRESETS["final"], seed=7) == "mesh"
+
+    assert [run["pipeline_type"] for run in pipeline.runs] == ["1024_cascade", "512"]
+    assert pipeline.runs[1]["low_vram"] is True and pipeline.runs[1]["live_runs"] == 0
+    assert runtime.pipeline_used == "512"
+    # The models stay off the GPU afterwards: an A10 keeps its low-VRAM mode, a sleeping runtime sleeps on
+    assert pipeline.low_vram is True and pipeline.weights() == {"cpu"} and pipeline.live_at_cuda == [0]
+    log = capsys.readouterr().out.splitlines()
+    assert len(log) == 1
+    assert log[0].startswith("[forge3d] out of GPU memory in 1024_cascade with the models already off the GPU, falling back to 512: ")
+
+
+def test_a_final_out_of_memory_in_low_vram_mode_that_fails_again_is_raised(capsys):
+    pipeline = FakePipeline(outcomes=["oom", "oom"], low_vram=True)
+    with pytest.raises(torch.cuda.OutOfMemoryError, match=r"\(run 2\)$"):
+        runtime_around(pipeline).generate(cutout(), PRESETS["final"], seed=7)
+    assert [run["pipeline_type"] for run in pipeline.runs] == ["1024_cascade", "512"]
+    assert capsys.readouterr().out.count("\n") == 1
+
+
+def test_sleep_puts_the_models_off_the_gpu_for_good_and_wake_brings_them_back():
+    pipeline = FakePipeline(outcomes=["oom", "mesh", "mesh"])
+    runtime = runtime_around(pipeline)
+    runtime.sleep()
+    assert runtime.asleep and pipeline.low_vram is True and pipeline.weights() == {"cpu"}
+    # A retry's restore leaves a sleeping runtime where it is
+    runtime._restore()
+    assert pipeline.low_vram is True and pipeline.weights() == {"cpu"}
+    # Asleep, it still works, in low-VRAM mode (an out-of-memory final falls back to 512 directly)
+    assert runtime.generate(cutout(), PRESETS["final"], seed=7) == "mesh"
+    assert [run["low_vram"] for run in pipeline.runs] == [True, True] and runtime.pipeline_used == "512"
+    runtime.wake()
+    assert not runtime.asleep and pipeline.low_vram is False and pipeline.weights() == {"cuda"}
+    assert runtime.generate(cutout(), PRESETS["final"], seed=7) == "mesh"
+    assert pipeline.runs[-1]["low_vram"] is False
+
+
+@pytest.mark.parametrize("why", ["deployed in low-VRAM mode", "asleep"])
+def test_a_model_a_failed_stage_left_on_the_gpu_goes_back_to_the_cpu(why, capsys):
+    """Upstream's low-VRAM stages move their model back without a finally; the restore does it instead."""
+    pipeline = FakePipeline(outcomes=["stranded-oom", "mesh"], low_vram=why != "asleep")
+    runtime = runtime_around(pipeline)
+    if why == "asleep":
+        runtime.sleep()
+
+    assert runtime.generate(cutout(), PRESETS["final"], seed=7) == "mesh"
+    assert runtime.pipeline_used == "512"
+    assert pipeline.low_vram is True and pipeline.weights() == {"cpu"}
+
+
+def test_freeing_gpu_memory_clears_a_stale_cuda_error(monkeypatch, capsys):
+    """CuMesh never resets CUDA's error flag; the next run's first kernel would report it."""
+    import forge3d_worker.pipeline as pipeline_module
+
+    monkeypatch.setattr(pipeline_module, "clear_cuda_error", lambda: "CUDA error: out of memory")
+    pipeline = FakePipeline(outcomes=["cumesh-oom", "mesh"], low_vram=True)
+    assert runtime_around(pipeline).generate(cutout(), PRESETS["final"], seed=7) == "mesh"
+    assert "[forge3d] cleared a stale CUDA error before going on: CUDA error: out of memory" in capsys.readouterr().out
+    monkeypatch.undo()
+    assert pipeline_module.clear_cuda_error() is None  # without CUDA (these tests) there is nothing to clear
 
 
 @pytest.mark.parametrize("kind", ["oom", "cumesh-oom"])

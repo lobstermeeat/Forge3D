@@ -74,9 +74,12 @@ export const aiRouter = router({
 
   recent: protectedProcedure.query(({ ctx }) => studioCall(() => getStudio().recent(ctx.user.id))),
 
-  /** Starts a GPU before its job is sent (FLUX while the user types), without waiting for it. */
+  /**
+   * Starts a GPU before its job is sent, without waiting for it: FLUX while the user types, and
+   * the multiview worker (AI_MULTIVIEW=1) while they choose a photo.
+   */
   warm: protectedProcedure
-    .input(z.object({ worker: z.enum(['references', 'model']) }))
+    .input(z.object({ worker: z.enum(['references', 'multiview', 'model']) }))
     .mutation(({ ctx, input }) => {
       getStudio().warm(ctx.user.id, input.worker);
     }),
