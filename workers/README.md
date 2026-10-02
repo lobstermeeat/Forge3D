@@ -823,7 +823,9 @@ and the `ai_generations` table as in `apps/server/src/db/schema.ts`
 (`pnpm --filter @forge3d/server exec drizzle-kit push` in development; Deploying on Modal, step 5,
 for production). Pictures and models are copied into the server's storage (`UPLOAD_DIR`), so they
 outlive the workers' outputs. Each user can have 3 models in progress and 30 an hour until credits
-exist (`apps/server/src/services/ai/studio.ts`).
+exist (`apps/server/src/services/ai/studio.ts`). Each request to the job API gives up after 30 s
+(`REQUEST_TIMEOUT_MS` in `providers/jobEndpoint.ts`; `runsync`, which the host holds open, after 150 s),
+so no poll hangs on it; a job's state that didn't come in time is asked again on the next poll.
 
 **The other sides (`AI_MULTIVIEW=1`, off by default).** The 3D models invent the sides a picture
 doesn't show. With `AI_MULTIVIEW=1` on the server, the picked picture (or the uploaded photo) first
@@ -855,10 +857,11 @@ TRELLIS.2's texture is a lottery. In three runs of the 20 test prompts, the fina
 enough to publish 35 times in 60, and the best of four textures of the same shape about 47 times (Phase
 7's rolls). No automatic pick was trustworthy, so the creator picks:
 
-1. Once a final is done, the server starts a `"textures"` job on the `trellis2` worker (Texture
-   options, under Job contracts) with what the final was made from: the picture, the final's seed and
-   its views, and `count` 3. The final is in the scene and usable meanwhile; under it the panel says
-   "Making 3 more textures to choose from…".
+1. The poll that finds the final done returns it at once, so it is in the scene and usable; under it
+   the panel says "Making 3 more textures to choose from…" and polls on every 5 s (after a reload too).
+   The next poll starts a `"textures"` job on the `trellis2` worker (Texture options, under Job
+   contracts) with what the final was made from: the picture, the final's seed and its views, `count` 3,
+   and `"pipeline": "512"` when the final fell back to it.
 2. About a minute or two later the panel shows "Texture 1 2 3 4". 1 is the final's own texture. Picking
    another swaps the model in the scene in place: the same object where it stands, so it saves with
    the scene, and Undo puts the last one back. The pressed number is the one in the scene. If the model
@@ -867,12 +870,27 @@ enough to publish 35 times in 60, and the best of four textures of the same shap
 The textures are copied into the server's storage beside the final and kept with the generation (the
 `textures_status`, `textures_job_id`, `textures` and `textures_error` columns, and `final_pipeline`), so
 a restarted server picks a running job up again. They never fail a generation. If their job can't
-start or fails, or its textures fit another shape (the job's `pipeline` isn't the final's, as when the
-final fell back to `512`), the panel says quietly that no more textures could be made, and the server
-logs why. When some textures fail, the panel offers the others. Picking another picture drops them, and
-stops their job if it still runs. Each final's options take about 1-1.5 minutes of the TRELLIS.2 container
-(about $0.04-0.06). `AI_TEXTURE_OPTIONS=0` (or `false`) on the server turns them off. Workers with the recipe
-on (`ORAINGE_FINAL_MODEL=pixal3d`) refuse them, so turn them off there too.
+start or fails, or its textures fit another shape (the job's `pipeline` isn't the final's, as when a
+worker from before `pipeline` makes a fallen-back final's textures on the cascade), the panel says
+quietly that no more textures could be made, and the server logs why. When some textures fail, the
+panel offers the others. Picking another picture drops them, and stops their job if it still runs
+(the job is read and cleared in one statement, so one a poll records meanwhile is stopped too). A job,
+or its textures, meant for one final never land on the next: the server records them only while that
+final is still the generation's.
+
+The job API's `run` isn't idempotent, so the server starts a textures job once. A start that fails
+once its request may have reached the workers (a 5xx, a dropped connection, no answer in 30 s) could
+have queued the job anyway, so it ends the texture options instead of queueing another on every poll.
+Only a start that never reached them (the connection refused, the host not found) is tried again, by
+the polls in the 2 minutes after the final (`TEXTURES_START_MS` in `apps/server/src/services/ai/studio.ts`).
+A job still running 15 minutes after it started (`TEXTURES_TIMEOUT_MS`) is stopped and ends them the
+same way, so the panel never waits for ever. Each final's options take about 1-1.5 minutes of the
+TRELLIS.2 container (about $0.04-0.06).
+
+`AI_TEXTURE_OPTIONS=0` (or `false`, `off` or `no`) on the server turns them off. A final that another
+model made gets none (on Modal its result's `model` says, e.g. `"pixal3d"` with the recipe on):
+retexturing is TRELLIS.2's. Workers with the recipe on (`ORAINGE_FINAL_MODEL=pixal3d`) refuse every
+textures job, even for a final TRELLIS.2 made in Pixal3D's place, so turn them off there too.
 
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
 labelled pictures (rated, with the second always the best) and return a small house model after
