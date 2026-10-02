@@ -1,0 +1,522 @@
+{
+ "pair-01n-cute-low-poly-fox-sitting-down": {
+  "seed": "next",
+  "phase5": "phase2e-01-cute-low-poly-fox-sitting-down",
+  "phase6": "phase2h-01-cute-low-poly-fox-sitting-down",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "Both clean; B's front-facing, big-eyed face reads cuter and more polished than A's head, which is turned sideways and tucked down.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-01s-cute-low-poly-fox-sitting-down": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-01-cute-low-poly-fox-sitting-down",
+  "phase6": "phase2g-01-cute-low-poly-fox-sitting-down",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "B's crisp low-poly facets and well-shaped head look more polished; A is softer and its head reads as a flat box from behind.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-02n-red-high-top-sneaker": {
+  "seed": "next",
+  "phase5": "phase2e-02-red-high-top-sneaker",
+  "phase6": "phase2h-02-red-high-top-sneaker",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "B is bright red with vivid laces; A is a muddy burgundy whose laces blend in and whose upper looks crumpled and faceted.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-02s-red-high-top-sneaker": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-02-red-high-top-sneaker",
+  "phase6": "phase2g-02-red-high-top-sneaker",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase5",
+  "why": "Both clean; B's bright, chunky laces pop against the upper like the reference, while A's laces blend into a slightly blotchy upper.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-03n-gaming-chair-black-and-purple": {
+  "seed": "next",
+  "phase5": "phase2e-03-gaming-chair-black-and-purple",
+  "phase6": "phase2h-03-gaming-chair-black-and-purple",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "B has white smeared patches on its backrest bolster and seat; A's black-and-purple upholstery is clean.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-03s-gaming-chair-black-and-purple": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-03-gaming-chair-black-and-purple",
+  "phase6": "phase2g-03-gaming-chair-black-and-purple",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "A has white smeared patches on its backrest bolster and seat; B's black-and-purple upholstery is clean.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-04n-retro-arcade-machine": {
+  "seed": "next",
+  "phase5": "phase2e-04-retro-arcade-machine",
+  "phase6": "phase2h-04-retro-arcade-machine",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "B has dark smudges and a scratch-like streak on both side panels; A's panels and back are clean.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-04s-retro-arcade-machine": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-04-retro-arcade-machine",
+  "phase6": "phase2g-04-retro-arcade-machine",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "B's back panel is smeared with garbled red streaks; A's back is clean black and its front details are just as good.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-05n-sci-fi-laser-pistol-white": {
+  "seed": "next",
+  "phase5": "phase2e-05-sci-fi-laser-pistol-white",
+  "phase6": "phase2h-05-sci-fi-laser-pistol-white",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "Both clean; A's long slide and crisp white-orange split look more sci-fi than B's stubbier body with smudgier color edges.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-05s-sci-fi-laser-pistol-white": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-05-sci-fi-laser-pistol-white",
+  "phase6": "phase2g-05-sci-fi-laser-pistol-white",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "Both clean; A keeps the long-slide sci-fi look with orange accents, while B is a stubbier pistol with gold trim and smudgier vents.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-06n-wooden-shield-with-a-lion": {
+  "seed": "next",
+  "phase5": "phase2e-06-wooden-shield-with-a-lion",
+  "phase6": "phase2h-06-wooden-shield-with-a-lion",
+  "phase5_verdict": "reject",
+  "phase6_verdict": "edits",
+  "preferred": "phase6",
+  "why": "B's front lion is crisp, needing only a dark blotch removed from the back; A's lion is smeared fragments on both faces.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-06s-wooden-shield-with-a-lion": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-06-wooden-shield-with-a-lion",
+  "phase6": "phase2g-06-wooden-shield-with-a-lion",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "A's lion is crisp with a clean plain back; B's lion fades below the head and a dark ghost lion covers its back.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-07n-chibi-knight-with-a-big-helmet": {
+  "seed": "next",
+  "phase5": "phase2e-07-chibi-knight-with-a-big-helmet",
+  "phase6": "phase2h-07-chibi-knight-with-a-big-helmet",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "Both are clean, complete knights; B's helmet stays silver all around, while A's looks almost black from the sides and back.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-07s-chibi-knight-with-a-big-helmet": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-07-chibi-knight-with-a-big-helmet",
+  "phase6": "phase2g-07-chibi-knight-with-a-big-helmet",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "Both are clean, complete knights; A's helmet reads silver from every side, while B's turns dark chrome from the sides and back.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-08n-vintage-film-camera": {
+  "seed": "next",
+  "phase5": "phase2e-08-vintage-film-camera",
+  "phase6": "phase2h-08-vintage-film-camera",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "reject",
+  "preferred": "phase5",
+  "why": "B is clean except an open back with protruding film spools; A has a ghost lens hole behind, smeared top, too-deep body.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-08s-vintage-film-camera": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-08-vintage-film-camera",
+  "phase6": "phase2g-08-vintage-film-camera",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "edits",
+  "preferred": "phase6",
+  "why": "A's body is right, with a ghost lump and stray tab on the back; B's back is a slanted wedge with a dark smear.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-09n-donut-with-pink-frosting": {
+  "seed": "next",
+  "phase5": "phase2e-09-donut-with-pink-frosting",
+  "phase6": "phase2h-09-donut-with-pink-frosting",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "A is clean from every angle; B has a detached green ball floating beside it and stray green sprinkles on the frosting.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-09s-donut-with-pink-frosting": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-09-donut-with-pink-frosting",
+  "phase6": "phase2g-09-donut-with-pink-frosting",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "A is clean from every angle; B has a few sprinkles floating above the donut or poking out of its sides.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-10n-astronaut-helmet": {
+  "seed": "next",
+  "phase5": "phase2e-10-astronaut-helmet",
+  "phase6": "phase2h-10-astronaut-helmet",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "A is evenly white and clean; B's shell has a crack-like seam over the top and a noticeably grayer back half.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-10s-astronaut-helmet": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-10-astronaut-helmet",
+  "phase6": "phase2g-10-astronaut-helmet",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase5",
+  "why": "Both are equally clean and complete; B sits noticeably tilted, so A wins only as a tie-breaker.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-11n-stack-of-old-books-with-a-candle": {
+  "seed": "next",
+  "phase5": "phase2e-11-stack-of-old-books-with-a-candle",
+  "phase6": "phase2h-11-stack-of-old-books-with-a-candle",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "A is a clean, faithful stack with crisp blue covers; B's books are muddy and smeared, with a stray dark book on top.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-11s-stack-of-old-books-with-a-candle": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-11-stack-of-old-books-with-a-candle",
+  "phase6": "phase2g-11-stack-of-old-books-with-a-candle",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "A is tidier and more faithful, though its top covers are washed out; B sprawls, with smeared covers and a dented bottom book.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-12n-skateboard-with-graffiti-art": {
+  "seed": "next",
+  "phase5": "phase2e-12-skateboard-with-graffiti-art",
+  "phase6": "phase2h-12-skateboard-with-graffiti-art",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "B's graffiti is crisp and matches the picture; A's lettering is smeared and blurry on a pinched, peanut-shaped deck.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-12s-skateboard-with-graffiti-art": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-12-skateboard-with-graffiti-art",
+  "phase6": "phase2g-12-skateboard-with-graffiti-art",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "A's RASK graffiti is crisp and readable; B's art is a washed-out blur on an odd peanut-shaped deck.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-13n-cute-cartoon-car-bright-blue": {
+  "seed": "next",
+  "phase5": "phase2e-13-cute-cartoon-car-bright-blue",
+  "phase6": "phase2h-13-cute-cartoon-car-bright-blue",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase5",
+  "why": "A is a clean, true bright-blue cartoon car; B leans teal-metallic, with streaky windows and a muddier rear.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-13s-cute-cartoon-car-bright-blue": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-13-cute-cartoon-car-bright-blue",
+  "phase6": "phase2g-13-cute-cartoon-car-bright-blue",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "publish",
+  "preferred": "phase5",
+  "why": "Both are clean, complete cartoon cars; A's details and tail lights are slightly crisper, while B has a muddy purplish rear plate.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-14n-bubble-tea-with-tapioca-pearls": {
+  "seed": "next",
+  "phase5": "phase2e-14-bubble-tea-with-tapioca-pearls",
+  "phase6": "phase2h-14-bubble-tea-with-tapioca-pearls",
+  "phase5_verdict": "reject",
+  "phase6_verdict": "reject",
+  "preferred": "phase5",
+  "why": "A is a blank white cup with no tea color; B at least reads as milk tea despite smeared bands and muddy pearls.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-14s-bubble-tea-with-tapioca-pearls": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-14-bubble-tea-with-tapioca-pearls",
+  "phase6": "phase2g-14-bubble-tea-with-tapioca-pearls",
+  "phase5_verdict": "reject",
+  "phase6_verdict": "edits",
+  "preferred": "phase6",
+  "why": "A reads as bubble tea with clear pearls despite one pale triangular patch; B is covered in blotches and its pearls mostly vanish.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-15n-health-potion-in-a-round-glass": {
+  "seed": "next",
+  "phase5": "phase2e-15-health-potion-in-a-round-glass",
+  "phase6": "phase2h-15-health-potion-in-a-round-glass",
+  "phase5_verdict": "reject",
+  "phase6_verdict": "reject",
+  "preferred": "phase5",
+  "why": "Neither reads as a potion: A is solid silver with a stray red line; B at least shows some pink liquid.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-15s-health-potion-in-a-round-glass": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-15-health-potion-in-a-round-glass",
+  "phase6": "phase2g-15-health-potion-in-a-round-glass",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "B is a glossy red-orange potion; A's body reads as washed-out bronze metal rather than liquid in glass.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-16n-green-dragon-sitting-cartoon": {
+  "seed": "next",
+  "phase5": "phase2e-16-green-dragon-sitting-cartoon",
+  "phase6": "phase2h-16-green-dragon-sitting-cartoon",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "B's tail splits into several duplicated prongs and has loose bits near the base; A is clean all around.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-16s-green-dragon-sitting-cartoon": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-16-green-dragon-sitting-cartoon",
+  "phase6": "phase2g-16-green-dragon-sitting-cartoon",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "B's tail tip is a separate floating piece and its belly texture is blotchy; A is clean and complete from every angle.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-17n-bowl-of-ramen-with-an-egg": {
+  "seed": "next",
+  "phase5": "phase2e-17-bowl-of-ramen-with-an-egg",
+  "phase6": "phase2h-17-bowl-of-ramen-with-an-egg",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "A's lower bowl is baked near-black; B is a clean, level bowl whose only quirk is a slightly garish green garnish.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-17s-bowl-of-ramen-with-an-egg": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-17-bowl-of-ramen-with-an-egg",
+  "phase6": "phase2g-17-bowl-of-ramen-with-an-egg",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "A's bowl turns near-black toward the bottom (baked-in shadow); B's bowl is clean white with egg, noodles and chopsticks intact.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-18n-electric-guitar": {
+  "seed": "next",
+  "phase5": "phase2e-18-electric-guitar",
+  "phase6": "phase2h-18-electric-guitar",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "Both fronts are good, but B's black back is covered in gray-white smears while A's back is clean.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-18s-electric-guitar": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-18-electric-guitar",
+  "phase6": "phase2g-18-electric-guitar",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "B's front has a crisp pickguard; A's front is smudged and its whole back is beige, which outweighs B's smeared back.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-19n-small-cabin-in-a-snowy-forest": {
+  "seed": "next",
+  "phase5": "phase2e-19-small-cabin-in-a-snowy-forest",
+  "phase6": "phase2h-19-small-cabin-in-a-snowy-forest",
+  "phase5_verdict": "edits",
+  "phase6_verdict": "publish",
+  "preferred": "phase6",
+  "why": "A has blotchy door glass and a stray wire and debris at its base; B is clean apart from a small stub under the deck.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-19s-small-cabin-in-a-snowy-forest": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-19-small-cabin-in-a-snowy-forest",
+  "phase6": "phase2g-19-small-cabin-in-a-snowy-forest",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "A's front door pane looks broken and it has a dark blob and debris under the base; B is clean from every side.",
+  "shown_as": {
+   "A": "phase6",
+   "B": "phase5"
+  }
+ },
+ "pair-20n-hot-air-balloon": {
+  "seed": "next",
+  "phase5": "phase2e-20-hot-air-balloon",
+  "phase6": "phase2h-20-hot-air-balloon",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "B's envelope has blotchy orange patches on one side; A is evenly colored and clean all around.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ },
+ "pair-20s-hot-air-balloon": {
+  "seed": "Phase 4's",
+  "phase5": "phase2d-20-hot-air-balloon",
+  "phase6": "phase2g-20-hot-air-balloon",
+  "phase5_verdict": "publish",
+  "phase6_verdict": "edits",
+  "preferred": "phase5",
+  "why": "B's envelope turns murky olive-mustard on one side; A is evenly colored, clean and complete.",
+  "shown_as": {
+   "A": "phase5",
+   "B": "phase6"
+  }
+ }
+}
