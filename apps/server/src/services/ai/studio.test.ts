@@ -1685,11 +1685,17 @@ describe('AIStudio texture options', () => {
     expect(t.store.rows.get(gen.id)).toMatchObject({ texturesStatus: null, texturesJobId: null });
   });
 
-  it('offers no textures made for another shape', async () => {
+  it("tells the textures job when the final fell back to 512, and offers no textures of another shape", async () => {
     const t = setup();
-    // The final ran out of GPU memory on the cascade, so the 512 pipeline made it
+    // The final ran out of GPU memory on the cascade, so the 512 pipeline made it: the worker is
+    // told, so it makes that shape again
     let gen = await finished(t, 'u1', { pipeline: '512' });
     expect(t.store.rows.get(gen.id)!.finalPipeline).toBe('512');
+    expect(t.started.at(-1)).toMatchObject({
+      kind: 'textures',
+      input: { seed: 4242, count: 3, pipeline: '512' },
+    });
+    // A worker from before ignores it and makes the cascade's shape: its textures fit another shape
     t.textures.set(texturesJob(t, gen), {
       status: 'done',
       output: texturesOutput([5242, 6242, 7242], { pipeline: '1024_cascade' }),
@@ -1706,7 +1712,7 @@ describe('AIStudio texture options', () => {
     // None was copied
     expect([...t.storage.files.keys()].filter((key) => key.includes('texture'))).toEqual([]);
 
-    // The same pipeline is fine, and so is a final whose worker didn't say
+    // The same pipeline is fine, and so is a final whose worker didn't say (and nothing is sent)
     const same = await finished(t, 'u2', { pipeline: '512' });
     t.textures.set(texturesJob(t, same), {
       status: 'done',
@@ -1715,6 +1721,7 @@ describe('AIStudio texture options', () => {
     expect((await t.studio.get('u2', same.id)).textures?.status).toBe('done');
     const unsaid = await finished(t, 'u3', { pipeline: undefined });
     expect(t.store.rows.get(unsaid.id)!.finalPipeline).toBeNull();
+    expect('pipeline' in texturesStarts(t).at(-1)!.input).toBe(false);
     t.textures.set(texturesJob(t, unsaid), { status: 'done', output: texturesOutput([5242]) });
     expect((await t.studio.get('u3', unsaid.id)).textures?.status).toBe('done');
   });

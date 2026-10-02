@@ -130,7 +130,8 @@ export const aiGenerations = pgTable('ai_generations', {
   finalTriangles: integer('final_triangles'),
   /**
    * The pipeline that made the final, when the worker said: "1024_cascade", or "512" when it ran
-   * out of GPU memory. Texture options made by another pipeline fit another shape.
+   * out of GPU memory (its textures job is then told, so the worker makes that shape again).
+   * Texture options made by another pipeline fit another shape.
    */
   finalPipeline: text('final_pipeline'),
   /**

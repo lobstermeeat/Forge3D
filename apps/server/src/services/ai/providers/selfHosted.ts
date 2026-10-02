@@ -197,13 +197,15 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
 
   /**
    * Texture options: TRELLIS.2 makes the final's shape again from the same picture, seed and
-   * views, then `count` more textures for it. Same endpoint as the preview and the final.
+   * views (and with "512" when the final fell back to it), then `count` more textures for it.
+   * Same endpoint as the preview and the final.
    */
   startTextures(input: {
     image: Buffer;
     views?: ModelView[];
     seed: number;
     count: number;
+    pipeline?: string;
     requestId: string;
   }): Promise<string> {
     return this.trellis2.run({
@@ -212,6 +214,7 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
       mode: 'textures',
       seed: input.seed,
       count: input.count,
+      ...(input.pipeline ? { pipeline: input.pipeline } : {}),
       request_id: input.requestId,
     });
   }

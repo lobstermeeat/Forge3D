@@ -691,6 +691,7 @@ describe('SelfHostedProvider', () => {
         output: { ...trellisOutput, pipeline: '512', model: 'trellis2' },
       },
       { id: 'fc-tex-2', status: 'IN_QUEUE' },
+      { id: 'fc-tex-512', status: 'IN_QUEUE' },
     ]);
     const provider = createSelfHostedProvider(
       { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
@@ -744,6 +745,14 @@ describe('SelfHostedProvider', () => {
     });
     // Without views, none are sent
     await provider.startTextures({ image: picture, seed: 77, count: 1, requestId: 'gen-7' });
+    // A final that fell back to 512 says so, so the worker makes that shape again
+    await provider.startTextures({
+      image: picture,
+      seed: 77,
+      count: 3,
+      pipeline: '512',
+      requestId: 'gen-7',
+    });
 
     expect(
       api.calls.map((call) => `${call.method} ${call.url.replace('https://w.modal.run', '')}`),
@@ -754,6 +763,7 @@ describe('SelfHostedProvider', () => {
       'GET /trellis2/status/fc-512',
       'GET /trellis2/status/fc-pixal',
       'GET /trellis2/status/fc-final',
+      'POST /trellis2/run',
       'POST /trellis2/run',
     ]);
     // The final's picture, seed and views, inline as for the final
@@ -775,6 +785,16 @@ describe('SelfHostedProvider', () => {
         mode: 'textures',
         seed: 77,
         count: 1,
+        request_id: 'gen-7',
+      },
+    });
+    expect(api.calls[7]!.body).toEqual({
+      input: {
+        image_base64: picture.toString('base64'),
+        mode: 'textures',
+        seed: 77,
+        count: 3,
+        pipeline: '512',
         request_id: 'gen-7',
       },
     });

@@ -194,6 +194,11 @@ export const TEXTURES_START_MS = 2 * 60 * 1000;
  * texture alone. It takes about 1-2 minutes, a few more from cold or behind other jobs.
  */
 export const TEXTURES_TIMEOUT_MS = 15 * 60 * 1000;
+/**
+ * The pipeline a final falls back to when the cascade runs out of GPU memory (workers/README.md).
+ * Its textures job is told, so the worker makes the same shape again.
+ */
+const FALLBACK_PIPELINE = '512';
 
 /** The texture options' columns when a final is done and its textures job is still to start */
 const TEXTURES_TO_START = {
@@ -680,9 +685,10 @@ export class AIStudio {
   }
 
   /**
-   * Starts the textures job for a done final, from what the final was made from: the picture,
-   * its seed and its views. Overlapping polls can both start one: the first is kept, and the other
-   * stopped, as is one started for a final that has been replaced since.
+   * Starts the textures job for a done final, from what the final was made from: the picture, its
+   * seed and views, and its pipeline when it fell back to "512". Overlapping polls can both start
+   * one: the first is kept, and the other stopped, as is one started for a final that has been
+   * replaced since.
    *
    * The job API's run isn't idempotent: a start that fails once its request may have arrived (a
    * 5xx, a connection reset, a timeout) may have queued a job all the same, so it ends the texture
@@ -730,6 +736,8 @@ export class AIStudio {
       ...(views ? { views } : {}),
       seed: record.seed,
       count: TEXTURE_COUNT,
+      // Then the worker makes the shape with it too, not with the cascade
+      ...(record.finalPipeline === FALLBACK_PIPELINE ? { pipeline: FALLBACK_PIPELINE } : {}),
       requestId: record.id,
     };
   }

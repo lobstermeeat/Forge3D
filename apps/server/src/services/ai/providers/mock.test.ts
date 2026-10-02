@@ -157,6 +157,12 @@ describe('mock workers', () => {
     expect(
       await workers.textures(await workers.startTextures({ image: picture, seed: 5, count: 1 })),
     ).toMatchObject({ status: 'done', output: { textures: [{ textureSeed: 1005 }] } });
+    // For a final that fell back to 512, the shape is made with it, as the worker does
+    expect(
+      await workers.textures(
+        await workers.startTextures({ image: picture, seed: 5, count: 1, pipeline: '512' }),
+      ),
+    ).toMatchObject({ status: 'done', output: { pipeline: '512' } });
 
     // A photo under 256 px gets none, so the panel's note can be seen
     const small = await sharp({
