@@ -820,12 +820,37 @@ multiview weights (`download_models --which multiview`); without them each views
 model is made from the picture alone. On RunPod, give the server `RUNPOD_MULTIVIEW_ENDPOINT_ID`;
 without it the step is skipped.
 
+**Texture options (`AI_TEXTURE_OPTIONS`, on by default).** On the sides the picture doesn't show,
+TRELLIS.2's texture is a lottery. On the 20 test prompts, the final's own texture was good enough to
+publish 10 times, and the best of four textures of the same shape 16 times (Phase 7's rolls). No
+automatic pick was trustworthy, so the creator picks:
+
+1. Once a final is done, the server starts a `"textures"` job on the `trellis2` worker (Texture
+   options, under Job contracts) with what the final was made from: the picture, the final's seed and
+   its views, and `count` 3. The final is in the scene and usable meanwhile; under it the panel says
+   "Making 3 more textures to choose from…".
+2. About 2 minutes later the panel shows "Texture 1 2 3 4". 1 is the final's own texture. Picking
+   another swaps the model in the scene in place: the same object where it stands, so it saves with
+   the scene, and Undo puts the last one back. The pressed number is the one in the scene. If the model
+   was removed, picking one places it again.
+
+The textures are copied into the server's storage beside the final and kept with the generation (the
+`textures_status`, `textures_job_id`, `textures` and `textures_error` columns, and `final_pipeline`), so
+a restarted server picks a running job up again. They never fail a generation. If their job can't
+start or fails, or its textures fit another shape (the job's `pipeline` isn't the final's, as when the
+final fell back to `512`), the panel says quietly that no more textures could be made, and the server
+logs why. When some textures fail, the panel offers the others. Picking another picture drops them, and
+stops their job if it still runs. Each final's options take about 2 minutes of the TRELLIS.2 container
+(about $0.09). `AI_TEXTURE_OPTIONS=0` (or `false`) on the server turns them off. Workers with the recipe
+on (`ORAINGE_FINAL_MODEL=pixal3d`) refuse them, so turn them off there too.
+
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
 labelled pictures (rated, with the second always the best) and return a small house model after
-a second or two. A prompt with the word "fail", or a photo under 64 px, shows the error states.
-With `AI_MULTIVIEW=1` too, they draw 6 views of a box (the front orange, the sides green and the
-back blue), except for a photo under 128 px, whose model is then made from the photo alone.
-It refuses to run in production.
+a second or two, then the final's house in 3 other colours as its texture options. A prompt with
+the word "fail", or a photo under 64 px, shows the error states, and a photo under 256 px gets no
+texture options. With `AI_MULTIVIEW=1` too, they draw 6 views of a box (the front orange, the sides
+green and the back blue), except for a photo under 128 px, whose model is then made from the photo
+alone. It refuses to run in production.
 
 ## Deploying on RunPod
 
