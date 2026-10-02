@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import dataclasses
 import io
 import ipaddress
 import math
@@ -18,7 +19,7 @@ from typing import Callable, Optional
 
 from PIL import Image, ImageOps
 
-from .settings import PRESETS, Mode
+from .settings import MAX_TEXTURES, MODES, TEXTURE_COUNT, Mode
 
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_SIDE = 4096
@@ -51,11 +52,19 @@ class Job:
     request_id: str
     # Extra views (the other sides); empty for a single-picture job
     views: tuple[View, ...] = ()
+    # How many textures a "textures" job makes (1 to MAX_TEXTURES); 0 for the other modes
+    count: int = 0
 
     @property
     def output_key(self) -> str:
         # The seed keeps each result at its own URL, so caches never serve a stale model
         return f"ai/{self.request_id}/{self.mode}-{self.seed}.glb"
+
+    def texture_key(self, number: int) -> str:
+        """Where a "textures" job stores texture ``number`` (1 to count): beside the final's model."""
+        # The final's key, with "-texture-<number>" before ".glb"
+        final = dataclasses.replace(self, mode="final").output_key
+        return f"{final.removesuffix('.glb')}-texture-{number}.glb"
 
 
 Fetch = Callable[[str], bytes]
@@ -196,20 +205,34 @@ def _parse_views(views: object, fetch: Optional[Fetch]) -> tuple[View, ...]:
     return tuple(parsed)
 
 
+def _texture_count(count: object) -> int:
+    if count is None:
+        return TEXTURE_COUNT
+    if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= MAX_TEXTURES:
+        raise InputError(f"count must be an integer from 1 to {MAX_TEXTURES}")
+    return count
+
+
 def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) -> Job:
     """Turn a RunPod ``input`` payload into a validated ``Job``."""
     if not isinstance(payload, dict):
         raise InputError("input must be an object")
 
     mode = payload.get("mode", "final")
-    if not isinstance(mode, str) or mode not in PRESETS:
-        raise InputError(f"mode must be one of {sorted(PRESETS)}")
+    if not isinstance(mode, str) or mode not in MODES:
+        raise InputError(f"mode must be one of {sorted(MODES)}")
 
     seed = payload.get("seed")
+    if seed is None and mode == "textures":
+        # Another seed would make another shape: texture options are for the final's
+        raise InputError("seed is required for textures: send the final's seed")
     if seed is None:
         seed = random.randrange(2**31)
     elif not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed < 2**31:
         raise InputError("seed must be an integer between 0 and 2^31 - 1")
+
+    # Only a textures job reads it; the other modes ignore it, as they ignore any field they don't know
+    count = _texture_count(payload.get("count")) if mode == "textures" else 0
 
     request_id = payload.get("request_id", fallback_id)
     if not isinstance(request_id, str) or not REQUEST_ID.match(request_id):
@@ -217,4 +240,4 @@ def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) 
 
     image = _read_image(payload, fetch)
     views = _parse_views(payload.get("views"), fetch)
-    return Job(mode=mode, seed=seed, image=image, request_id=request_id, views=views)
+    return Job(mode=mode, seed=seed, image=image, request_id=request_id, views=views, count=count)
