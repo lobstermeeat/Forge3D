@@ -60,6 +60,13 @@ interface TexturesJobOutput {
   pipeline?: unknown;
   timings?: Record<string, unknown>;
   credits?: string[];
+  /**
+   * The judge's answer, when the job asked for it: `pick` 0 is the final's own texture and k the
+   * k-th entry of `textures` as returned; a verdict per candidate, the final's own first.
+   */
+  judge?: { pick?: unknown; verdicts?: unknown; why?: unknown; model?: unknown; seconds?: unknown };
+  /** Why the judge gave no answer, when the job asked for one (the textures are still there) */
+  judge_error?: unknown;
   error?: string;
 }
 
@@ -194,7 +201,8 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
 
   /**
    * Texture options: TRELLIS.2 makes the final's shape again from the same picture, seed and
-   * views, then `count` more textures for it. Same endpoint as the preview and the final.
+   * views, then `count` more textures for it. Same endpoint as the preview and the final. With
+   * `judge`, the judge then says which texture a creator would rather use.
    */
   startTextures(input: {
     image: Buffer;
@@ -202,6 +210,7 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
     seed: number;
     count: number;
     requestId: string;
+    judge?: { prompt: string };
   }): Promise<string> {
     return this.trellis2.run({
       image_base64: input.image.toString('base64'),
@@ -209,6 +218,7 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
       mode: 'textures',
       seed: input.seed,
       count: input.count,
+      ...(input.judge ? { judge: true, prompt: input.judge.prompt } : {}),
       request_id: input.requestId,
     });
   }
@@ -237,6 +247,7 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
         (sum, t) => sum + (finite(t) ?? 0),
         0,
       ),
+      ...judgement(output),
     }));
   }
 
@@ -382,6 +393,33 @@ function rating(image: { score?: unknown; issues?: unknown }): {
     ...(score === undefined ? {} : { score }),
     ...(issues.length ? { issues } : {}),
   };
+}
+
+/**
+ * The judge's pick, as the picked texture's seed (null for the final's own texture), or why there
+ * is none; nothing when the judge wasn't asked, or the worker doesn't judge yet. `pick` indexes
+ * the worker's own `textures` list as returned, so it is read here, before textures without a file
+ * or a seed are dropped.
+ */
+function judgement(output: TexturesJobOutput): Pick<TexturesOutput, 'judge' | 'judgeError'> {
+  const { judge, judge_error: error } = output;
+  if (error !== undefined && error !== null) {
+    const message = typeof error === 'string' ? error.trim() : '';
+    return { judgeError: message || 'the judge failed' };
+  }
+  if (judge === undefined || judge === null) return {};
+  const pick = typeof judge === 'object' ? judge.pick : undefined;
+  const textures = Array.isArray(output.textures) ? output.textures : [];
+  if (typeof pick !== 'number' || !Number.isInteger(pick) || pick < 0 || pick > textures.length) {
+    return { judgeError: `the judge's pick, ${JSON.stringify(pick) ?? 'none'}, isn't a texture` };
+  }
+  const why = typeof judge.why === 'string' ? judge.why.trim() : '';
+  if (pick === 0) return { judge: { textureSeed: null, why } };
+  const textureSeed = finite(textures[pick - 1]?.texture_seed);
+  if (textureSeed === undefined) {
+    return { judgeError: `the judge picked texture ${pick}, which came back without its seed` };
+  }
+  return { judge: { textureSeed, why } };
 }
 
 function finite(value: unknown): number | undefined {

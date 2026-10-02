@@ -976,7 +976,8 @@ without it the step is skipped.
 **Texture options (`AI_TEXTURE_OPTIONS`, on by default).** On the sides the picture doesn't show,
 TRELLIS.2's texture is a lottery. On the 20 test prompts, the final's own texture was good enough to
 publish 10 times, and the best of four textures of the same shape 16 times (Phase 7's rolls). No
-automatic pick was trustworthy, so the creator picks:
+pick from image statistics was trustworthy, so the creator picks, starting from the judge's pick when
+it is on (below):
 
 1. Once a final is done, the server starts a `"textures"` job on the `trellis2` worker (Texture
    options, under Job contracts) with what the final was made from: the picture, the final's seed and
@@ -997,9 +998,36 @@ stops their job if it still runs. Each final's options take about 2 minutes of t
 (about $0.09). `AI_TEXTURE_OPTIONS=0` (or `false`) on the server turns them off. Workers with the recipe
 on (`ORAINGE_FINAL_MODEL=pixal3d`) refuse them, so turn them off there too.
 
+**The judge's pick (`AI_TEXTURE_JUDGE=1`, off by default).** With it on (`1` or `true`), each
+textures job also asks a self-hosted judge (Qwen3-VL-8B) which of the four textures a creator would
+rather use, the final's own among them. The server sends `"judge": true` and `"prompt"`, what the user
+typed (empty for a photo). On a 20-object validation set the judge's pick was publishable for 15, the
+final's own texture for 11 (the reviewers' own best: about 16). So the Studio makes the judge's pick
+the default:
+
+1. The server keeps the pick with the generation, numbered as the panel numbers the textures (1 is
+   the final's own), with the judge's one sentence (the `textures_pick` and `textures_pick_why`
+   columns). The worker's `pick` counts in its own list of textures, so when some failed, the server
+   finds the picked one by its seed among the ones it kept.
+2. When the options arrive, a dot marks the recommended texture (its tooltip says why), and the panel
+   switches the model in the scene to it, in place, as picking it would: Undo says "Use texture 3".
+   Under the picker it says "Switched to texture 3, the cleanest of the four. Pick another any time."
+3. It switches once, and only over the final's own texture. Never after the creator chose a texture,
+   and never again after Undo or a reload: the panel tells the server (`ai.chooseTexture`, kept in the
+   `textures_pick_applied` and `textures_chosen` columns). Not while the scene plays: it switches when
+   the scene stops. Not while the model is out of the scene: it switches once the final is back.
+
+A pick of 1, a judge that failed (`judge_error`) or a pick the server couldn't keep changes nothing:
+the panel is as without the judge. The server logs why and keeps it (`textures_judge_error`), as it
+does when a worker from before the judge sends no answer. With the judge off, a pick from a job started
+while it was on is left out. The judge needs its weights on the workers (`modal run
+workers/modal_app.py::download_models --which judge8b`), and the server the new `ai_generations`
+columns (`drizzle-kit push`).
+
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
 labelled pictures (rated, with the second always the best) and return a small house model after
-a second or two, then the final's house in 3 other colours as its texture options. A prompt with
+a second or two, then the final's house in 3 other colours as its texture options. With
+`AI_TEXTURE_JUDGE=1`, their judge always recommends texture 3. A prompt with
 the word "fail", or a photo under 64 px, shows the error states, and a photo under 256 px gets no
 texture options. With `AI_MULTIVIEW=1` too, they draw 6 views of a box (the front orange, the sides
 green and the back blue), except for a photo under 128 px, whose model is then made from the photo

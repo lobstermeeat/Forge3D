@@ -1,7 +1,7 @@
 /**
- * The views step and the texture options on Postgres: the ai_generations columns as drizzle-kit
- * creates them, and the guards that let only one of two overlapping polls start the preview, or
- * the textures job. It runs where DATABASE_URL reaches a server that lets it create a database
+ * The views step, the texture options and the judge's pick on Postgres: the ai_generations columns
+ * as drizzle-kit creates them, and the guards that let only one of two overlapping polls start the
+ * preview, or the textures job. It runs where DATABASE_URL reaches a server that lets it create a database
  * (CI's Postgres service), in a database of its own made from the schema and dropped afterwards,
  * so it never touches the app's tables. Without a reachable server it is skipped.
  */
@@ -13,7 +13,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import type { Database } from '../../db';
 import * as schema from '../../db/schema';
 import type { StorageProvider } from '../storage';
-import { MOCK_VIEW_AZIMUTHS, MockWorkers } from './providers/mock';
+import { MOCK_JUDGE_WHY, MOCK_VIEW_AZIMUTHS, MockWorkers } from './providers/mock';
 import { AIStudio, drizzleGenerationStore, type GenerationStore } from './studio';
 import type { StudioWorkers } from './types';
 
@@ -80,6 +80,22 @@ describe.skipIf(!available)('AIStudio on Postgres (ai_generations)', () => {
       select status, final_pipeline, textures_status, textures_job_id, textures, textures_error
       from ai_generations where id = ${id}`;
     return found!;
+  };
+
+  /** The judge's pick and the creator's choice as Postgres has them */
+  const pickRow = async (id: string) => {
+    const [found] = await sql`
+      select textures_pick, textures_pick_why, textures_judge_error, textures_pick_applied,
+        textures_chosen
+      from ai_generations where id = ${id}`;
+    return found!;
+  };
+  const NO_PICK = {
+    textures_pick: null,
+    textures_pick_why: null,
+    textures_judge_error: null,
+    textures_pick_applied: false,
+    textures_chosen: null,
   };
 
   /** Another user, so each test's models in progress stay under the limit */
@@ -253,6 +269,56 @@ describe.skipIf(!available)('AIStudio on Postgres (ai_generations)', () => {
       textures: null,
       textures_error: null,
     });
+  });
+
+  it("keeps the judge's pick and the creator's choice with the generation", async () => {
+    const id = await user('u-judge');
+    const storage = memoryStorage();
+    const workers = new MockWorkers(0);
+    const studio = new AIStudio({ workers, store, storage, textureJudge: true });
+    let gen = await studio.startFromPrompt(id, 'a brass desk lamp');
+    // The columns' defaults: no pick, not applied, nothing chosen
+    expect(await pickRow(gen.id)).toEqual(NO_PICK);
+
+    gen = await studio.get(id, gen.id);
+    gen = await studio.pick(id, gen.id, gen.recommended!);
+    expect((await studio.get(id, gen.id)).status).toBe('reviewing');
+    await studio.keep(id, gen.id);
+    expect((await studio.get(id, gen.id)).textures?.status).toBe('running');
+    gen = await studio.get(id, gen.id);
+    expect(gen.textures).toMatchObject({
+      status: 'done',
+      recommended: { number: 3, why: MOCK_JUDGE_WHY, applied: false },
+      chosen: null,
+      judgeError: null,
+    });
+    expect(await pickRow(gen.id)).toEqual({
+      ...NO_PICK,
+      textures_pick: 3,
+      textures_pick_why: MOCK_JUDGE_WHY,
+    });
+
+    // The panel applied the pick, then the creator chose another
+    await studio.chooseTexture(id, gen.id, 3, 'judge');
+    await studio.chooseTexture(id, gen.id, 2, 'creator');
+    expect(await pickRow(gen.id)).toEqual({
+      ...NO_PICK,
+      textures_pick: 3,
+      textures_pick_why: MOCK_JUDGE_WHY,
+      textures_pick_applied: true,
+      textures_chosen: 2,
+    });
+
+    // A restarted server tells the panel the same, so the pick never goes in again
+    const restarted = new AIStudio({ workers, store, storage, textureJudge: true });
+    expect((await restarted.get(id, gen.id)).textures).toMatchObject({
+      recommended: { number: 3, applied: true },
+      chosen: 2,
+    });
+
+    // Another picture clears them, with the final
+    await restarted.pick(id, gen.id, 0);
+    expect(await pickRow(gen.id)).toEqual(NO_PICK);
   });
 
   it('lets one of two overlapping polls start the textures job', async () => {
