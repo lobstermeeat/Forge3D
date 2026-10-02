@@ -325,6 +325,46 @@ def test_finals_fall_back_to_trellis2_when_pixal3d_is_not_there(capsys):
     assert result["model"] == "trellis2" and pool.resident == "trellis2" and "fallback" not in result
 
 
+@pytest.mark.parametrize("final_model", ["trellis2", "pixal3d"])
+def test_texture_options_are_trellis2s(final_model):
+    payload = {"mode": "textures", "seed": 7}
+    assert modal_app.choose_model({"input": payload}, final_model, {"trellis2", "pixal3d"}) == "trellis2"
+
+
+def test_texture_options_for_trellis2s_finals_go_to_trellis2():
+    pool = modal_app.ModelPool(FakeRuntime("trellis2"))
+    handlers = Handlers({"trellis2": {"mode": "textures", "textures": [{"texture_seed": 1007}]}})
+    result = modal_app.handle_with_models(job("textures", seed=7), pool, "trellis2", handlers, "storage", "pack")
+    assert result == {"mode": "textures", "textures": [{"texture_seed": 1007}], "model": "trellis2"}
+    assert handlers.calls == [("trellis2", "trellis2", "textures", "storage", "pack")]
+    # An error is passed on as it is, with no model named
+    handlers = Handlers({"trellis2": {"error": "invalid input: seed is required for textures: send the final's seed"}})
+    result = modal_app.handle_with_models(job("textures"), pool, "trellis2", handlers, None, None)
+    assert result == {"error": "invalid input: seed is required for textures: send the final's seed"}
+
+
+@pytest.mark.parametrize("pixal3d", ["loaded", "missing"])
+def test_texture_options_are_refused_with_the_recipe_on(pixal3d, capsys):
+    """A Pixal3D final has another shape than TRELLIS.2 would make, and only TRELLIS.2 retextures."""
+    if pixal3d == "loaded":
+        pool = pool_with_both()
+    else:  # its finals are TRELLIS.2's here, but the creator's final may come from a container where it loaded
+        pool = modal_app.ModelPool(FakeRuntime("trellis2"))
+        pool.count_out("pixal3d", "its weights are missing")
+    handlers = Handlers({"trellis2": {"glb": "t"}, "pixal3d": {"glb": "p"}})
+    result = modal_app.handle_with_models(job("textures", seed=7), pool, "pixal3d", handlers, None, None)
+    assert result == {"error": "texture options need TRELLIS.2 finals"}
+    assert handlers.calls == []  # nothing ran
+    assert pool.resident == "trellis2" and pool.runtimes["trellis2"].log == []  # nor did TRELLIS.2 go to sleep
+    assert "[orainge] a textures job refused: the finals are pixal3d's" in capsys.readouterr().out
+
+
+def test_the_refusal_is_the_trellis2_workers_own():
+    """The TRELLIS.2 worker's service refuses a runtime that can't retexture with the same words."""
+    service = (WORKERS / "trellis2" / "forge3d_worker" / "service.py").read_text()
+    assert f'TEXTURES_NEED_TRELLIS2 = "{modal_app.TEXTURES_NEED_TRELLIS2}"' in service
+
+
 class MovableRuntime(FakeRuntime):
     """A runtime whose models can go to the CPU and back (Pixal3D's _offload and _restore)."""
 
