@@ -145,6 +145,19 @@ export const aiGenerations = pgTable('ai_generations', {
   textures: jsonb('textures').$type<{ url: string; triangles: number; textureSeed: number }[]>(),
   /** Why there are no textures to choose from, or why some of them couldn't be made */
   texturesError: text('textures_error'),
+  /**
+   * The judge's pick (AI_TEXTURE_JUDGE=1): the texture a creator would rather use, numbered as the
+   * panel numbers them (1 is the final's own texture, then `textures` in order). Null without one.
+   */
+  texturesPick: integer('textures_pick'),
+  /** Why the judge picked it, in its one sentence */
+  texturesPickWhy: text('textures_pick_why'),
+  /** Why the judge gave no pick, when it was asked (the textures are offered all the same) */
+  texturesJudgeError: text('textures_judge_error'),
+  /** Whether the panel put the judge's pick in the creator's scene (it does so once) */
+  texturesPickApplied: boolean('textures_pick_applied').notNull().default(false),
+  /** The texture the creator last chose in the panel (1 is the final's own); null until they do */
+  texturesChosen: integer('textures_chosen'),
   /** Attribution shown with the model, such as "Built with DINOv3" (a license requirement) */
   credits: jsonb('credits').$type<string[]>(),
   resultAssetId: uuid('result_asset_id').references(() => assets.id),

@@ -22,9 +22,19 @@ type Job =
       noObject: boolean;
       viewsUsed: number;
     }
-  | { kind: 'textures'; readyAt: number; seed: number; count: number; noTextures: boolean };
+  | {
+      kind: 'textures';
+      readyAt: number;
+      seed: number;
+      count: number;
+      noTextures: boolean;
+      /** Whether the judge was asked (AI_TEXTURE_JUDGE=1) */
+      judge: boolean;
+    };
 
 const MOCK_CREDITS = ['Mock model for development: no AI ran'];
+/** Why the mock judge picks the texture it does */
+export const MOCK_JUDGE_WHY = 'The mock judge always picks the second new texture: no AI looked.';
 /** Ratings like the FLUX worker's, by position, so the second picture is always the best */
 const MOCK_RATINGS: { score: number; issues: string[] }[] = [
   { score: 0.64, issues: ['small in the frame'] },
@@ -40,7 +50,8 @@ export const MOCK_VIEW_AZIMUTHS = [0, 45, 90, 180, 270, 315];
  * models and texture options appear after a short delay, with no GPU, network or cost. The
  * pictures are rated like the real worker rates them, with the second always the best, the views
  * are 6 cutouts of a box seen from around it, and the texture options are the final's house in
- * other colours. A prompt containing "fail" fails its pictures, a photo under 256 px gets no
+ * other colours; asked for the judge's pick, they always pick the second new texture (texture 3 in
+ * the panel). A prompt containing "fail" fails its pictures, a photo under 256 px gets no
  * texture options, a photo under 128 px gets no views either (the model is then made from the
  * photo alone), and a photo under 64 px fails its model too, so the error and fallback states can
  * be tried. Never enable it in production.
@@ -156,7 +167,12 @@ export class MockWorkers implements StudioWorkers {
     };
   }
 
-  async startTextures(input: { image: Buffer; seed: number; count: number }): Promise<string> {
+  async startTextures(input: {
+    image: Buffer;
+    seed: number;
+    count: number;
+    judge?: { prompt: string };
+  }): Promise<string> {
     const { width = 0 } = await sharp(input.image).metadata();
     return this.add({
       kind: 'textures',
@@ -165,6 +181,7 @@ export class MockWorkers implements StudioWorkers {
       count: input.count,
       // A small photo stands in for a textures job that failed, so the panel's note can be seen
       noTextures: width < 256,
+      judge: !!input.judge,
     });
   }
 
@@ -185,9 +202,19 @@ export class MockWorkers implements StudioWorkers {
       const glb = mockGlb(textureSeed, 'final');
       return { file: { data: glb }, textureSeed, triangles: MOCK_TRIANGLES, bytes: glb.length };
     });
+    // The second new texture (or the only one), so the panel switches the model to it
+    const picked = textures[Math.min(1, textures.length - 1)];
     return {
       status: 'done',
-      output: { textures, errors: [], pipeline: MOCK_FINAL_PIPELINE, seconds: 1.5 * job.count },
+      output: {
+        textures,
+        errors: [],
+        pipeline: MOCK_FINAL_PIPELINE,
+        seconds: 1.5 * job.count,
+        ...(job.judge && picked
+          ? { judge: { textureSeed: picked.textureSeed, why: MOCK_JUDGE_WHY } }
+          : {}),
+      },
     };
   }
 

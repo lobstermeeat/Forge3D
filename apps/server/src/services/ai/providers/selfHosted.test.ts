@@ -3,6 +3,7 @@ import {
   createAIOrchestrator,
   createStudioWorkers,
   multiviewEnabled,
+  textureJudgeEnabled,
   textureOptionsEnabled,
 } from '../index';
 import { JobEndpoint, type FetchLike } from './jobEndpoint';
@@ -767,6 +768,131 @@ describe('SelfHostedProvider', () => {
         request_id: 'gen-7',
       },
     });
+  });
+
+  it("asks for the judge's pick with the textures, and reads it by the texture's seed", async () => {
+    const texture = (k: number, more: object = {}) => ({
+      texture_seed: 77 + 1000 * k,
+      glb: {
+        key: `ai/gen-8/final-77-texture-${k}.glb`,
+        url: `https://r2.test/ai/gen-8/final-77-texture-${k}.glb`,
+      },
+      bytes: 1_550_172,
+      triangles: 96_205,
+      ...more,
+    });
+    // Texture 2 failed, so the worker's list goes 1, 3, 4, 5; 4 came back without its file, and
+    // 5 without a seed the server can read
+    const textures = [
+      texture(1),
+      texture(3),
+      texture(4, { glb: undefined }),
+      texture(5, { texture_seed: '5077' }),
+    ];
+    const done = (more: object) => ({
+      id: 'fc-judged',
+      status: 'COMPLETED',
+      output: {
+        request_id: 'gen-8',
+        mode: 'textures',
+        seed: 77,
+        textures,
+        texture_errors: [{ texture_seed: 2077, error: 'CUDA out of memory' }],
+        pipeline: '1024_cascade',
+        timings: { generate_s: 27.7, retexture_s: 40.8 },
+        ...more,
+      },
+    });
+    const verdicts = ['edits', 'reject', 'publish', 'edits', 'reject'];
+    const answers: [object, object][] = [
+      // pick k is the k-th entry of the worker's own list: the second is texture 3
+      [
+        { judge: { pick: 2, verdicts, why: ' The back stays clean. ', model: '8b', seconds: 9.1 } },
+        { judge: { textureSeed: 3077, why: 'The back stays clean.' } },
+      ],
+      // 0 is the final's own texture
+      [
+        { judge: { pick: 0, verdicts, why: 'The final is fine as it is.' } },
+        { judge: { textureSeed: null, why: 'The final is fine as it is.' } },
+      ],
+      // A texture the server won't offer is still named by its seed (the studio drops the pick)
+      [{ judge: { pick: 3 } }, { judge: { textureSeed: 4077, why: '' } }],
+      [
+        { judge: { pick: 4 } },
+        { judgeError: 'the judge picked texture 4, which came back without its seed' },
+      ],
+      [{ judge: { pick: 5 } }, { judgeError: "the judge's pick, 5, isn't a texture" }],
+      [{ judge: { pick: -1 } }, { judgeError: "the judge's pick, -1, isn't a texture" }],
+      [{ judge: { pick: 1.5 } }, { judgeError: "the judge's pick, 1.5, isn't a texture" }],
+      [{ judge: { pick: '1' } }, { judgeError: `the judge's pick, "1", isn't a texture` }],
+      [{ judge: true }, { judgeError: "the judge's pick, none, isn't a texture" }],
+      // The judge failed: the textures are there, without a pick
+      [
+        { judge_error: ' judge failed: CUDA out of memory ' },
+        { judgeError: 'judge failed: CUDA out of memory' },
+      ],
+      [
+        { judge: { pick: 1 }, judge_error: 'judge failed: timed out' },
+        { judgeError: 'judge failed: timed out' },
+      ],
+      [{ judge_error: { detail: 'odd' } }, { judgeError: 'the judge failed' }],
+      // Not asked, or a worker from before the judge
+      [{}, {}],
+      [{ judge: null }, {}],
+    ];
+    const api = fakeJobApi([
+      { id: 'fc-judged', status: 'IN_QUEUE' },
+      ...answers.map(([answer]) => done(answer)),
+    ]);
+    const provider = createSelfHostedProvider(
+      { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
+      api.fetchImpl,
+    )!;
+    const picture = Buffer.from('picture');
+    expect(
+      await provider.startTextures({
+        image: picture,
+        seed: 77,
+        count: 4,
+        requestId: 'gen-8',
+        judge: { prompt: 'a brass desk lamp' },
+      }),
+    ).toBe('fc-judged');
+    // The judge and what the user typed go with the textures job; without `judge`, neither does
+    // (see the test above)
+    expect(api.calls[0]!.body).toEqual({
+      input: {
+        image_base64: picture.toString('base64'),
+        mode: 'textures',
+        seed: 77,
+        count: 4,
+        judge: true,
+        prompt: 'a brass desk lamp',
+        request_id: 'gen-8',
+      },
+    });
+
+    for (const [answer, expected] of answers) {
+      const state = await provider.textures('fc-judged');
+      if (state.status !== 'done') throw new Error(`the job is ${state.status}`);
+      const { judge, judgeError } = state.output;
+      const read = { ...(judge ? { judge } : {}), ...(judgeError ? { judgeError } : {}) };
+      expect(read, JSON.stringify(answer)).toEqual(expected);
+      // The textures are read as without the judge
+      expect(state.output.textures.map((t) => t.textureSeed)).toEqual([1077, 3077]);
+    }
+  });
+
+  it('asks the judge only with AI_TEXTURE_JUDGE=1 (or true)', () => {
+    expect(textureJudgeEnabled({})).toBe(false);
+    expect(textureJudgeEnabled({ AI_TEXTURE_JUDGE: '' })).toBe(false);
+    expect(textureJudgeEnabled({ AI_TEXTURE_JUDGE: '0' })).toBe(false);
+    expect(textureJudgeEnabled({ AI_TEXTURE_JUDGE: 'false' })).toBe(false);
+    expect(textureJudgeEnabled({ AI_TEXTURE_JUDGE: 'yes' })).toBe(false);
+    expect(textureJudgeEnabled({ AI_TEXTURE_JUDGE: '1' })).toBe(true);
+    expect(textureJudgeEnabled({ AI_TEXTURE_JUDGE: ' 1\n' })).toBe(true);
+    expect(textureJudgeEnabled({ AI_TEXTURE_JUDGE: 'true' })).toBe(true);
+    expect(textureJudgeEnabled({ AI_TEXTURE_JUDGE: 'TRUE' })).toBe(true);
   });
 
   it('makes texture options unless AI_TEXTURE_OPTIONS is 0 or false', () => {

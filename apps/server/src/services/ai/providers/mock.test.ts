@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { MOCK_VIEW_AZIMUTHS, MockWorkers, mockGlb } from './mock';
+import { MOCK_JUDGE_WHY, MOCK_VIEW_AZIMUTHS, MockWorkers, mockGlb } from './mock';
 
 function readGlb(data: Buffer) {
   expect(data.toString('ascii', 0, 4)).toBe('glTF');
@@ -168,6 +168,41 @@ describe('mock workers', () => {
       await workers.textures(await workers.startTextures({ image: small, seed: 42, count: 3 })),
     ).toMatchObject({ status: 'failed', message: expect.stringContaining('256 px') });
     expect(await workers.textures('mock-404')).toMatchObject({ status: 'failed' });
+  });
+
+  it("pick the second new texture when asked for the judge's pick", async () => {
+    const workers = new MockWorkers(0);
+    const picture = await sharp({
+      create: { width: 256, height: 256, channels: 3, background: '#888' },
+    })
+      .png()
+      .toBuffer();
+    const judged = await workers.textures(
+      await workers.startTextures({
+        image: picture,
+        seed: 42,
+        count: 3,
+        judge: { prompt: 'a brass desk lamp' },
+      }),
+    );
+    expect(judged).toMatchObject({
+      status: 'done',
+      // Texture 3 in the panel: the final's own is 1
+      output: { judge: { textureSeed: 2042, why: MOCK_JUDGE_WHY } },
+    });
+    expect(judged).not.toHaveProperty('output.judgeError');
+
+    // The only one when there is one, and none when not asked
+    expect(
+      await workers.textures(
+        await workers.startTextures({ image: picture, seed: 5, count: 1, judge: { prompt: '' } }),
+      ),
+    ).toMatchObject({ status: 'done', output: { judge: { textureSeed: 1005 } } });
+    const unasked = await workers.textures(
+      await workers.startTextures({ image: picture, seed: 42, count: 3 }),
+    );
+    expect(unasked).toMatchObject({ status: 'done', output: { textures: expect.any(Array) } });
+    expect(unasked).not.toHaveProperty('output.judge');
   });
 
   it('build models from the views they are sent, and stop jobs', async () => {

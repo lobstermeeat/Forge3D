@@ -36,6 +36,14 @@ import type {
  * of four 16 times. The final is done and usable at once: the textures job runs after it, with
  * its own state (texturesStatus), and never fails the generation.
  *
+ * The judge (AI_TEXTURE_JUDGE=1, off by default): the textures job also asks a self-hosted judge
+ * (Qwen3-VL-8B) which of the four textures a creator would rather use, and the panel makes its pick
+ * the default, once. On a 20-object validation set its pick was publishable for 15, the final's
+ * own texture for 11 (the reviewers' own best: about 16). When the judge fails, the reason is kept
+ * (texturesJudgeError) and the options are offered as without it. The panel tells the server when
+ * it applied the pick and which texture the creator chose (chooseTexture), so the pick never goes
+ * over the creator's choice, and never goes in twice.
+ *
  * Every job is started and then polled by `get`, so no request waits on a GPU. Pictures, views
  * and models are copied into the server's storage, so scenes keep working after the workers
  * forget their outputs.
@@ -72,6 +80,8 @@ export type StoredView = NonNullable<GenerationRecord['views']>[number];
 export type TextureOption = NonNullable<GenerationRecord['textures']>[number];
 /** Where the texture options are: their job runs, they are made, or there are none */
 export type TexturesStatus = 'running' | 'done' | 'failed';
+/** Who put a texture option in the scene: the creator, or the panel with the judge's pick */
+export type TextureChooser = 'creator' | 'judge';
 
 export interface GenerationStore {
   create(values: NewGeneration): Promise<GenerationRecord>;
@@ -129,6 +139,16 @@ export interface GenerationView {
     options: TextureOption[];
     /** Why there are none, or why some of them couldn't be made */
     error: string | null;
+    /**
+     * The judge's pick (AI_TEXTURE_JUDGE=1), numbered as the panel numbers the textures (1 is the
+     * final's own), with why, and whether the panel put it in the scene (it does so once). Null
+     * when the judge wasn't asked or gave no pick.
+     */
+    recommended: { number: number; why: string | null; applied: boolean } | null;
+    /** The texture the creator last chose in the panel; null while they haven't chosen one */
+    chosen: number | null;
+    /** Why the judge gave no pick, when it was asked */
+    judgeError: string | null;
   } | null;
   credits: string[];
   error: string | null;
@@ -171,12 +191,21 @@ export const VIEWS_TIMEOUT_MS = 3 * 60 * 1000;
  */
 export const TEXTURE_COUNT = 3;
 
+/** The judge's pick and the creator's choice, before there are any */
+const NO_PICK = {
+  texturesPick: null,
+  texturesPickWhy: null,
+  texturesJudgeError: null,
+  texturesPickApplied: false,
+  texturesChosen: null,
+} satisfies Partial<NewGeneration>;
 /** The texture options' columns when a final is done and its textures job is still to start */
 const TEXTURES_TO_START = {
   texturesStatus: 'running',
   texturesJobId: null,
   textures: null,
   texturesError: null,
+  ...NO_PICK,
 } satisfies Partial<NewGeneration>;
 /** The texture options' columns when there are none */
 const NO_TEXTURES = {
@@ -184,6 +213,7 @@ const NO_TEXTURES = {
   texturesJobId: null,
   textures: null,
   texturesError: null,
+  ...NO_PICK,
 } satisfies Partial<NewGeneration>;
 
 export interface StudioDeps {
@@ -200,6 +230,11 @@ export interface StudioDeps {
    * workers can. On unless false.
    */
   textureOptions?: boolean;
+  /**
+   * AI_TEXTURE_JUDGE=1: the textures job also asks the judge which texture a creator would rather
+   * use, and the panel makes its pick the default. Off by default.
+   */
+  textureJudge?: boolean;
   /** Downloads worker outputs stored at a URL (workers with R2) */
   fetchImpl?: FetchLike;
 }
@@ -330,6 +365,37 @@ export class AIStudio {
       throw new StudioError('BAD_REQUEST', 'Only a failed step can be tried again');
     }
     return view(await this.runJob(record, record.jobKind as JobKind));
+  }
+
+  /**
+   * Records a texture option the panel put in the scene: one the creator chose (by 'creator'), or
+   * the judge's pick, which the panel applies once (by 'judge'). The panel reads both back, so the
+   * pick never goes over the creator's choice, nor in twice, even after a reload.
+   */
+  async chooseTexture(
+    userId: string,
+    id: string,
+    number: number,
+    by: TextureChooser,
+  ): Promise<GenerationView> {
+    const record = await this.find(userId, id);
+    const count = record.textures?.length ?? 0;
+    if (
+      record.status !== 'done' ||
+      record.texturesStatus !== 'done' ||
+      !Number.isInteger(number) ||
+      number < 1 ||
+      number > count + 1
+    ) {
+      throw new StudioError('BAD_REQUEST', 'There is no such texture');
+    }
+    if (by === 'judge') {
+      if (record.texturesPick !== number) {
+        throw new StudioError('BAD_REQUEST', "That texture isn't the recommended one");
+      }
+      return view(await this.deps.store.update(record.id, { texturesPickApplied: true }));
+    }
+    return view(await this.deps.store.update(record.id, { texturesChosen: number }));
   }
 
   async recent(userId: string, limit = 12): Promise<GenerationView[]> {
@@ -633,11 +699,19 @@ export class AIStudio {
     }
     const problems = made.problems.join('; ').slice(0, 500);
     if (problems) console.warn(`[AI] Generation ${record.id}: some textures failed:`, problems);
+    const pick = judgePick(output, made.options, this.textureJudge());
+    if (pick.texturesJudgeError) {
+      console.warn(
+        `[AI] Generation ${record.id} has no recommended texture:`,
+        pick.texturesJudgeError,
+      );
+    }
     return this.settleTextures(record, {
       texturesStatus: 'done',
       texturesJobId: null,
       textures: made.options,
       texturesError: problems || null,
+      ...pick,
       durationMs: (record.durationMs ?? 0) + Math.round(output.seconds * 1000),
       updatedAt: new Date(),
     });
@@ -645,8 +719,8 @@ export class AIStudio {
 
   /**
    * Starts the textures job for a done final, from what the final was made from: the picture,
-   * its seed and its views. Overlapping polls can both start one: the first is kept, the other
-   * stopped.
+   * its seed and its views, and with AI_TEXTURE_JUDGE=1 the prompt for the judge. Overlapping
+   * polls can both start one: the first is kept, the other stopped.
    */
   private async startTextures(record: GenerationRecord): Promise<GenerationRecord> {
     let jobId: string;
@@ -663,6 +737,8 @@ export class AIStudio {
         seed: record.seed,
         count: TEXTURE_COUNT,
         requestId: record.id,
+        // What the user typed; a photo has no prompt
+        ...(this.textureJudge() ? { judge: { prompt: record.prompt ?? '' } } : {}),
       });
     } catch (err) {
       // Couldn't reach the workers: try again on the next poll
@@ -740,6 +816,11 @@ export class AIStudio {
   /** Whether finals get texture options: AI_TEXTURE_OPTIONS isn't off, and the workers make them. */
   private textureOptions(): boolean {
     return this.deps.textureOptions !== false && !!this.deps.workers?.startTextures;
+  }
+
+  /** Whether the textures job asks the judge for its pick: AI_TEXTURE_JUDGE=1. */
+  private textureJudge(): boolean {
+    return !!this.deps.textureJudge;
   }
 
   /** Where a chosen picture goes first: to its other sides (AI_MULTIVIEW=1), else the preview. */
@@ -897,6 +978,42 @@ function withoutViews(record: GenerationRecord, reason: unknown): string {
   return message;
 }
 
+/**
+ * The judge's pick as the panel numbers the textures (1 is the final's own, then the stored ones
+ * in order), with why; or why there is none. Textures that failed or couldn't be copied leave
+ * gaps, so the pick is found by its texture's seed. With the judge off (not `asked`), there is
+ * none, even from a job started while it was on.
+ */
+function judgePick(
+  output: TexturesOutput,
+  options: TextureOption[],
+  asked: boolean,
+): Pick<NewGeneration, 'texturesPick' | 'texturesPickWhy' | 'texturesJudgeError'> {
+  const none = (reason: string | null) => ({
+    texturesPick: null,
+    texturesPickWhy: null,
+    texturesJudgeError: reason?.slice(0, 500) ?? null,
+  });
+  if (!asked) return none(null);
+  if (output.judgeError) return none(output.judgeError);
+  // A 3D worker from before the judge ignores the question
+  if (!output.judge) {
+    return none("the judge's answer didn't come back (does the 3D worker ask the judge yet?)");
+  }
+  const { textureSeed, why } = output.judge;
+  let number = 1;
+  if (textureSeed !== null) {
+    const index = options.findIndex((option) => option.textureSeed === textureSeed);
+    if (index < 0) return none(`the judge picked texture ${textureSeed}, which isn't offered`);
+    number = index + 2;
+  }
+  return {
+    texturesPick: number,
+    texturesPickWhy: why.slice(0, 500) || null,
+    texturesJudgeError: null,
+  };
+}
+
 /** A worker's picture's format, or null when it isn't a PNG, JPEG or WebP picture. */
 async function pictureFormat(data: Buffer): Promise<{ type: string; extension: string } | null> {
   const meta = await sharp(data)
@@ -937,6 +1054,16 @@ function view(record: GenerationRecord): GenerationView {
           count: TEXTURE_COUNT,
           options: record.textures ?? [],
           error: record.texturesError,
+          recommended:
+            record.texturesPick === null
+              ? null
+              : {
+                  number: record.texturesPick,
+                  why: record.texturesPickWhy,
+                  applied: record.texturesPickApplied,
+                },
+          chosen: record.texturesChosen,
+          judgeError: record.texturesJudgeError,
         }
       : null,
     credits: record.credits ?? [],

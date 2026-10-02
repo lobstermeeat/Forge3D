@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import { randomUUID } from 'node:crypto';
 import type { StorageProvider } from '../storage';
 import type { FetchLike } from './providers/jobEndpoint';
-import { MOCK_VIEW_AZIMUTHS, MockWorkers } from './providers/mock';
+import { MOCK_JUDGE_WHY, MOCK_VIEW_AZIMUTHS, MockWorkers } from './providers/mock';
 import {
   AIStudio,
   LIMITS,
@@ -53,6 +53,11 @@ function memoryStore(): GenerationStore & { rows: Map<string, GenerationRecord> 
         texturesJobId: null,
         textures: null,
         texturesError: null,
+        texturesPick: null,
+        texturesPickWhy: null,
+        texturesJudgeError: null,
+        texturesPickApplied: false,
+        texturesChosen: null,
         credits: null,
         resultAssetId: null,
         creditsUsed: 0,
@@ -235,16 +240,22 @@ const sentViews = (start: { input: Record<string, unknown> }) =>
   start.input['views'] as ModelView[] | undefined;
 
 /**
- * AIStudio with scripted workers; `multiview` is AI_MULTIVIEW=1 and `textureOptions` is
- * AI_TEXTURE_OPTIONS (on unless false)
+ * AIStudio with scripted workers; `multiview` is AI_MULTIVIEW=1, `textureOptions` is
+ * AI_TEXTURE_OPTIONS (on unless false) and `textureJudge` is AI_TEXTURE_JUDGE=1
  */
 function setup(
   prompts = true,
   {
     multiview = false,
     textureOptions,
+    textureJudge,
     fetchImpl,
-  }: { multiview?: boolean; textureOptions?: boolean; fetchImpl?: FetchLike } = {},
+  }: {
+    multiview?: boolean;
+    textureOptions?: boolean;
+    textureJudge?: boolean;
+    fetchImpl?: FetchLike;
+  } = {},
 ) {
   const store = memoryStore();
   const storage = memoryStorage();
@@ -255,6 +266,7 @@ function setup(
     storage,
     multiview,
     textureOptions,
+    textureJudge,
     fetchImpl,
   });
   return { studio, store, storage, ...jobs };
@@ -1202,6 +1214,10 @@ describe('AIStudio texture options', () => {
         textureSeed,
       })),
       error: null,
+      // The judge is off by default (see 'AIStudio texture judge'), and the creator hasn't chosen
+      recommended: null,
+      chosen: null,
+      judgeError: null,
     });
     // Copied into storage beside the final, and kept with the generation
     expect(t.storage.files.get(key(6242))?.toString()).toBe('glb-texture-6242');
@@ -1284,6 +1300,9 @@ describe('AIStudio texture options', () => {
         },
       ],
       error: `texture 6242: ConnectionError: R2 unreachable; texture 7242: Couldn't download ${file(3).url}: 404`,
+      recommended: null,
+      chosen: null,
+      judgeError: null,
     });
     expect(t.storage.files.get(`ai/${gen.id}/final-4242-texture-5242.glb`)?.toString()).toBe(
       `fetched ${file(1).url}`,
@@ -1576,6 +1595,313 @@ describe('AIStudio texture options', () => {
     expect(photo).toMatchObject({
       status: 'done',
       textures: { status: 'failed', error: expect.stringContaining('256 px') },
+    });
+  });
+
+  describe("the judge's pick (AI_TEXTURE_JUDGE=1)", () => {
+    const why = 'The back keeps the brass colour, with no smudges.';
+    const judged = (judge: TexturesOutput['judge']) => ({
+      status: 'done' as const,
+      output: texturesOutput([5242, 6242, 7242], { judge }),
+    });
+
+    it('asks the judge only when it is on, with what the user typed', async () => {
+      const on = setup(true, { textureJudge: true });
+      await finished(on);
+      expect(on.started.at(-1)).toMatchObject({
+        kind: 'textures',
+        input: { seed: 4242, count: 3, judge: { prompt: 'a vintage film camera' } },
+      });
+
+      // A photo has no prompt: the judge gets an empty one
+      const photo = setup(false, { textureJudge: true });
+      const gen = await photo.studio.startFromPhoto('u1', await png('#c84'));
+      photo.models.set('model-1', { status: 'done', output: modelOutput(8, 'preview') });
+      await photo.studio.get('u1', gen.id);
+      await photo.studio.keep('u1', gen.id);
+      photo.models.set('model-2', { status: 'done', output: modelOutput(8, 'final') });
+      expect((await photo.studio.get('u1', gen.id)).textures?.status).toBe('running');
+      expect(photo.started.at(-1)).toMatchObject({
+        kind: 'textures',
+        input: { seed: 8, judge: { prompt: '' } },
+      });
+
+      // Off by default
+      const off = setup();
+      await finished(off);
+      expect(off.started.at(-1)!.kind).toBe('textures');
+      expect(off.started.at(-1)!.input).not.toHaveProperty('judge');
+    });
+
+    it("keeps the judge's pick, numbered as the panel numbers the textures", async () => {
+      const t = setup(true, { textureJudge: true });
+      let gen = await finished(t);
+      expect(gen.textures).toMatchObject({
+        status: 'running',
+        recommended: null,
+        chosen: null,
+        judgeError: null,
+      });
+      t.textures.set(texturesJob(t, gen), judged({ textureSeed: 6242, why }));
+      gen = await t.studio.get('u1', gen.id);
+      // 1 is the final's own texture, so the second new one is 3
+      expect(gen).toMatchObject({ status: 'done', error: null });
+      expect(gen.textures).toMatchObject({
+        status: 'done',
+        error: null,
+        recommended: { number: 3, why, applied: false },
+        chosen: null,
+        judgeError: null,
+      });
+      expect(gen.textures!.options).toHaveLength(3);
+      expect(t.store.rows.get(gen.id)).toMatchObject({
+        texturesPick: 3,
+        texturesPickWhy: why,
+        texturesJudgeError: null,
+        texturesPickApplied: false,
+        texturesChosen: null,
+      });
+      expect(warn).not.toHaveBeenCalled();
+
+      // The final's own texture is 1, and a pick without a reason has none
+      const own = await finished(t, 'u2');
+      t.textures.set(texturesJob(t, own), judged({ textureSeed: null, why: '' }));
+      expect((await t.studio.get('u2', own.id)).textures?.recommended).toEqual({
+        number: 1,
+        why: null,
+        applied: false,
+      });
+    });
+
+    it('finds the pick among the textures that were kept, by its seed', async () => {
+      const t = setup(true, {
+        textureJudge: true,
+        // The worker's copy of texture 3 is gone
+        fetchImpl: async (url) =>
+          url.endsWith('texture-3.glb')
+            ? new Response('Not found', { status: 404 })
+            : new Response(`fetched ${url}`),
+      });
+      const texture = (id: string, k: number, textureSeed: number) => ({
+        file: { url: `https://r2.test/ai/${id}/final-4242-texture-${k}.glb` },
+        textureSeed,
+        triangles: 96_000,
+        bytes: 20,
+      });
+
+      // Texture 6242 failed on the worker, so its last texture is the panel's 3, not 4
+      let gen = await finished(t);
+      t.textures.set(texturesJob(t, gen), {
+        status: 'done',
+        output: texturesOutput([], {
+          textures: [texture(gen.id, 1, 5242), texture(gen.id, 4, 7242)],
+          errors: [{ textureSeed: 6242, message: 'CUDA out of memory' }],
+          judge: { textureSeed: 7242, why },
+        }),
+      });
+      gen = await t.studio.get('u1', gen.id);
+      expect(gen.textures!.options.map((option) => option.textureSeed)).toEqual([5242, 7242]);
+      expect(gen.textures).toMatchObject({
+        error: 'texture 6242: CUDA out of memory',
+        recommended: { number: 3, why },
+        judgeError: null,
+      });
+
+      // The picked texture couldn't be copied: the others are offered, without a pick
+      let lost = await finished(t, 'u2');
+      t.textures.set(texturesJob(t, lost), {
+        status: 'done',
+        output: texturesOutput([], {
+          textures: [texture(lost.id, 1, 5242), texture(lost.id, 3, 7242)],
+          judge: { textureSeed: 7242, why },
+        }),
+      });
+      lost = await t.studio.get('u2', lost.id);
+      expect(lost.textures!.options.map((option) => option.textureSeed)).toEqual([5242]);
+      expect(lost.textures).toMatchObject({
+        status: 'done',
+        recommended: null,
+        judgeError: "the judge picked texture 7242, which isn't offered",
+      });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(`${lost.id} has no recommended texture`),
+        "the judge picked texture 7242, which isn't offered",
+      );
+    });
+
+    it("keeps the judge's error as a note, and offers the textures as without it", async () => {
+      const t = setup(true, { textureJudge: true });
+      let gen = await finished(t);
+      t.textures.set(texturesJob(t, gen), {
+        status: 'done',
+        output: texturesOutput([5242, 6242, 7242], {
+          judgeError: 'judge failed: CUDA out of memory',
+        }),
+      });
+      gen = await t.studio.get('u1', gen.id);
+      expect(gen).toMatchObject({ status: 'done', error: null });
+      expect(gen.textures).toMatchObject({
+        status: 'done',
+        error: null,
+        recommended: null,
+        chosen: null,
+        judgeError: 'judge failed: CUDA out of memory',
+      });
+      expect(gen.textures!.options).toHaveLength(3);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(gen.id),
+        'judge failed: CUDA out of memory',
+      );
+
+      // A 3D worker from before the judge answers without it
+      const old = await finished(t, 'u2');
+      t.textures.set(texturesJob(t, old), {
+        status: 'done',
+        output: texturesOutput([5242, 6242, 7242]),
+      });
+      expect((await t.studio.get('u2', old.id)).textures).toMatchObject({
+        status: 'done',
+        recommended: null,
+        judgeError: expect.stringContaining("the judge's answer didn't come back"),
+      });
+
+      // With the judge off, a pick from a job started while it was on is left out
+      const off = setup();
+      const quiet = await finished(off);
+      off.textures.set(texturesJob(off, quiet), judged({ textureSeed: 5242, why }));
+      expect((await off.studio.get('u1', quiet.id)).textures).toMatchObject({
+        status: 'done',
+        recommended: null,
+        judgeError: null,
+      });
+      expect(off.store.rows.get(quiet.id)!.texturesPick).toBeNull();
+    });
+
+    it('records the pick the panel applied, and the texture the creator chose', async () => {
+      const t = setup(true, { textureJudge: true });
+      let gen = await finished(t);
+      t.textures.set(texturesJob(t, gen), judged({ textureSeed: 6242, why }));
+      await t.studio.get('u1', gen.id);
+
+      gen = await t.studio.chooseTexture('u1', gen.id, 3, 'judge');
+      expect(gen.textures).toMatchObject({
+        recommended: { number: 3, why, applied: true },
+        chosen: null,
+      });
+      gen = await t.studio.chooseTexture('u1', gen.id, 2, 'creator');
+      expect(gen.textures).toMatchObject({ recommended: { applied: true }, chosen: 2 });
+      // The last choice counts, the final's own texture included
+      gen = await t.studio.chooseTexture('u1', gen.id, 1, 'creator');
+      expect(t.store.rows.get(gen.id)).toMatchObject({
+        texturesPick: 3,
+        texturesPickApplied: true,
+        texturesChosen: 1,
+      });
+      // As the panel reads it back after a reload
+      expect((await t.studio.get('u1', gen.id)).textures).toMatchObject({
+        recommended: { number: 3, applied: true },
+        chosen: 1,
+      });
+
+      // Only a texture there is, and only the judge's pick as the judge's
+      for (const number of [0, 5, 2.5]) {
+        await expect(t.studio.chooseTexture('u1', gen.id, number, 'creator')).rejects.toThrow(
+          'There is no such texture',
+        );
+      }
+      await expect(t.studio.chooseTexture('u1', gen.id, 2, 'judge')).rejects.toThrow(
+        "That texture isn't the recommended one",
+      );
+      await expect(t.studio.chooseTexture('u2', gen.id, 2, 'creator')).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+
+      // Nor while the textures are made, nor past the ones made when some failed
+      const running = await finished(t, 'u3');
+      await expect(t.studio.chooseTexture('u3', running.id, 1, 'creator')).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+      t.textures.set(texturesJob(t, running), {
+        status: 'done',
+        output: texturesOutput([5242, 7242], {
+          errors: [{ textureSeed: 6242, message: 'CUDA out of memory' }],
+        }),
+      });
+      await t.studio.get('u3', running.id);
+      expect((await t.studio.chooseTexture('u3', running.id, 3, 'creator')).textures?.chosen).toBe(
+        3,
+      );
+      await expect(t.studio.chooseTexture('u3', running.id, 4, 'creator')).rejects.toThrow(
+        'There is no such texture',
+      );
+      // Without a pick there is none to apply
+      await expect(t.studio.chooseTexture('u3', running.id, 2, 'judge')).rejects.toThrow(
+        "That texture isn't the recommended one",
+      );
+    });
+
+    it('forgets the pick and the choice with the final they were for', async () => {
+      const t = setup(true, { textureJudge: true });
+      let gen = await finished(t);
+      t.textures.set(texturesJob(t, gen), judged({ textureSeed: 6242, why }));
+      await t.studio.get('u1', gen.id);
+      await t.studio.chooseTexture('u1', gen.id, 3, 'judge');
+      await t.studio.chooseTexture('u1', gen.id, 2, 'creator');
+
+      // Another picture: the old final's textures go, with their pick and the choice
+      gen = await t.studio.pick('u1', gen.id, 0);
+      expect(gen).toMatchObject({ status: 'previewing', textures: null });
+      expect(t.store.rows.get(gen.id)).toMatchObject({
+        texturesPick: null,
+        texturesPickWhy: null,
+        texturesJudgeError: null,
+        texturesPickApplied: false,
+        texturesChosen: null,
+      });
+
+      // A choice recorded late (a slow request) doesn't carry over to the next final
+      await t.store.update(gen.id, { texturesPickApplied: true, texturesChosen: 2 });
+      t.models.set([...t.models.keys()].at(-1)!, {
+        status: 'done',
+        output: modelOutput(5353, 'preview'),
+      });
+      await t.studio.get('u1', gen.id);
+      await t.studio.keep('u1', gen.id);
+      t.models.set([...t.models.keys()].at(-1)!, {
+        status: 'done',
+        output: { ...modelOutput(5353, 'final'), pipeline: '1024_cascade' },
+      });
+      gen = await t.studio.get('u1', gen.id);
+      expect(gen.textures).toMatchObject({ status: 'running', recommended: null, chosen: null });
+      expect(t.store.rows.get(gen.id)).toMatchObject({
+        texturesPickApplied: false,
+        texturesChosen: null,
+      });
+    });
+
+    it('makes a fake pick on the mock workers (AI_WORKERS_MOCK=1)', async () => {
+      const store = memoryStore();
+      const storage = memoryStorage();
+      const studio = new AIStudio({
+        workers: new MockWorkers(0),
+        store,
+        storage,
+        textureJudge: true,
+      });
+      let gen = await studio.startFromPrompt('u1', 'a brass ship compass');
+      gen = await studio.get('u1', gen.id);
+      gen = await studio.pick('u1', gen.id, gen.recommended!);
+      expect((await studio.get('u1', gen.id)).status).toBe('reviewing');
+      await studio.keep('u1', gen.id);
+      expect((await studio.get('u1', gen.id)).textures?.status).toBe('running');
+      gen = await studio.get('u1', gen.id);
+      // The second new texture: texture 3 in the panel
+      expect(gen.textures).toMatchObject({
+        status: 'done',
+        recommended: { number: 3, why: MOCK_JUDGE_WHY, applied: false },
+        judgeError: null,
+      });
+      expect(gen.textures!.options[1]!.textureSeed - store.rows.get(gen.id)!.seed!).toBe(2000);
     });
   });
 });
