@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import inspect
 import time
 import traceback
@@ -66,8 +67,8 @@ def handle_job(
     Input: ``{"image_url" | "image_base64", "mode": "preview" | "final", "seed"?, "request_id"?, "views"?}``,
     where ``views`` are other pictures of the object: ``[{"image_url" | "image_base64", "azimuth",
     "elevation", "weight"?}]``. Reuse the preview's ``seed`` and ``views`` for the final pass so the final
-    refines the approved shape. ``"mode": "textures"`` with the final's input (its ``seed`` required) and
-    ``"count"``? makes more textures for the final's shape instead: see make_textures.
+    refines the approved shape. ``"mode": "textures"`` with the final's input (its ``seed`` required),
+    ``"count"``? and ``"pipeline"``? makes more textures for the final's shape instead: see make_textures.
     """
     try:
         spec = parse_job(job.get("input"), fallback_id=str(job.get("id", "job")), fetch=fetch)
@@ -139,10 +140,16 @@ def make_textures(spec: Job, runtime: Runtime, storage: Storage, pack: Pack) -> 
     made, the job fails. A runtime that can't retexture (the Pixal3D worker's) is refused before anything runs.
     Each texture's ``export`` says how its export ran (Trellis2Runtime's last_export): the first runs to_glb
     in full and keeps the shape's texture layout, the others only sample their texture onto it ("rebake").
+
+    A final that fell back to the preview's pipeline (``spec.pipeline``, "512") has that pipeline's shape, so
+    the shape is made with it at once, as the fallback made it: the final's preset with that pipeline, run by
+    the same generate(). The cascade would make another shape, or run out of memory again first.
     """
     if not callable(getattr(runtime, "retexture", None)):
         return {"error": TEXTURES_NEED_TRELLIS2}
     preset = PRESETS["final"]
+    if spec.pipeline is not None:
+        preset = dataclasses.replace(preset, pipeline_type=spec.pipeline)
     # Each step's seconds, summed over the textures. A failed step counts too: its GPU time was spent
     timings = dict.fromkeys(("generate_s", "retexture_s", "export_s", "pack_s", "upload_s"), 0.0)
 

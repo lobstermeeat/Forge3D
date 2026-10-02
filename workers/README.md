@@ -245,7 +245,7 @@ final's settings, and reports `"pipeline": "512"`. A final that runs out while T
 already off the GPU (deployed in low-VRAM mode, or asleep beside Pixal3D) goes to that pipeline at once.
 The same seed gives that pipeline the shape the user approved in the preview, and its memory use is known
 to fit, while TRELLIS.2's cascade has no cheaper setting for a 1024³ final (see `FALLBACK_PIPELINE` in
-`trellis2/forge3d_worker/pipeline.py`).
+`trellis2/forge3d_worker/settings.py`).
 
 `model` (Modal only) is the model that made it: `"trellis2"`, or `"pixal3d"` for a final when the
 recipe is on. With the recipe on, a final that TRELLIS.2 made instead says why in `fallback`: Pixal3D's
@@ -371,7 +371,12 @@ data). A `"textures"` job makes those textures for a final the creator already h
 It takes what the final took: the same picture, the final's `seed` (required here: another seed would make
 another shape) and the final's `views`, if it had any. `count` is how many textures to make, 1 to 4 (3 if
 left out). The worker makes the final's shape again, as the final job did (the final's preset, seed and
-views), but doesn't export its texture: the creator has it. Then, for k = 1 to `count`, TRELLIS.2's texture
+views), but doesn't export its texture: the creator has it. `pipeline` (optional) is the final's: send
+`"512"` for a final that fell back to it (its result said `"pipeline": "512"`), and the shape is made with
+that pipeline at once, as the fallback made it (the final's preset with the fallback's pipeline, through the
+same `generate()`; `FALLBACK_PIPELINE` in `settings.py`). The cascade would make another shape, or run out
+of memory again first. `"1024_cascade"` is the same as leaving it out, and anything else is invalid input.
+Previews and finals ignore `count` and `pipeline`. Then, for k = 1 to `count`, TRELLIS.2's texture
 flow alone samples a new texture for that shape (`Trellis2Runtime.retexture`), from the picture alone, with
 its noise drawn from seed `seed + 1000 * k` (the rolls' seeds; `TEXTURE_SEED_STEP` in
 `trellis2/forge3d_worker/settings.py`). Each texture is exported and packed as a final is (to_glb,
@@ -425,8 +430,9 @@ again (give or take the GPU's own nondeterminism) and stores them under the same
   "generation failed: none of the 3 textures was made: …"}`), and so it does when the shape can't be made.
   After a GPU fault the container is replaced once the job is done, either way.
 - `pipeline` is the shape's: `"1024_cascade"`, or `"512"` when the cascade ran out of GPU memory even in
-  low-VRAM mode. The textures are then for the `512` shape, which is the final's only if the final fell back
-  too (its own `pipeline` says).
+  low-VRAM mode, or when the job asked for `"512"`. Textures for a `512` shape fit the final only if the
+  final's own `pipeline` was `"512"` too, so a job for a final that fell back should say so; the server
+  checks the two match either way.
 - `timings`: the shape's generation, then each step summed over the textures, failed attempts included.
   `views_used` and `model` (Modal only) are as for a final.
 - **Pixal3D finals.** Retexturing is TRELLIS.2's, and a recipe final has Pixal3D's shape, so with
