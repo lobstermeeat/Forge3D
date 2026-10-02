@@ -1558,6 +1558,23 @@
   border-radius: 7px;
   background: var(--bg3);
 }
+/* The picture drawn from 6 sides (the multiview worker), shown while the model is built from it */
+.f3-ai-views {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+}
+.f3-ai-views img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 5px;
+  background: var(--bg3);
+}
 .f3-ai-result {
   display: flex;
   flex-direction: column;

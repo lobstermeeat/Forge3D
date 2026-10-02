@@ -11,11 +11,13 @@ import { useAIStore } from '@/stores/aiStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { logOutput } from '@/stores/outputStore';
 // Type only, like AppRouter in api/trpc.ts: no server code is bundled
-import type { GenerationView as Generation } from '../../../../apps/server/src/services/ai/studio';
+import type {
+  GenerationView as Generation,
+  RunningStatus,
+} from '../../../../apps/server/src/services/ai/studio';
 
 type Status = Generation['status'];
 
-const RUNNING: ReadonlySet<Status> = new Set(['drawing', 'previewing', 'finishing']);
 const MAX_PROMPT = 500;
 const EXAMPLE = 'a wooden treasure chest with iron bands';
 const DEFAULT_CREDITS = [
@@ -24,11 +26,18 @@ const DEFAULT_CREDITS = [
   'Pictures: FLUX.1 [schnell] (Apache-2.0)',
 ];
 
-/** What each running step is doing, and how long it usually takes. */
-const STEP: Record<'drawing' | 'previewing' | 'finishing', { title: string; detail: string }> = {
+/**
+ * What each running step is doing, and how long it usually takes. Keyed by the server's running
+ * steps, so a new one can't be left out.
+ */
+const STEP: Record<RunningStatus, { title: string; detail: string }> = {
   drawing: {
     title: 'Drawing 4 pictures',
     detail: 'Usually 10–40 s. After a quiet spell the first run takes a minute or two.',
+  },
+  viewing: {
+    title: 'Drawing the other sides',
+    detail: 'Usually 20–60 s. The 3D preview is then built from every side, not just the front.',
   },
   previewing: {
     title: 'Building a 3D preview',
@@ -39,6 +48,7 @@ const STEP: Record<'drawing' | 'previewing' | 'finishing', { title: string; deta
     detail: 'Usually 1–2 min. It replaces the preview in your scene, where it stands.',
   },
 };
+const RUNNING: ReadonlySet<Status> = new Set(Object.keys(STEP) as RunningStatus[]);
 
 function modelData(g: Generation, quality: 'preview' | 'final'): ModelData {
   const file = quality === 'final' ? g.final! : g.preview!;
@@ -69,6 +79,13 @@ function errorText(err: unknown): string {
 function issuesText(issues: string[] | undefined): string | undefined {
   if (!issues?.length) return undefined;
   return issues.map((issue) => issue.charAt(0).toUpperCase() + issue.slice(1)).join('\n');
+}
+
+/** Which side a view shows, e.g. "Front" or "Turned 45°": azimuth 0 is the picture's front. */
+function sideName({ azimuth, elevation }: Generation['views'][number]): string {
+  const around = ((Math.round(azimuth) % 360) + 360) % 360;
+  const side = around === 0 ? 'Front' : around === 180 ? 'Back' : `Turned ${around}°`;
+  return elevation ? `${side}, ${Math.round(elevation)}° from above` : side;
 }
 
 export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?: string }) {
@@ -129,6 +146,15 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
     warmed.current = true;
     warm({ worker: 'references' });
   }, [signedIn, prompts, warm]);
+
+  // A photo's first job draws its other sides (with the multiview worker on), so start that GPU
+  // while the user chooses the photo. The server starts each GPU at most every 2 minutes.
+  const multiview = capabilities.data?.multiview ?? false;
+  const choosingPhoto =
+    !currentId && (mode === 'photo' || (!!capabilities.data && !capabilities.data.prompts));
+  useEffect(() => {
+    if (signedIn && multiview && choosingPhoto) warm({ worker: 'multiview' });
+  }, [signedIn, multiview, choosingPhoto, warm]);
 
   // After a reload, carry on with this scene's unfinished generation (once per page load)
   useEffect(() => {
@@ -279,7 +305,8 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
             Draw 4 pictures
           </button>
           <p className="f3-ai-fine">
-            You pick the one you like, then get a 3D preview in about a minute.
+            You pick the one you like, then get a 3D preview in{' '}
+            {multiview ? 'a minute or two' : 'about a minute'}.
           </p>
         </form>
       ) : (
@@ -371,6 +398,21 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
 
         {running && g.image && g.status !== 'drawing' && (
           <img className="f3-ai-source" src={g.image} alt="The picture being made into 3D" />
+        )}
+
+        {running && g.views.length > 0 && (
+          <ul className="f3-ai-views" aria-label="The other sides the model is built from">
+            {g.views.map((v) => (
+              <li key={v.url}>
+                <img src={v.url} alt={sideName(v)} title={sideName(v)} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {g.status === 'previewing' && g.viewsError && (
+          <p className="f3-ai-fine">
+            The other sides couldn’t be drawn this time, so the back is guessed from the picture.
+          </p>
         )}
 
         {g.status === 'reviewing' && g.preview && (
@@ -505,7 +547,8 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
     <div className="f3-ai">
       {caps?.mock && (
         <p className="f3-ai-mock">
-          <Icon name="info" size={13} /> Mock workers: pictures and models are stand-ins.
+          <Icon name="info" size={13} /> Mock workers:{' '}
+          {multiview ? 'pictures, views and models' : 'pictures and models'} are stand-ins.
         </p>
       )}
       {currentId && !g && gen.isError ? (

@@ -11,7 +11,7 @@ export { SelfHostedProvider, createSelfHostedProvider } from './providers/selfHo
 export { JobEndpoint } from './providers/jobEndpoint';
 export { MockWorkers } from './providers/mock';
 export { AIStudio, StudioError } from './studio';
-export type { GenerationView, GenerationStatus } from './studio';
+export type { GenerationView, GenerationStatus, RunningStatus } from './studio';
 export type {
   AIProvider,
   GenerationRequest,
@@ -47,13 +47,31 @@ export function createStudioWorkers(
   return createSelfHostedProvider(env);
 }
 
+/**
+ * AI_MULTIVIEW=1: the multiview worker draws the chosen picture from 6 sides, and the preview and
+ * final are built from those views too, so the model's back isn't invented. Off by default.
+ */
+export function multiviewEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env['AI_MULTIVIEW']?.trim() === '1';
+}
+
 let studio: AIStudio | null = null;
 
 export function getStudio(): AIStudio {
-  studio ??= new AIStudio({
-    workers: createStudioWorkers(),
-    store: drizzleGenerationStore(db),
-    storage: getStorage(),
-  });
+  if (!studio) {
+    const workers = createStudioWorkers();
+    const multiview = multiviewEnabled();
+    if (multiview && workers && !workers.multiview) {
+      console.warn(
+        '[AI] AI_MULTIVIEW=1, but there is no multiview worker (on RunPod, set RUNPOD_MULTIVIEW_ENDPOINT_ID): models are made from the picture alone',
+      );
+    }
+    studio = new AIStudio({
+      workers,
+      store: drizzleGenerationStore(db),
+      storage: getStorage(),
+      multiview,
+    });
+  }
   return studio;
 }

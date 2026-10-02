@@ -84,15 +84,41 @@ export interface ModelOutput {
   seconds: number;
   /** Attribution to show with the model, e.g. "Built with DINOv3" (a license requirement). */
   credits: string[];
+  /**
+   * How many views the model was built from besides the picture; left out by 3D workers from
+   * before views, which ignore them.
+   */
+  viewsUsed?: number;
 }
+
+/** Where a view of the object was drawn from, in degrees (see workers/README.md, multiview). */
+export interface ViewAngle {
+  /** Around the object; 0 is the picture's front */
+  azimuth: number;
+  /** Above the object's middle; 0 is level with it */
+  elevation: number;
+}
+
+/** The picture drawn from other sides by the multiview worker (MV-Adapter). */
+export interface ViewsOutput {
+  views: (ViewAngle & { file: WorkerFile })[];
+  /** GPU seconds the job took */
+  seconds: number;
+}
+
+/** A view sent to the 3D worker with the picture, so it builds the back and sides from it. */
+export type ModelView = ViewAngle & { image: Buffer };
 
 export type WorkerJobState<T> =
   | { status: 'running' }
   | { status: 'done'; output: T }
   | { status: 'failed'; message: string };
 
-/** The GPU workers the Studio uses: FLUX for the pictures, TRELLIS.2 for the models. */
-export type WorkerKind = 'references' | 'model';
+/**
+ * The GPU workers the Studio uses: FLUX for the pictures, MV-Adapter for the picture's other
+ * sides, TRELLIS.2 for the models.
+ */
+export type WorkerKind = 'references' | 'multiview' | 'model';
 
 /**
  * What the Studio's AI panel needs from the GPU workers. Every step is a job that is started
@@ -102,15 +128,24 @@ export interface StudioWorkers {
   readonly name: string;
   /** Text prompts need the reference-image worker; photos only need TRELLIS.2. */
   readonly prompts: boolean;
+  /** Whether the multiview worker is there to draw the picture from other sides. */
+  readonly multiview: boolean;
   /**
    * Starts a worker's GPU before a job needs it, when the host can (about 45 s for FLUX and
    * 100 s for TRELLIS.2 from cold). Resolves once it's asked, not once the GPU is ready.
    */
   warm?(kind: WorkerKind): Promise<void>;
+  /** Stops a job nobody waits for any more, when the host can (it bills while it runs). */
+  cancel?(kind: WorkerKind, jobId: string): Promise<void>;
   startReferences(input: { prompt: string; count: number; requestId: string }): Promise<string>;
   references(jobId: string): Promise<WorkerJobState<ReferencesOutput>>;
+  /** Draws the picture from 6 sides (the multiview worker); only when `multiview` is true. */
+  startViews(input: { image: Buffer; requestId: string }): Promise<string>;
+  views(jobId: string): Promise<WorkerJobState<ViewsOutput>>;
   startModel(input: {
     image: Buffer;
+    /** The picture from other sides, for the back and sides; the picture stays the main image */
+    views?: ModelView[];
     mode: GenerationQuality;
     seed?: number;
     requestId: string;
