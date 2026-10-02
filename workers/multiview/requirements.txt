@@ -1,0 +1,16 @@
+# Runtime dependencies on top of torch 2.6.0 and torchvision 0.21.0 (cu124), which the image installs.
+# MV-Adapter (vendored in mvadapter/): the versions its own image-to-multiview demo pins
+# (huggingface.co/spaces/VAST-AI/MV-Adapter-I2MV-SDXL)
+diffusers==0.31.0
+transformers==4.46.3
+accelerate==1.1.1
+huggingface_hub>=0.25,<1
+safetensors>=0.4
+einops>=0.8
+# BiRefNet (background removal, loaded with trust_remote_code)
+timm>=1.0
+kornia>=0.7
+# Worker (R2 storage)
+boto3>=1.34
+pillow>=10.3
+numpy<2.3

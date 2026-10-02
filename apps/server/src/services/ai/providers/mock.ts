@@ -2,14 +2,25 @@ import sharp from 'sharp';
 import type {
   GenerationQuality,
   ModelOutput,
+  ModelView,
   ReferencesOutput,
   StudioWorkers,
+  ViewsOutput,
   WorkerJobState,
+  WorkerKind,
 } from '../types';
 
 type Job =
   | { kind: 'references'; readyAt: number; prompt: string; count: number }
-  | { kind: 'model'; readyAt: number; mode: GenerationQuality; seed: number; noObject: boolean };
+  | { kind: 'views'; readyAt: number; noViews: boolean }
+  | {
+      kind: 'model';
+      readyAt: number;
+      mode: GenerationQuality;
+      seed: number;
+      noObject: boolean;
+      viewsUsed: number;
+    };
 
 const MOCK_CREDITS = ['Mock model for development: no AI ran'];
 /** Ratings like the FLUX worker's, by position, so the second picture is always the best */
@@ -19,17 +30,22 @@ const MOCK_RATINGS: { score: number; issues: string[] }[] = [
   { score: 0.37, issues: ['cut off at the bottom', 'more than one object'] },
   { score: 0.55, issues: ['cut off at the top'] },
 ];
+/** Where the multiview worker draws its 6 views from (workers/README.md), all level */
+export const MOCK_VIEW_AZIMUTHS = [0, 45, 90, 180, 270, 315];
 
 /**
- * Stand-in GPU workers for development and browser tests (AI_WORKERS_MOCK=1): pictures and
- * models appear after a short delay, with no GPU, network or cost. The pictures are rated like
- * the real worker rates them, with the second always the best. A prompt containing "fail" fails
- * its pictures, and a photo run fails when the photo is very small, so error states can be tried
- * too. Never enable it in production.
+ * Stand-in GPU workers for development and browser tests (AI_WORKERS_MOCK=1): pictures, views
+ * and models appear after a short delay, with no GPU, network or cost. The pictures are rated
+ * like the real worker rates them, with the second always the best, and the views are 6 cutouts
+ * of a box seen from around it. A prompt containing "fail" fails its pictures, a photo under
+ * 128 px gets no views (the model is then made from the photo alone), and a photo under 64 px
+ * fails its model too, so the error and fallback states can be tried. Never enable it in
+ * production.
  */
 export class MockWorkers implements StudioWorkers {
   readonly name = 'mock';
   readonly prompts = true;
+  readonly multiview = true;
   private jobs = new Map<string, Job>();
   private next = 1;
 
@@ -61,8 +77,39 @@ export class MockWorkers implements StudioWorkers {
     return { status: 'done', output: { images } };
   }
 
+  async startViews(input: { image: Buffer }): Promise<string> {
+    const { width = 0 } = await sharp(input.image).metadata();
+    return this.add({
+      kind: 'views',
+      readyAt: Date.now() + this.delayMs,
+      // A small photo stands in for a multiview job that failed, so the fallback can be tried
+      noViews: width < 128,
+    });
+  }
+
+  async views(jobId: string): Promise<WorkerJobState<ViewsOutput>> {
+    const job = this.jobs.get(jobId);
+    if (job?.kind !== 'views') return { status: 'failed', message: `Unknown job ${jobId}` };
+    if (Date.now() < job.readyAt) return { status: 'running' };
+    if (job.noViews) {
+      return {
+        status: 'failed',
+        message: 'The mock workers draw no views of a photo under 128 px',
+      };
+    }
+    const views = await Promise.all(
+      MOCK_VIEW_AZIMUTHS.map(async (azimuth) => ({
+        file: { data: await mockView(azimuth) },
+        azimuth,
+        elevation: 0,
+      })),
+    );
+    return { status: 'done', output: { views, seconds: 1 } };
+  }
+
   async startModel(input: {
     image: Buffer;
+    views?: ModelView[];
     mode: GenerationQuality;
     seed?: number;
   }): Promise<string> {
@@ -74,6 +121,7 @@ export class MockWorkers implements StudioWorkers {
       seed: input.seed ?? 42 + this.next,
       // A tiny photo stands in for "no object found", so the panel's error state can be tried
       noObject: width < 64,
+      viewsUsed: input.views?.length ?? 0,
     });
   }
 
@@ -98,12 +146,19 @@ export class MockWorkers implements StudioWorkers {
         bytes: glb.length,
         seconds: job.mode === 'final' ? 3 : 1.5,
         credits: MOCK_CREDITS,
+        // Like a 3D worker that takes views
+        viewsUsed: job.viewsUsed,
       },
     };
   }
 
   /** Nothing to start: the mock has no cold start. */
   async warm(): Promise<void> {}
+
+  /** Forgets the job, so polling it finds nothing. */
+  async cancel(_kind: WorkerKind, jobId: string): Promise<void> {
+    this.jobs.delete(jobId);
+  }
 
   private add(job: Job): string {
     const id = `mock-${this.next++}`;
@@ -124,6 +179,26 @@ async function mockPicture(prompt: string, index: number): Promise<Buffer> {
     <rect x="${156 + index * 6}" y="190" width="200" height="200" rx="18" fill="${colour}"/>
     <polygon points="136,200 256,${96 + index * 8} 376,200" fill="${colour}" opacity="0.8"/>
     <text x="256" y="470" font-family="sans-serif" font-size="22" text-anchor="middle" fill="#55524c">${label}</text>
+  </svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+/**
+ * A 256 px "view" like the multiview worker's: a PNG cutout (transparent around the object) of a
+ * box with a roof, 200 wide and 120 deep, seen from `azimuth` degrees round it, labelled with the
+ * angle. Views of the front are orange, of the sides green and of the back blue, so it's easy to
+ * tell which is which.
+ */
+async function mockView(azimuth: number): Promise<Buffer> {
+  const angle = (azimuth * Math.PI) / 180;
+  const facing = Math.cos(angle);
+  const width = Math.round(200 * Math.abs(facing) + 120 * Math.abs(Math.sin(angle)));
+  const left = 128 - width / 2;
+  const colour = facing > 0.01 ? '#e8703a' : facing < -0.01 ? '#3a8ee8' : '#48b86a';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+    <rect x="${left}" y="110" width="${width}" height="110" rx="8" fill="${colour}"/>
+    <polygon points="${left - 8},116 128,40 ${left + width + 8},116" fill="${colour}" opacity="0.8"/>
+    <text x="128" y="180" font-family="sans-serif" font-size="26" text-anchor="middle" fill="#fff">${azimuth}°</text>
   </svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();
 }

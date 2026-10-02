@@ -11,7 +11,9 @@ interface Credit {
  */
 export const AI_CREDITS: Credit[] = [
   { name: 'Built with DINOv3', detail: 'Image understanding · Meta · DINOv3 License' },
-  { name: 'TRELLIS.2', detail: 'Image to 3D · Microsoft · MIT' },
+  { name: 'TRELLIS.2', detail: 'Image to 3D (previews) · Microsoft · MIT' },
+  { name: 'Pixal3D', detail: 'Image to 3D (finals), on TRELLIS.2 · Tencent ARC · MIT' },
+  { name: 'MoGe-2', detail: "The picture's camera · Microsoft · MIT" },
   { name: 'FLUX.1 [schnell]', detail: 'Reference images · Black Forest Labs · Apache-2.0' },
   { name: 'BiRefNet', detail: 'Background removal · MIT' },
 ];

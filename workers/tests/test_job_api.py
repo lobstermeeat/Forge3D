@@ -413,10 +413,10 @@ def test_the_deployed_api_warms_each_worker_with_its_own_class(monkeypatch):
 
     # Building it fails if either class has no warm method (Modal raises AttributeError)
     monkeypatch.setattr(job_api, "app_for_token", lambda token, calls: calls)
-    assert modal_app.api.local().workers == ("trellis2", "reference")
+    assert modal_app.api.local().workers == ("trellis2", "reference", "multiview")
 
     spawned = []
-    for cls in ("Trellis2", "FluxSchnell"):
+    for cls in ("Trellis2", "FluxSchnell", "MultiView"):
         methods = SimpleNamespace(
             generate=FakeMethod(f"{cls}.generate", spawned), warm=FakeMethod(f"{cls}.warm", spawned)
         )
@@ -430,4 +430,6 @@ def test_the_deployed_api_warms_each_worker_with_its_own_class(monkeypatch):
         ("Trellis2.generate", {"input": {}}),
         ("FluxSchnell.warm",),
         ("FluxSchnell.generate", {"input": {}}),
+        ("MultiView.warm",),
+        ("MultiView.generate", {"input": {}}),
     ]

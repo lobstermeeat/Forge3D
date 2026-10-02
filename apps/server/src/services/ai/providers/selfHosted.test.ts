@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createAIOrchestrator } from '../index';
+import { createAIOrchestrator, createStudioWorkers, multiviewEnabled } from '../index';
 import { JobEndpoint, type FetchLike } from './jobEndpoint';
 import { SelfHostedProvider, createSelfHostedProvider } from './selfHosted';
 
@@ -467,5 +467,155 @@ describe('SelfHostedProvider', () => {
         ],
       },
     });
+  });
+
+  it('draws the views on the multiview worker and sends them with the picture to TRELLIS.2', async () => {
+    const view = (azimuth: unknown, more: object) => ({
+      key: `ai/gen-6/view-${String(azimuth)}.png`,
+      azimuth,
+      ...more,
+    });
+    const api = fakeJobApi([
+      { id: 'fc-mv', status: 'IN_QUEUE' },
+      { id: 'fc-mv', status: 'IN_PROGRESS' },
+      {
+        id: 'fc-mv',
+        status: 'COMPLETED',
+        output: {
+          request_id: 'gen-6',
+          views: [
+            view(0, { elevation: 0, url: 'https://r2.test/ai/gen-6/view-0.png' }),
+            view(45, { elevation: 0, url: null, base64: 'iVBORw0KGgo=' }),
+            // A view that doesn't say where it was seen from is left out
+            view('90', { elevation: 0, url: 'https://r2.test/ai/gen-6/view-90.png' }),
+            view(180, { url: 'https://r2.test/ai/gen-6/view-180.png' }),
+          ],
+          camera: { type: 'orthographic' },
+          seconds: 18.4,
+        },
+      },
+      { id: 'fc-glb', status: 'IN_QUEUE' },
+      { id: 'fc-glb', status: 'COMPLETED', output: { ...trellisOutput, views_used: 2 } },
+      // A 3D worker from before views doesn't report them
+      { id: 'fc-old', status: 'COMPLETED', output: trellisOutput },
+      { id: 'fc-oom', status: 'COMPLETED', output: { error: 'generation failed: out of memory' } },
+      {
+        id: 'fc-r2',
+        status: 'COMPLETED',
+        output: { views: [view(0, { elevation: 0, url: null })], seconds: 1 },
+      },
+      { status: 'WARMING' },
+      { id: 'fc-mv', status: 'CANCELLED' },
+    ]);
+    const provider = createSelfHostedProvider(
+      { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
+      api.fetchImpl,
+    )!;
+    expect(provider.multiview).toBe(true);
+
+    const picture = Buffer.from('picture');
+    expect(await provider.startViews({ image: picture, requestId: 'gen-6' })).toBe('fc-mv');
+    expect(await provider.views('fc-mv')).toEqual({ status: 'running' });
+    expect(await provider.views('fc-mv')).toStrictEqual({
+      status: 'done',
+      output: {
+        views: [
+          { file: { url: 'https://r2.test/ai/gen-6/view-0.png' }, azimuth: 0, elevation: 0 },
+          { file: { data: Buffer.from('iVBORw0KGgo=', 'base64') }, azimuth: 45, elevation: 0 },
+        ],
+        seconds: 18.4,
+      },
+    });
+
+    const views = [
+      { image: Buffer.from('front'), azimuth: 0, elevation: 0 },
+      { image: Buffer.from('side'), azimuth: 45, elevation: 0 },
+    ];
+    expect(
+      await provider.startModel({ image: picture, views, mode: 'preview', requestId: 'gen-6' }),
+    ).toBe('fc-glb');
+    expect(await provider.model('fc-glb')).toMatchObject({
+      status: 'done',
+      output: { seed: 77, viewsUsed: 2 },
+    });
+    const old = await provider.model('fc-old');
+    expect(old.status === 'done' && 'viewsUsed' in old.output).toBe(false);
+    expect(await provider.views('fc-oom')).toEqual({
+      status: 'failed',
+      message: 'generation failed: out of memory',
+    });
+    await expect(provider.views('fc-r2')).rejects.toThrow(/without a public URL/);
+    await provider.warm('multiview');
+    await provider.cancel('multiview', 'fc-mv');
+
+    expect(
+      api.calls.map((call) => `${call.method} ${call.url.replace('https://w.modal.run', '')}`),
+    ).toEqual([
+      'POST /multiview/run',
+      'GET /multiview/status/fc-mv',
+      'GET /multiview/status/fc-mv',
+      'POST /trellis2/run',
+      'GET /trellis2/status/fc-glb',
+      'GET /trellis2/status/fc-old',
+      'GET /multiview/status/fc-oom',
+      'GET /multiview/status/fc-r2',
+      'POST /multiview/warm',
+      'POST /multiview/cancel/fc-mv',
+    ]);
+    expect(api.calls.every((call) => call.auth === 'Bearer worker-token')).toBe(true);
+    expect(api.calls[0]!.body).toEqual({
+      input: { image_base64: picture.toString('base64'), request_id: 'gen-6' },
+    });
+    // The views go inline, like the picture
+    expect(api.calls[3]!.body).toEqual({
+      input: {
+        image_base64: picture.toString('base64'),
+        views: [
+          { image_base64: Buffer.from('front').toString('base64'), azimuth: 0, elevation: 0 },
+          { image_base64: Buffer.from('side').toString('base64'), azimuth: 45, elevation: 0 },
+        ],
+        mode: 'preview',
+        request_id: 'gen-6',
+      },
+    });
+  });
+
+  it('has the multiview worker on RunPod only with RUNPOD_MULTIVIEW_ENDPOINT_ID', async () => {
+    const env = { RUNPOD_API_KEY: 'k', RUNPOD_TRELLIS2_ENDPOINT_ID: 'ep' };
+    const image = Buffer.from('picture');
+    const without = createSelfHostedProvider(env, fakeJobApi([]).fetchImpl)!;
+    expect(without.multiview).toBe(false);
+    await expect(without.startViews({ image, requestId: 'g' })).rejects.toThrow(
+      'The views need the multiview worker',
+    );
+
+    const api = fakeJobApi([
+      { id: 'mv-1', status: 'IN_QUEUE' },
+      { id: 'mv-1', status: 'CANCELLED' },
+    ]);
+    const provider = createSelfHostedProvider(
+      { ...env, RUNPOD_MULTIVIEW_ENDPOINT_ID: 'mv-ep' },
+      api.fetchImpl,
+    )!;
+    expect(provider.multiview).toBe(true);
+    expect(await provider.startViews({ image, requestId: 'g' })).toBe('mv-1');
+    // RunPod can't start a GPU early, but can stop a job
+    await provider.warm('multiview');
+    await provider.cancel('multiview', 'mv-1');
+    expect(api.calls.map((call) => `${call.method} ${call.url}`)).toEqual([
+      'POST https://api.runpod.ai/v2/mv-ep/run',
+      'POST https://api.runpod.ai/v2/mv-ep/cancel/mv-1',
+    ]);
+  });
+
+  it('turns the views step on only with AI_MULTIVIEW=1', () => {
+    expect(multiviewEnabled({})).toBe(false);
+    expect(multiviewEnabled({ AI_MULTIVIEW: '' })).toBe(false);
+    expect(multiviewEnabled({ AI_MULTIVIEW: '0' })).toBe(false);
+    expect(multiviewEnabled({ AI_MULTIVIEW: 'true' })).toBe(false);
+    expect(multiviewEnabled({ AI_MULTIVIEW: '1' })).toBe(true);
+    expect(multiviewEnabled({ AI_MULTIVIEW: ' 1\n' })).toBe(true);
+    // The mock workers have one, so development works end to end
+    expect(createStudioWorkers({ AI_WORKERS_MOCK: '1' })!.multiview).toBe(true);
   });
 });

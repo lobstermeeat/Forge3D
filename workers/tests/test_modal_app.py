@@ -27,9 +27,20 @@ def test_pins_match_the_runpod_dockerfile():
     assert f"pip install {modal_app.FLASH_ATTN_WHEEL}" in dockerfile
 
 
-def test_defines_both_workers_the_api_and_the_helpers():
+def test_pixal3d_pins_match_its_notice():
+    """The commits the image clones are the ones pixal3d/NOTICE.md records (and its download script's)."""
+    notice = (WORKERS / "pixal3d" / "NOTICE.md").read_text()
+    for commit in (modal_app.PIXAL3D_COMMIT, modal_app.NAF_COMMIT, modal_app.MOGE_COMMIT, modal_app.UTILS3D_COMMIT):
+        assert f"`{commit}`" in notice, commit
+    assert modal_app.PIXAL3D_WEIGHTS == "all"  # the recipe needs the multi-view set and the single-view one
+    assert modal_app.FINAL_MODEL in modal_app.FINAL_MODELS
+
+
+def test_defines_the_workers_the_api_and_the_helpers():
     assert isinstance(modal_app.Trellis2, modal.Cls)
     assert isinstance(modal_app.FluxSchnell, modal.Cls)
+    assert isinstance(modal_app.MultiView, modal.Cls)
+    assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d"]  # download order
     assert isinstance(modal_app.download_models, modal.Function)
     assert isinstance(modal_app.api, modal.Function)
     assert isinstance(modal_app.make_model, modal.Function)
@@ -112,6 +123,168 @@ def test_complete_downloads_are_kept_and_not_repeated(volume, monkeypatch):
         modal_app._require_weights("trellis2")
 
 
+# Two models in one container: TRELLIS.2 for previews, Pixal3D for finals
+
+
+def job(mode="final", **extra):
+    return {"id": "j", "input": {"image_base64": "aGk=", "mode": mode, **extra}}
+
+
+@pytest.mark.parametrize("payload", [{"mode": "preview"}, {"mode": "preview", "views": [{"azimuth": 90}]}])
+def test_previews_are_trellis2s_whatever_is_loaded(payload):
+    assert modal_app.choose_model({"input": payload}, "pixal3d", {"trellis2", "pixal3d"}) == "trellis2"
+
+
+@pytest.mark.parametrize("payload", [{"mode": "final"}, {}, {"mode": "final", "views": [{"azimuth": 90}]}])
+def test_finals_are_the_final_models_when_it_is_loaded(payload):
+    assert modal_app.choose_model({"input": payload}, "pixal3d", {"trellis2", "pixal3d"}) == "pixal3d"
+    assert modal_app.choose_model({"input": payload}, "pixal3d", {"trellis2"}) == "trellis2"  # not loaded
+    assert modal_app.choose_model({"input": payload}, "trellis2", {"trellis2", "pixal3d"}) == "trellis2"
+    assert modal_app.choose_model({"input": "garbage"}, "pixal3d", {"trellis2", "pixal3d"}) == "pixal3d"
+
+
+class FakeRuntime:
+    def __init__(self, name):
+        self.name = name
+        self.asleep = False
+        self.log = []
+
+    def sleep(self):
+        self.asleep = True
+        self.log.append("sleep")
+
+    def wake(self):
+        self.asleep = False
+        self.log.append("wake")
+
+
+def test_the_pool_builds_pixal3d_in_the_background_and_puts_trellis2_to_sleep_once():
+    trellis2, pixal3d = FakeRuntime("trellis2"), FakeRuntime("pixal3d")
+    pool = modal_app.ModelPool(trellis2)
+    assert pool.loaded == {"trellis2"} and pool.use("trellis2") is trellis2
+
+    pool.load_later("pixal3d", lambda: pixal3d)
+    assert pool.loaded == {"trellis2", "pixal3d"}  # a job may ask for it already; use() waits
+    assert pool.use("pixal3d") is pixal3d
+    assert trellis2.log == ["sleep"] and pool.resident == "pixal3d"
+    # From then on TRELLIS.2 serves asleep; nothing is swapped back and forth between jobs
+    assert pool.use("trellis2") is trellis2 and pool.use("pixal3d") is pixal3d
+    assert trellis2.log == ["sleep"] and pixal3d.log == [] and pool.resident == "pixal3d"
+
+
+def test_a_model_that_fails_to_load_is_counted_out(capsys):
+    trellis2 = FakeRuntime("trellis2")
+    pool = modal_app.ModelPool(trellis2)
+
+    def broken():
+        raise RuntimeError("pipeline_mv.json is missing")
+
+    pool.load_later("pixal3d", broken)
+    assert pool.use("pixal3d") is None
+    assert pool.loaded == {"trellis2"} and trellis2.log == []
+    assert "pixal3d could not be loaded, so finals are made with trellis2: RuntimeError: pipeline_mv.json" in capsys.readouterr().out
+
+    pool.count_out("pixal3d", "its weights are missing")
+    assert pool.loaded == {"trellis2"} and pool.use("pixal3d") is None
+
+
+class Handlers:
+    """Each model's handle_job, scripted: the result, or an error."""
+
+    def __init__(self, outcomes):
+        self.outcomes = dict(outcomes)
+        self.calls = []
+
+    def __getitem__(self, name):
+        def handle(job, runtime, storage, pack):
+            self.calls.append((name, runtime.name, job["input"]["mode"], storage, pack))
+            outcome = self.outcomes[name]
+            return dict(outcome.pop(0) if isinstance(outcome, list) else outcome)
+
+        return handle
+
+
+def pool_with_both():
+    trellis2, pixal3d = FakeRuntime("trellis2"), FakeRuntime("pixal3d")
+    pool = modal_app.ModelPool(trellis2)
+    pool.load_later("pixal3d", lambda: pixal3d)
+    return pool
+
+
+def test_finals_go_through_pixal3d_and_previews_through_trellis2():
+    pool = pool_with_both()
+    handlers = Handlers({"trellis2": {"glb": "t"}, "pixal3d": {"glb": "p", "weights": "multiview"}})
+    final = modal_app.handle_with_models(job("final"), pool, "pixal3d", handlers, "storage", "pack")
+    preview = modal_app.handle_with_models(job("preview"), pool, "pixal3d", handlers, "storage", "pack")
+    assert final == {"glb": "p", "weights": "multiview", "model": "pixal3d"}
+    assert preview == {"glb": "t", "model": "trellis2"}
+    assert [call[:3] for call in handlers.calls] == [("pixal3d", "pixal3d", "final"), ("trellis2", "trellis2", "preview")]
+    assert handlers.calls[0][3:] == ("storage", "pack")
+
+
+def test_a_pixal3d_final_out_of_memory_is_made_with_trellis2_and_says_so(capsys):
+    pool = pool_with_both()
+    oom = {"error": "generation failed: OutOfMemoryError: CUDA out of memory. Tried to allocate 2 GiB"}
+    handlers = Handlers({"pixal3d": oom, "trellis2": {"glb": "t", "pipeline": "512"}})
+    result = modal_app.handle_with_models(job("final"), pool, "pixal3d", handlers, None, None)
+    assert result == {"glb": "t", "pipeline": "512", "model": "trellis2", "fallback": oom["error"]}
+    assert [call[0] for call in handlers.calls] == ["pixal3d", "trellis2"]
+    assert "pixal3d ran out of GPU memory; making this final with trellis2 instead" in capsys.readouterr().out
+
+
+def test_other_pixal3d_failures_are_reported_as_they_are():
+    pool = pool_with_both()
+    handlers = Handlers({"pixal3d": {"error": "invalid input: no object found in the image"}, "trellis2": {"glb": "t"}})
+    result = modal_app.handle_with_models(job("final"), pool, "pixal3d", handlers, None, None)
+    assert result == {"error": "invalid input: no object found in the image"}  # no "model" on an error
+    assert [call[0] for call in handlers.calls] == ["pixal3d"]
+
+
+def test_finals_fall_back_to_trellis2_when_pixal3d_is_not_there(capsys):
+    trellis2 = FakeRuntime("trellis2")
+    pool = modal_app.ModelPool(trellis2)
+    pool.count_out("pixal3d", "its weights are missing")
+    handlers = Handlers({"trellis2": {"glb": "t", "pipeline": "1024_cascade"}})
+    result = modal_app.handle_with_models(job("final"), pool, "pixal3d", handlers, None, None)
+    assert result == {"glb": "t", "pipeline": "1024_cascade", "model": "trellis2"}
+    assert trellis2.log == []  # TRELLIS.2 keeps the GPU to itself
+
+    # Deployed with ORAINGE_FINAL_MODEL=trellis2: Pixal3D is never asked for
+    pool = pool_with_both()
+    result = modal_app.handle_with_models(job("final"), pool, "trellis2", handlers, None, None)
+    assert result["model"] == "trellis2" and pool.resident == "trellis2"
+
+
+def test_build_pixal3d_shares_the_containers_trellis2(monkeypatch):
+    import sys
+    import types
+
+    built = {}
+
+    class Runtime:
+        def __init__(self, **options):
+            built.update(options)
+
+    fake = types.ModuleType("pixal3d_worker.pipeline")
+    fake.Pixal3DRuntime = Runtime
+    fake.LEVEL_PREVIEW = "preview"
+    fake.thin_ratio_from_env = lambda raw: 0.25 if raw else 0.2
+    package = types.ModuleType("pixal3d_worker")
+    package.pipeline = fake
+    monkeypatch.setitem(sys.modules, "pixal3d_worker", package)
+    monkeypatch.setitem(sys.modules, "pixal3d_worker.pipeline", fake)
+    monkeypatch.delenv("PIXAL3D_THIN_RATIO", raising=False)
+
+    trellis2 = FakeRuntime("trellis2")
+    modal_app.build_pixal3d(trellis2)
+    # The multi-view weights with the single-view set for thin objects, resident, levelling against the
+    # recipe's preview made by this container's TRELLIS.2 (no second copy)
+    assert built == {"multiview": True, "low_vram": False, "level": "preview", "trellis2": trellis2, "thin_ratio": 0.2}
+    monkeypatch.setenv("PIXAL3D_THIN_RATIO", "0.25")
+    modal_app.build_pixal3d(trellis2)
+    assert built["thin_ratio"] == 0.25
+
+
 # run_pipeline: the whole flow `make` runs in the cloud, with fake workers
 
 
@@ -149,6 +322,17 @@ class FakeWorkers:
         }
         if mode == "final":  # the worker says whether it painted the picture onto the model
             result["projection"] = {"applied": False, "reason": "the silhouettes don't match well enough"}
+            result["views_used"] = 0
+            # The Pixal3D recipe's notes (production's container)
+            result["pipeline"] = "pixal3d-1024_cascade"
+            result["model"] = "pixal3d"
+            result["weights"] = "multiview"
+            result["thin"] = {"extents": [0.4, 0.8, 1.0], "ratio": 0.4, "threshold": 0.2, "thin": False, "decided": True}
+            result["camera"] = {"fov_deg": 31.2, "tilt": {"elevation": 21.2, "roll": 0.0, "source": "preview"}}
+            result["pose"] = {"applied": True, "reason": "found", "iou": 0.98}
+            result["level"] = {"applied": True, "elevation": 21.2, "roll": 0.0}
+        else:
+            result["model"] = "trellis2"
         return result
 
 
@@ -171,12 +355,13 @@ def test_prompt_run_saves_every_step(tmp_path):
     folder = tmp_path / "run-1"
     state = run(folder, workers, prompt="a brass pocket watch", final=True)
 
-    assert workers.calls[:2] == [("weights", "trellis2"), ("weights", "reference")]
-    assert workers.calls[2] == (
+    # The weights for every step, Pixal3D's because a final is asked for
+    assert workers.calls[:3] == [("weights", "trellis2"), ("weights", "reference"), ("weights", "pixal3d")]
+    assert workers.calls[3] == (
         "reference",
         {"input": {"prompt": "a brass pocket watch", "count": 4, "request_id": "run-1"}},
     )
-    preview, final = workers.calls[3][1]["input"], workers.calls[4][1]["input"]
+    preview, final = workers.calls[4][1]["input"], workers.calls[5][1]["input"]
     # Unscored pictures: the first goes to 3D, and the final reuses the preview's seed
     assert base64.b64decode(preview["image_base64"]) == b"png-5"
     assert (preview["mode"], preview["request_id"], "seed" in preview) == ("preview", "run-1", False)
@@ -195,9 +380,18 @@ def test_prompt_run_saves_every_step(tmp_path):
         "final": "done",
     }
     assert saved["steps"]["final"]["triangles"] == 100_000
-    assert saved["steps"]["final"]["pipeline"] == "1024_cascade" and saved["steps"]["preview"]["pipeline"] == "512"
-    assert saved["steps"]["final"]["projection"]["applied"] is False
-    assert "projection" not in saved["steps"]["preview"]
+    final_step, preview_step = saved["steps"]["final"], saved["steps"]["preview"]
+    assert final_step["pipeline"] == "pixal3d-1024_cascade" and preview_step["pipeline"] == "512"
+    assert final_step["projection"]["applied"] is False
+    assert "projection" not in preview_step
+    # What made the final and how: the model, Pixal3D's weights, what the preview measured, the camera, the
+    # pose search and the levelling; nothing of that on a TRELLIS.2 preview, and no "views_used": 0
+    assert (final_step["model"], final_step["weights"]) == ("pixal3d", "multiview")
+    assert final_step["thin"]["ratio"] == 0.4 and final_step["level"]["elevation"] == 21.2
+    assert final_step["camera"]["tilt"]["source"] == "preview" and final_step["pose"]["iou"] == 0.98
+    assert preview_step["model"] == "trellis2"
+    assert "views_used" not in final_step and "fallback" not in final_step
+    assert not {"weights", "thin", "camera", "pose", "level"} & set(preview_step)
 
 
 def test_an_interrupted_run_continues_where_it_stopped(tmp_path):
@@ -270,7 +464,7 @@ def test_pictures_first_then_the_picked_one_becomes_3d(tmp_path):
     workers = FakeWorkers()
     folder = tmp_path / "run-7"
     state = run(folder, workers, prompt="a lamp", final=True, pictures_only=True)
-    assert [name for name, _ in workers.calls] == ["weights", "weights", "reference"]
+    assert [name for name, _ in workers.calls] == ["weights", "weights", "weights", "reference"]
     assert state["input"] == "reference-5.png" and "preview" not in state["steps"]
 
     # Like a user in the Studio: the second picture goes on to 3D, preview and final
@@ -561,7 +755,7 @@ def test_make_set_runs_every_line_and_reports_failures(tmp_path, monkeypatch, ca
     monkeypatch.chdir(tmp_path)
     modal_app.make_set.info.raw_f(prompts=str(listing), final=True, name="s")
 
-    # Weights once, up front, then every run in one map
+    # Weights once, up front (all of them: prompts need FLUX, finals Pixal3D), then every run in one map
     assert calls == [
         ("download", "all"),
         ("starmap", [("s-01-lamp", "a lamp"), ("s-02-chair", "a chair")], True),
@@ -572,6 +766,36 @@ def test_make_set_runs_every_line_and_reports_failures(tmp_path, monkeypatch, ca
     assert "s-02-chair: failed (RuntimeError: invalid input: no object found)" in out
     assert "Done: 1 of 2 runs finished" in out
     assert "make_set --prompts" in out and "--name s" in out
+
+
+def test_a_set_of_photos_fetches_trellis2_and_pixal3d_for_finals(tmp_path, monkeypatch):
+    photo = tmp_path / "cat.png"
+    photo.write_bytes(b"png")
+    listing = tmp_path / "set.txt"
+    listing.write_text("cat.png\n")
+    calls = []
+
+    class Outputs(FakeOutputs):
+        def listdir(self, path):
+            return []
+
+    class Download:
+        def remote(self, which):
+            calls.append(which)
+
+    class MakeModel:
+        def starmap(self, arguments, return_exceptions):
+            return iter([{"steps": {}}])
+
+    monkeypatch.setattr(modal_app, "outputs", Outputs({}))
+    monkeypatch.setattr(modal_app, "download_models", Download())
+    monkeypatch.setattr(modal_app, "make_model", MakeModel())
+    monkeypatch.chdir(tmp_path)
+    modal_app.make_set.info.raw_f(prompts=str(listing), final=True, name="s")
+    assert calls == ["trellis2", "pixal3d"]  # no FLUX for photos; Pixal3D's after TRELLIS.2's, which it reuses
+    calls.clear()
+    modal_app.make_set.info.raw_f(prompts=str(listing), final=False, name="s")
+    assert calls == ["trellis2"]
 
 
 def test_make_set_can_stop_at_the_pictures(tmp_path, monkeypatch, capsys):

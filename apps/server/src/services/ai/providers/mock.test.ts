@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { MockWorkers, mockGlb } from './mock';
+import { MOCK_VIEW_AZIMUTHS, MockWorkers, mockGlb } from './mock';
 
 function readGlb(data: Buffer) {
   expect(data.toString('ascii', 0, 4)).toBe('glTF');
@@ -71,5 +71,76 @@ describe('mock workers', () => {
       message: expect.stringMatching(/no object found/),
     });
     expect(await workers.model('mock-404')).toMatchObject({ status: 'failed' });
+  });
+
+  it('draw 6 views around the picture as cutouts, like the multiview worker', async () => {
+    const workers = new MockWorkers(0);
+    expect(workers.multiview).toBe(true);
+    const picture = await sharp({
+      create: { width: 512, height: 512, channels: 3, background: '#888' },
+    })
+      .png()
+      .toBuffer();
+    const drawn = await workers.views(await workers.startViews({ image: picture }));
+    expect(drawn.status).toBe('done');
+    const views = drawn.status === 'done' ? drawn.output.views : [];
+    expect(views.map(({ azimuth, elevation }) => [azimuth, elevation])).toEqual(
+      [0, 45, 90, 180, 270, 315].map((azimuth) => [azimuth, 0]),
+    );
+    expect(MOCK_VIEW_AZIMUTHS).toEqual([0, 45, 90, 180, 270, 315]);
+    const sizes = new Set<number>();
+    for (const { file } of views) {
+      const data = 'data' in file ? file.data : Buffer.alloc(0);
+      expect(await sharp(data).metadata()).toMatchObject({
+        format: 'png',
+        width: 256,
+        height: 256,
+        hasAlpha: true,
+      });
+      // Cut out: the corners are transparent, the object isn't
+      const { data: pixels, info } = await sharp(data).raw().toBuffer({ resolveWithObject: true });
+      const alpha = (x: number, y: number) => pixels[(y * info.width + x) * info.channels + 3];
+      expect(alpha(0, 0)).toBe(0);
+      expect(alpha(128, 160)).toBe(255);
+      sizes.add(data.length);
+    }
+    // Each side looks different
+    expect(sizes.size).toBeGreaterThan(1);
+
+    // A small photo gets none, so the fallback can be tried
+    const small = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: '#888' },
+    })
+      .png()
+      .toBuffer();
+    expect(await workers.views(await workers.startViews({ image: small }))).toMatchObject({
+      status: 'failed',
+      message: expect.stringContaining('128 px'),
+    });
+    expect(await workers.views('mock-404')).toMatchObject({ status: 'failed' });
+  });
+
+  it('build models from the views they are sent, and stop jobs', async () => {
+    const workers = new MockWorkers(0);
+    const picture = await sharp({
+      create: { width: 256, height: 256, channels: 3, background: '#888' },
+    })
+      .png()
+      .toBuffer();
+    const views = [0, 90, 180].map((azimuth) => ({ image: picture, azimuth, elevation: 0 }));
+    const withViews = await workers.startModel({ image: picture, views, mode: 'preview' });
+    expect(await workers.model(withViews)).toMatchObject({
+      status: 'done',
+      output: { viewsUsed: 3 },
+    });
+    const alone = await workers.startModel({ image: picture, mode: 'preview' });
+    expect(await workers.model(alone)).toMatchObject({ status: 'done', output: { viewsUsed: 0 } });
+
+    const job = await workers.startViews({ image: picture });
+    await workers.cancel('multiview', job);
+    expect(await workers.views(job)).toMatchObject({
+      status: 'failed',
+      message: `Unknown job ${job}`,
+    });
   });
 });

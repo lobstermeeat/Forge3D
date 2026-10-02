@@ -1,10 +1,11 @@
-"""Validates a job's input and loads its reference image."""
+"""Validates a job's input and loads its pictures."""
 
 from __future__ import annotations
 
 import base64
 import io
 import ipaddress
+import math
 import os
 import random
 import re
@@ -21,6 +22,10 @@ from .settings import PRESETS, Mode
 
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_SIDE = 4096
+# Extra views of the object (the multiview worker draws 6)
+MAX_VIEWS = 8
+# A view's weight against the others (see settings.MultiView)
+MAX_VIEW_WEIGHT = 100.0
 REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
@@ -29,11 +34,23 @@ class InputError(ValueError):
 
 
 @dataclass(frozen=True)
+class View:
+    """Another picture of the object: azimuth 0 is the main picture's side, elevation 0 level with it."""
+
+    image: Image.Image
+    azimuth: float  # degrees, 0 to 360
+    elevation: float  # degrees, -90 to 90
+    weight: float = 1.0
+
+
+@dataclass(frozen=True)
 class Job:
     mode: Mode
     seed: int
     image: Image.Image
     request_id: str
+    # Extra views (the other sides); empty for a single-picture job
+    views: tuple[View, ...] = ()
 
     @property
     def output_key(self) -> str:
@@ -120,6 +137,65 @@ def _decode_image(data: bytes) -> Image.Image:
     return image.convert("RGBA") if "A" in image.getbands() else image.convert("RGB")
 
 
+def _read_image(source: dict, fetch: Optional[Fetch]) -> Image.Image:
+    """The image of an object with exactly one of ``image_url`` or ``image_base64``."""
+    url = source.get("image_url")
+    encoded = source.get("image_base64")
+    if (url is None) == (encoded is None):
+        raise InputError("provide exactly one of image_url or image_base64")
+    if url is not None:
+        if not isinstance(url, str):
+            raise InputError("image_url must be a string")
+        data = (fetch or fetch_url)(url)
+    else:
+        if not isinstance(encoded, str):
+            raise InputError("image_base64 must be a string")
+        try:
+            data = base64.b64decode(encoded, validate=True)
+        except ValueError as err:
+            raise InputError("image_base64 is not valid base64") from err
+        if len(data) > MAX_IMAGE_BYTES:
+            raise InputError("image is larger than 20 MB")
+    return _decode_image(data)
+
+
+def _number(value: object) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        return None
+    return float(value)
+
+
+def _parse_view(entry: object, fetch: Optional[Fetch]) -> View:
+    if not isinstance(entry, dict):
+        raise InputError("must be an object")
+    azimuth = _number(entry.get("azimuth"))
+    if azimuth is None:
+        raise InputError("azimuth must be a number of degrees")
+    elevation = _number(entry.get("elevation", 0))
+    if elevation is None or not -90 <= elevation <= 90:
+        raise InputError("elevation must be a number of degrees between -90 and 90")
+    weight = _number(entry.get("weight", 1.0))
+    if weight is None or not 0 < weight <= MAX_VIEW_WEIGHT:
+        raise InputError(f"weight must be a number above 0 and at most {MAX_VIEW_WEIGHT:g}")
+    return View(image=_read_image(entry, fetch), azimuth=azimuth % 360, elevation=elevation, weight=weight)
+
+
+def _parse_views(views: object, fetch: Optional[Fetch]) -> tuple[View, ...]:
+    if views is None:
+        return ()
+    if not isinstance(views, list):
+        raise InputError("views must be a list")
+    if len(views) > MAX_VIEWS:
+        raise InputError(f"views can have at most {MAX_VIEWS} images")
+    parsed = []
+    for number, entry in enumerate(views):
+        try:
+            parsed.append(_parse_view(entry, fetch))
+        except InputError as err:
+            raise InputError(f"views[{number}]: {err}") from err
+    return tuple(parsed)
+
+
 def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) -> Job:
     """Turn a RunPod ``input`` payload into a validated ``Job``."""
     if not isinstance(payload, dict):
@@ -139,22 +215,6 @@ def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) 
     if not isinstance(request_id, str) or not REQUEST_ID.match(request_id):
         raise InputError("request_id must be 1-64 letters, digits, '-' or '_'")
 
-    url = payload.get("image_url")
-    encoded = payload.get("image_base64")
-    if (url is None) == (encoded is None):
-        raise InputError("provide exactly one of image_url or image_base64")
-    if url is not None:
-        if not isinstance(url, str):
-            raise InputError("image_url must be a string")
-        data = (fetch or fetch_url)(url)
-    else:
-        if not isinstance(encoded, str):
-            raise InputError("image_base64 must be a string")
-        try:
-            data = base64.b64decode(encoded, validate=True)
-        except ValueError as err:
-            raise InputError("image_base64 is not valid base64") from err
-        if len(data) > MAX_IMAGE_BYTES:
-            raise InputError("image is larger than 20 MB")
-
-    return Job(mode=mode, seed=seed, image=_decode_image(data), request_id=request_id)
+    image = _read_image(payload, fetch)
+    views = _parse_views(payload.get("views"), fetch)
+    return Job(mode=mode, seed=seed, image=image, request_id=request_id, views=views)
