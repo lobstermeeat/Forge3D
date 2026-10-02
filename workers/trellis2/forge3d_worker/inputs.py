@@ -28,6 +28,9 @@ MAX_VIEWS = 8
 # A view's weight against the others (see settings.MultiView)
 MAX_VIEW_WEIGHT = 100.0
 REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+# What a textures job may pass on to the judge as the user's prompt: the judge's limit
+# (judge_worker/service.py's MAX_PROMPT), and the Studio's
+MAX_PROMPT = 500
 
 
 class InputError(ValueError):
@@ -54,6 +57,10 @@ class Job:
     views: tuple[View, ...] = ()
     # How many textures a "textures" job makes (1 to MAX_TEXTURES); 0 for the other modes
     count: int = 0
+    # A "textures" job only: whether to ask the judge which texture is best, and what the user typed
+    # (the judge's context; "" for a photo)
+    judge: bool = False
+    prompt: str = ""
 
     @property
     def output_key(self) -> str:
@@ -213,6 +220,24 @@ def _texture_count(count: object) -> int:
     return count
 
 
+def _judging(payload: dict) -> tuple[bool, str]:
+    """
+    A textures job's ``judge`` (absent, null or false: no judge) and, when it is true, its ``prompt``
+    (absent or null: none). A prompt is only read for the judge, so without one it isn't checked.
+    """
+    judge = payload.get("judge")
+    if judge is None or judge is False:
+        return False, ""
+    if judge is not True:
+        raise InputError("judge must be true or false")
+    prompt = payload.get("prompt")
+    if prompt is None:
+        return True, ""
+    if not isinstance(prompt, str) or len(prompt) > MAX_PROMPT:
+        raise InputError(f"prompt must be a string of at most {MAX_PROMPT} characters")
+    return True, prompt
+
+
 def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) -> Job:
     """Turn a RunPod ``input`` payload into a validated ``Job``."""
     if not isinstance(payload, dict):
@@ -231,8 +256,9 @@ def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) 
     elif not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed < 2**31:
         raise InputError("seed must be an integer between 0 and 2^31 - 1")
 
-    # Only a textures job reads it; the other modes ignore it, as they ignore any field they don't know
+    # Only a textures job reads these; the other modes ignore them, as they ignore any field they don't know
     count = _texture_count(payload.get("count")) if mode == "textures" else 0
+    judge, prompt = _judging(payload) if mode == "textures" else (False, "")
 
     request_id = payload.get("request_id", fallback_id)
     if not isinstance(request_id, str) or not REQUEST_ID.match(request_id):
@@ -240,4 +266,13 @@ def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) 
 
     image = _read_image(payload, fetch)
     views = _parse_views(payload.get("views"), fetch)
-    return Job(mode=mode, seed=seed, image=image, request_id=request_id, views=views, count=count)
+    return Job(
+        mode=mode,
+        seed=seed,
+        image=image,
+        request_id=request_id,
+        views=views,
+        count=count,
+        judge=judge,
+        prompt=prompt,
+    )

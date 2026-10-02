@@ -23,6 +23,7 @@ it runs on the GPU in the TRELLIS.2 container and on the CPU in tests.
 
 from __future__ import annotations
 
+import io
 import math
 from typing import Any, Optional
 
@@ -202,3 +203,20 @@ def turntable(
             row, column = divmod(number, columns)
             sheet[row * size : (row + 1) * size, column * size : (column + 1) * size] = tile
     return Image.fromarray(sheet, "RGB")
+
+
+def from_glb(raw: bytes, **options: Any) -> Image.Image:
+    """
+    ``turntable`` of an exported GLB (``raw``, as Trellis2Runtime.export returns it, before gltfpack), read
+    by trimesh as one mesh, as the judge experiment read them (ops/exp_judge.py). ``options`` go to
+    turntable. On a GPU, torch's cached blocks go back to CUDA afterwards, out of the next job's way
+    (CuMesh allocates outside torch's cache).
+    """
+    import trimesh
+
+    mesh = trimesh.load(io.BytesIO(raw), file_type="glb", force="mesh")
+    try:
+        return turntable(mesh, **options)
+    finally:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()

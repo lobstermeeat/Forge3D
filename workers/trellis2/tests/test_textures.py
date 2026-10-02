@@ -1,20 +1,29 @@
-"""Texture options (mode "textures") with a fake runtime: the shape, the seeds, the keys, the failures."""
+"""
+Texture options (mode "textures") with a fake runtime: the shape, the seeds, the keys, the failures, and
+the judge ("judge": true) with fakes for the renderer and the judge: the final's own texture exported first,
+what the judge is sent, its pick, its failures.
+"""
 
 import base64
 import gc
 import io
 import json
+import math
+import pathlib
+import random
 import types
 import weakref
 
 import pytest
 from PIL import Image
 
-from forge3d_worker import service
+from forge3d_worker import inputs, service
 from forge3d_worker.compress import CompressionError
 from forge3d_worker.inputs import InputError, parse_job
-from forge3d_worker.service import TEXTURES_NEED_TRELLIS2, handle_job, texture_seed
+from forge3d_worker.service import NO_JUDGE, TEXTURES_NEED_TRELLIS2, handle_job, judge_picture, texture_seed
 from forge3d_worker.settings import CREDITS, MAX_TEXTURES, MODES, PRESETS, TEXTURE_COUNT, TEXTURE_SEED_STEP
+
+WORKERS = pathlib.Path(__file__).resolve().parents[2]
 
 
 def png(size=(64, 48)) -> str:
@@ -430,3 +439,585 @@ def test_timings_sum_each_step_over_the_textures(monkeypatch):
     # A failed step counts as well (the second export): the GPU was busy all the same
     assert out["timings"] == {"generate_s": 30.0, "retexture_s": 30.0, "export_s": 60.0, "pack_s": 3.0, "upload_s": 0.5}
     assert sum(out["timings"].values()) == pytest.approx(now[0])  # the job's whole time
+
+
+# --- The judge ("judge": true): which texture is best ---------------------------------------------------------
+
+# Each candidate's grid, as Draw makes it, is a small image in its texture's tint
+TINTS = {
+    "final": (230, 40, 40),
+    "2234": (40, 200, 60),
+    "3234": (50, 70, 220),
+    "4234": (230, 210, 40),
+    "5234": (40, 200, 210),
+}
+PROMPT = "a red lamp"
+
+
+def judged_job(**extra) -> dict:
+    return textures_job(judge=True, prompt=PROMPT, **extra)
+
+
+def texture_of(raw: bytes) -> str:
+    """Which texture a fake GLB is of: "final" (the generation's own) or its seed."""
+    return raw.decode().split("glb of texture ")[1]
+
+
+def tint_of(encoded: str) -> str:
+    """Which texture a base64 PNG Draw made shows."""
+    colour = Image.open(io.BytesIO(base64.b64decode(encoded))).convert("RGB").getpixel((0, 0))
+    return next(name for name, tint in TINTS.items() if tint == colour)
+
+
+class LayoutRuntime(FakeRuntime):
+    """
+    FakeRuntime with Trellis2Runtime's export paths: a mesh marked with its shape (by keep_layout, as the
+    generation's own texture is, or by retexture) runs to_glb in full and keeps the layout when none is kept
+    yet, and rebakes on it after that; an unmarked mesh runs to_glb, unwatched. A new shape drops the layout.
+    """
+
+    def __init__(self, **options) -> None:
+        super().__init__(**options)
+        self.layout = False
+
+    def generate(self, image, preset, seed, views=()):
+        self.layout = False
+        return super().generate(image, preset, seed, views)
+
+    def keep_layout(self, mesh) -> bool:
+        self.calls.append(("keep_layout", mesh.texture))
+        mesh.shape = True
+        return True
+
+    def retexture(self, *, seed):
+        mesh = super().retexture(seed=seed)
+        mesh.shape = True
+        return mesh
+
+    def export(self, mesh, preset):
+        self.last_export = None
+        exported = super().export(mesh, preset)
+        if not getattr(mesh, "shape", False):
+            self.last_export = {"path": "to_glb", "seconds": 20.0}
+        elif self.layout:
+            self.last_export = {"path": "rebake", "seconds": 3.0}
+        else:
+            self.layout = True
+            self.last_export = {"path": "to_glb", "seconds": 20.0, "captured": True}
+        return exported
+
+
+class Draw:
+    """Stands in for judgeviews: a candidate's grid is a small image in its texture's tint (grey for others)."""
+
+    def __init__(self, fail=None) -> None:
+        self.fail = dict(fail or {})  # texture -> what drawing it raises
+        self.drawn = []
+
+    def __call__(self, raw: bytes) -> Image.Image:
+        texture = texture_of(raw)
+        self.drawn.append(texture)
+        if texture in self.fail:
+            raise self.fail[texture]
+        return Image.new("RGB", (12, 8), TINTS.get(texture, (128, 128, 128)))
+
+
+class FakeJudge:
+    """
+    Stands in for Judge8B: it likes ``favourite`` best (a texture: "final" or a seed) and calls the others
+    "edits", or gives ``answer``, or raises ``fail``. ``missing`` is what unavailable() says. Notes each
+    request, and its warm-ups (in ``log`` too, when given one).
+    """
+
+    model = "8b"
+
+    def __init__(self, favourite="3234", answer=None, fail=None, missing=None, warm_fail=None, log=None) -> None:
+        self.favourite, self.answer, self.fail, self.missing, self.warm_fail = favourite, answer, fail, missing, warm_fail
+        self.log = log if log is not None else []
+        self.requests = []
+        self.warmed = 0
+
+    def unavailable(self):
+        return self.missing
+
+    def warm(self) -> None:
+        self.warmed += 1
+        self.log.append(("warm",))
+        if self.warm_fail is not None:
+            raise self.warm_fail
+
+    def __call__(self, request: dict) -> dict:
+        self.requests.append(request)
+        self.log.append(("judge",))
+        if self.fail is not None:
+            raise self.fail
+        if self.answer is not None:
+            return self.answer
+        seen = [tint_of(grid) for grid in request["candidates_png"]]
+        best = seen.index(self.favourite)
+        return {
+            "verdicts": ["publish" if texture == self.favourite else "edits" for texture in seen],
+            "best": best,
+            "why": f"{self.favourite} has the cleanest back",
+            "raw": "{…}",
+            "seconds": 8.6,
+            "letters": ["K", "L", "M", "N", "P"][: len(seen)],
+            "problems": [None] * len(seen),
+            "model": "8b",
+        }
+
+
+@pytest.fixture
+def still_clock(monkeypatch):
+    """No time passes, so two jobs' timings compare equal."""
+    monkeypatch.setattr(service, "time", types.SimpleNamespace(perf_counter=lambda: 0.0))
+
+
+def seeded_order(count: int, seed: int = 1234) -> list:
+    order = list(range(count))
+    random.Random(seed).shuffle(order)
+    return order
+
+
+@pytest.fixture
+def judge_worker(monkeypatch):
+    """The judge worker's own package (workers/judge), for checks across the two."""
+    monkeypatch.syspath_prepend(str(WORKERS / "judge"))
+    from judge_worker import judge, parse, prompt
+    from judge_worker import service as judge_service
+
+    return types.SimpleNamespace(judge=judge, parse=parse, prompt=prompt, service=judge_service)
+
+
+@pytest.mark.parametrize("judge", ["absent", None, False])
+def test_without_the_judge_a_textures_job_is_as_before(judge, still_clock):
+    # Without the judge, a prompt isn't read: one that isn't a string goes unchecked, as before
+    extra = {} if judge == "absent" else {"judge": judge, "prompt": 42}
+    before = LayoutRuntime()
+    expected = handle_job(textures_job(), before, FakeStorage(), Packer())
+    runtime, storage, packer, asked, draw = LayoutRuntime(), FakeStorage(), Packer(), FakeJudge(), Draw()
+
+    out = handle_job(textures_job(**extra), runtime, storage, packer, judge=asked, render=draw)
+
+    assert out == expected and runtime.calls == before.calls
+    assert [call[0] for call in runtime.calls] == ["generate"] + ["retexture", "export"] * 3
+    # The first new texture runs to_glb in full and keeps the layout, as it always has
+    assert [texture["export"]["path"] for texture in out["textures"]] == ["to_glb", "rebake", "rebake"]
+    assert set(out["timings"]) == {"generate_s", "retexture_s", "export_s", "pack_s", "upload_s"}
+    assert not {"judge", "judge_error", "own_texture"} & set(out)
+    assert asked.requests == [] and asked.warmed == 0 and draw.drawn == []
+
+
+def test_with_the_judge_the_finals_own_texture_is_exported_first_and_keeps_the_layout(still_clock):
+    runtime, storage, packer = LayoutRuntime(), FakeStorage(), Packer()
+    out = handle_job(judged_job(), runtime, storage, packer, judge=FakeJudge(), render=Draw())
+
+    final = PRESETS["final"]
+    assert runtime.calls == [
+        ("generate", final, 1234, (64, 48), []),
+        # Marked with its shape, then exported as the final was: to_glb in full, its layout kept
+        ("keep_layout", "final"),
+        ("export", "final", final),
+        # Let go before the first new texture is sampled, as each texture is before the next
+        ("retexture", 2234, []),
+        ("export", 2234, final),
+        ("retexture", 3234, []),
+        ("export", 3234, final),
+        ("retexture", 4234, []),
+        ("export", 4234, final),
+    ]
+    assert out["own_texture"] == {
+        "raw_bytes": len(raw_glb("final")),
+        "triangles": 99_000,
+        "export": {"path": "to_glb", "seconds": 20.0, "captured": True},
+    }
+    # So every new texture rebakes
+    assert [texture["export"] for texture in out["textures"]] == [{"path": "rebake", "seconds": 3.0}] * 3
+    # The own texture is never packed, stored or returned: the final has it
+    assert [raw for raw, _ in packer.calls] == [raw_glb(seed) for seed in (2234, 3234, 4234)]
+    assert list(storage.saved) == [key(1), key(2), key(3)]
+    assert [texture["texture_seed"] for texture in out["textures"]] == [2234, 3234, 4234]
+    assert set(out["timings"]) == {
+        "generate_s", "retexture_s", "export_s", "pack_s", "upload_s", "own_export_s", "render_s", "judge_s"
+    }
+    assert json.loads(json.dumps(out)) == out  # what the job API passes on
+
+
+@pytest.mark.parametrize("favourite, pick", [("final", 0), ("2234", 1), ("3234", 2), ("4234", 3)])
+def test_the_judge_sees_every_candidate_in_a_seeded_order_and_its_pick_names_one(favourite, pick, still_clock):
+    judge, draw = FakeJudge(favourite), Draw()
+    out = handle_job(judged_job(), LayoutRuntime(), FakeStorage(), Packer(), judge=judge, render=draw)
+
+    # Every candidate drawn from its exported GLB: the own texture first, then the new ones in order
+    assert draw.drawn == ["final", "2234", "3234", "4234"]
+    (request,) = judge.requests
+    assert set(request) == {"picture_png", "candidates_png", "prompt", "order"}
+    assert [tint_of(grid) for grid in request["candidates_png"]] == ["final", "2234", "3234", "4234"]
+    # Shown in an order shuffled with the job's seed (the judge favours some places over others)
+    order = seeded_order(4)
+    assert request["order"] == order and order != [0, 1, 2, 3]
+    assert request["prompt"] == PROMPT
+    # 0 is the final's own texture, k the k-th of "textures"
+    assert out["judge"] == {
+        "pick": pick,
+        "verdicts": ["publish" if candidate == pick else "edits" for candidate in range(4)],
+        "why": f"{favourite} has the cleanest back",
+        "model": "8b",
+        "seconds": 8.6,
+        "order": order,
+    }
+    if pick:
+        assert out["textures"][pick - 1]["texture_seed"] == int(favourite)
+    assert "judge_error" not in out
+
+
+def test_the_order_is_the_jobs_own():
+    """The same final shows the judge its candidates in the same order every time; another seed may not."""
+    orders = {}
+    for seed in (1234, 1234, 7, 99):
+        judge = FakeJudge(answer={"verdicts": ["edits"] * 4, "best": 0, "why": "", "seconds": 8.0})
+        out = handle_job(judged_job(seed=seed), LayoutRuntime(), FakeStorage(), Packer(), judge=judge, render=Draw())
+        orders.setdefault(seed, []).append(judge.requests[0]["order"])
+        assert out["judge"]["order"] == judge.requests[0]["order"]
+    assert orders[1234][0] == orders[1234][1] == seeded_order(4, 1234)
+    assert orders[7] == [seeded_order(4, 7)] and orders[99] == [seeded_order(4, 99)]
+    assert len({tuple(order[0]) for order in orders.values()}) > 1
+
+
+def test_the_order_is_what_the_judges_own_seed_gives(judge_worker):
+    for seed, count in ((1234, 4), (7, 2), (2**31 - 1, 5)):
+        assert seeded_order(count, seed) == judge_worker.service.shuffled(count, seed)
+
+
+def test_a_texture_that_failed_is_left_out_and_the_pick_counts_the_textures_returned(still_clock):
+    runtime = LayoutRuntime(fail={("export", 3234): IndexError("index 7 is out of bounds")})
+    judge = FakeJudge("4234")
+    out = handle_job(judged_job(), runtime, FakeStorage(), Packer(), judge=judge, render=Draw())
+
+    assert out["texture_errors"] == [{"texture_seed": 3234, "error": "IndexError: index 7 is out of bounds"}]
+    assert [tint_of(grid) for grid in judge.requests[0]["candidates_png"]] == ["final", "2234", "4234"]
+    assert judge.requests[0]["order"] == seeded_order(3)
+    assert out["judge"]["pick"] == 2 and out["textures"][1]["texture_seed"] == 4234
+    assert out["judge"]["verdicts"] == ["edits", "edits", "publish"]
+
+
+def test_a_textures_job_that_makes_no_texture_fails_as_before_and_asks_no_judge():
+    error = RuntimeError("no shape to retexture: generate() one first, or pass a latent")
+    runtime = LayoutRuntime(fail={("retexture", seed): error for seed in (2234, 3234, 4234)})
+    judge, draw = FakeJudge(), Draw()
+    out = handle_job(judged_job(), runtime, FakeStorage(), Packer(), judge=judge, render=draw)
+    assert out == {"error": f"generation failed: none of the 3 textures was made: RuntimeError: {error}"}
+    assert judge.requests == [] and draw.drawn == []
+
+
+# A judge's failure: what the fake does, and the job's judge_error
+JUDGE_FAILURES = {
+    "timeout": (
+        {"fail": TimeoutError("the judge didn't answer within 180 s")},
+        "the judge failed: TimeoutError: the judge didn't answer within 180 s",
+    ),
+    "error": (
+        {"answer": {"error": "judge failed: RuntimeError: CUDA error: out of memory"}},
+        "the judge returned an error: judge failed: RuntimeError: CUDA error: out of memory",
+    ),
+    "no pick": (
+        # The judge says best 0 when its reply names none, and flags it
+        {"answer": {"verdicts": [None] * 4, "best": 0, "why": "", "parse_error": "no JSON object or pick in the reply"}},
+        "the judge's reply named no pick: no JSON object or pick in the reply",
+    ),
+    "a pick out of range": (
+        {"answer": {"verdicts": ["edits"] * 4, "best": 4, "why": ""}},
+        "the judge's pick 4 is none of the 4 candidates",
+    ),
+    "a pick that is no number": (
+        {"answer": {"verdicts": ["edits"] * 4, "best": "L", "why": ""}},
+        'the judge\'s pick "L" is none of the 4 candidates',
+    ),
+    "verdicts missing": (
+        {"answer": {"verdicts": ["edits"] * 3, "best": 1, "why": ""}},
+        'the judge\'s verdicts ["edits", "edits", "edits"] are not one per candidate',
+    ),
+    "not an object": ({"answer": ["K"]}, "the judge answered with list, not an object"),
+}
+
+
+@pytest.mark.parametrize("failure", JUDGE_FAILURES)
+def test_a_judge_that_fails_keeps_the_textures(failure, still_clock, capsys):
+    options, reason = JUDGE_FAILURES[failure]
+    expected = handle_job(judged_job(), LayoutRuntime(), FakeStorage(), Packer(), judge=FakeJudge(), render=Draw())
+    storage = FakeStorage()
+    out = handle_job(judged_job(), LayoutRuntime(), storage, Packer(), judge=FakeJudge(**options), render=Draw())
+
+    assert out["judge_error"] == reason and "judge" not in out
+    assert {k: v for k, v in out.items() if k != "judge_error"} == {k: v for k, v in expected.items() if k != "judge"}
+    assert list(storage.saved) == [key(1), key(2), key(3)] and "refresh_worker" not in out
+    assert f"[forge3d] no judgement: {reason}" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "texture, which",
+    [("final", "the final's own texture"), ("3234", "the texture of seed 3234")],
+)
+def test_a_candidate_that_cannot_be_drawn_keeps_the_textures_and_asks_no_judge(texture, which, still_clock):
+    judge = FakeJudge()
+    draw = Draw(fail={texture: ValueError("the mesh has no base colour texture or UVs")})
+    out = handle_job(judged_job(), LayoutRuntime(), FakeStorage(), Packer(), judge=judge, render=draw)
+
+    assert out["judge_error"] == f"{which} could not be drawn for the judge: ValueError: the mesh has no base colour texture or UVs"
+    assert "judge" not in out and judge.requests == [] and draw.drawn[-1] == texture
+    assert len(out["textures"]) == 3 and "own_texture" in out and "refresh_worker" not in out
+
+
+def test_a_gpu_fault_while_drawing_keeps_the_textures_and_replaces_the_worker(still_clock):
+    fault = RuntimeError("CUDA error: an illegal memory access was encountered")
+    out = handle_job(
+        judged_job(), LayoutRuntime(), FakeStorage(), Packer(), judge=FakeJudge(), render=Draw(fail={"2234": fault})
+    )
+    assert out["judge_error"] == f"the texture of seed 2234 could not be drawn for the judge: RuntimeError: {fault}"
+    assert len(out["textures"]) == 3 and out["refresh_worker"] is True
+
+
+@pytest.mark.parametrize(
+    "error, refresh",
+    [(RuntimeError("[CuMesh] remesh failed"), False), (RuntimeError("CUDA error: an illegal memory access"), True)],
+)
+def test_when_the_own_texture_cannot_be_exported_the_textures_are_made_as_without_the_judge(error, refresh, still_clock):
+    runtime = LayoutRuntime(fail={("export", "final"): error})
+    judge, draw = FakeJudge(), Draw()
+    out = handle_job(judged_job(), runtime, FakeStorage(), Packer(), judge=judge, render=draw)
+
+    assert out["judge_error"] == f"the final's own texture could not be exported: RuntimeError: {error}"
+    assert "judge" not in out and "own_texture" not in out
+    assert judge.requests == [] and draw.drawn == [] and judge.warmed == 1
+    # The first new texture then keeps the layout, as without the judge, and the mesh was let go first
+    assert [texture["export"]["path"] for texture in out["textures"]] == ["to_glb", "rebake", "rebake"]
+    assert [call[2] for call in runtime.calls if call[0] == "retexture"] == [[], [], []]
+    assert out.get("refresh_worker", False) is refresh
+
+
+class Unreadable(FakeJudge):
+    def unavailable(self):
+        raise OSError("Read-only file system: '/models'")
+
+
+@pytest.mark.parametrize(
+    "judge, reason",
+    [
+        (None, NO_JUDGE),
+        (
+            FakeJudge(missing="the judge's weights are missing: modal run workers/modal_app.py::download_models --which judge8b"),
+            "the judge's weights are missing: modal run workers/modal_app.py::download_models --which judge8b",
+        ),
+        (Unreadable(), "the judge could not be checked: OSError: Read-only file system: '/models'"),
+    ],
+    ids=["no judge", "weights missing", "unreadable"],
+)
+def test_a_judge_that_cannot_run_here_costs_the_job_nothing(judge, reason, still_clock):
+    runtime, draw = LayoutRuntime(), Draw()
+    out = handle_job(judged_job(), runtime, FakeStorage(), Packer(), judge=judge, render=draw)
+
+    assert NO_JUDGE == "no judge in this worker"
+    assert out["judge_error"] == reason and not {"judge", "own_texture"} & set(out)
+    # None of the judge's part ran: no own export, no warm-up, nothing drawn, nothing asked
+    assert [call[0] for call in runtime.calls] == ["generate"] + ["retexture", "export"] * 3
+    assert [texture["export"]["path"] for texture in out["textures"]] == ["to_glb", "rebake", "rebake"]
+    assert draw.drawn == [] and (judge is None or (judge.requests == [] and judge.warmed == 0))
+    assert {name: out["timings"][name] for name in ("own_export_s", "render_s", "judge_s")} == dict.fromkeys(
+        ("own_export_s", "render_s", "judge_s"), 0.0
+    )
+
+
+def test_the_judge_starts_up_once_the_shape_is_made(still_clock, capsys):
+    runtime = LayoutRuntime()
+    judge = FakeJudge(log=runtime.calls)
+    out = handle_job(judged_job(), runtime, FakeStorage(), Packer(), judge=judge, render=Draw())
+    # Warmed as soon as the shape is there, so its container starts while the textures are made
+    assert [call[0] for call in runtime.calls] == (
+        ["generate", "warm", "keep_layout", "export"] + ["retexture", "export"] * 3 + ["judge"]
+    )
+    assert judge.warmed == 1 and "judge" in out
+
+    # A shape that fails starts nothing
+    runtime = LayoutRuntime(fail={"generate": RuntimeError("CUDA out of memory")})
+    judge = FakeJudge()
+    out = handle_job(judged_job(), runtime, FakeStorage(), Packer(), judge=judge, render=Draw())
+    assert out["error"] == "generation failed: RuntimeError: CUDA out of memory" and judge.warmed == 0
+
+    # A warm-up that fails changes nothing but the time the judge takes
+    judge = FakeJudge(warm_fail=ConnectionError("Modal is unreachable"))
+    out = handle_job(judged_job(), LayoutRuntime(), FakeStorage(), Packer(), judge=judge, render=Draw())
+    assert out["judge"]["pick"] == 2
+    assert "[forge3d] the judge was not warmed up: ConnectionError: Modal is unreachable" in capsys.readouterr().out
+
+
+def test_what_the_judge_says_is_passed_on_as_the_contract_has_it(still_clock):
+    answer = {"verdicts": ["publish", None, "maybe", "reject"], "best": 1, "seconds": 9, "notes": ["no verdict for L"]}
+    out = handle_job(judged_job(), LayoutRuntime(), FakeStorage(), Packer(), judge=FakeJudge(answer=answer), render=Draw())
+    # Unknown verdicts become null; no "why" is ""; "model" is the judge's own when the answer doesn't say
+    assert out["judge"] == {
+        "pick": 1,
+        "verdicts": ["publish", None, None, "reject"],
+        "why": "",
+        "model": "8b",
+        "seconds": 9.0,
+        "order": seeded_order(4),
+    }
+    # An answer without its seconds: how long the job waited for it
+    answer = {"verdicts": ["edits"] * 4, "best": 3, "why": "M", "model": "8b"}
+    out = handle_job(judged_job(), LayoutRuntime(), FakeStorage(), Packer(), judge=FakeJudge(answer=answer), render=Draw())
+    assert out["judge"]["seconds"] == 0.0 and isinstance(out["judge"]["seconds"], float)
+
+
+def test_timings_with_the_judge(monkeypatch):
+    now = [0.0]
+    monkeypatch.setattr(service, "time", types.SimpleNamespace(perf_counter=lambda: now[0]))
+
+    def taking(seconds, work):
+        def timed(*args, **kwargs):
+            now[0] += seconds(*args) if callable(seconds) else seconds
+            return work(*args, **kwargs)
+
+        return timed
+
+    runtime = LayoutRuntime()
+    runtime.generate = taking(30.0, runtime.generate)
+    runtime.retexture = taking(10.0, runtime.retexture)
+    # The own texture runs to_glb in full; the new ones rebake
+    runtime.export = taking(lambda mesh, preset: 25.0 if mesh.texture == "final" else 5.0, runtime.export)
+    storage = FakeStorage()
+    storage.put = taking(0.25, storage.put)
+    judge = FakeJudge()
+
+    out = handle_job(judged_job(), runtime, storage, taking(1.5, Packer()), judge=taking(9.0, judge), render=taking(0.5, Draw()))
+
+    assert out["timings"] == {
+        "generate_s": 30.0,
+        "retexture_s": 30.0,
+        "export_s": 15.0,
+        "pack_s": 4.5,
+        "upload_s": 0.75,
+        "own_export_s": 25.0,
+        "render_s": 2.0,
+        "judge_s": 9.0,
+    }
+    assert sum(out["timings"].values()) == pytest.approx(now[0])  # the job's whole time
+    assert out["judge"]["seconds"] == 8.6  # the judge's own time, not the job's wait
+
+
+def test_the_picture_the_judge_gets_is_what_its_own_fit_makes_of_the_jobs(judge_worker):
+    """Shrunk and on white before it is sent, so the judge sees what it would have made of the full picture."""
+    import numpy as np
+
+    rng = np.random.default_rng(3)
+    rgba = rng.integers(0, 256, (1000, 1600, 4), dtype=np.uint8)
+    rgba[..., 3] = np.where(rng.random((1000, 1600)) < 0.5, 0, rgba[..., 3])  # transparent where it isn't the object
+    picture = Image.fromarray(rgba, "RGBA")
+    buffer = io.BytesIO()
+    picture.save(buffer, "PNG")
+    judge = FakeJudge()
+    job = {"id": "rp-1", "input": {**judged_job()["input"], "image_base64": base64.b64encode(buffer.getvalue()).decode()}}
+    handle_job(job, LayoutRuntime(), FakeStorage(), Packer(), judge=judge, render=Draw())
+
+    sent = Image.open(io.BytesIO(base64.b64decode(judge.requests[0]["picture_png"])))
+    expected = judge_worker.judge.fit(picture, judge_worker.judge.PICTURE_SIDE)
+    assert sent.mode == "RGB" and sent.size == expected.size == (768, 480)
+    assert np.array_equal(np.asarray(sent), np.asarray(expected))
+    # The judge's own fit leaves it as it is
+    again = judge_worker.judge.fit(sent, judge_worker.judge.PICTURE_SIDE)
+    assert again.size == sent.size and np.array_equal(np.asarray(again), np.asarray(sent))
+    # A small picture without transparency goes as it is
+    small = Image.new("RGB", (300, 200), (10, 20, 30))
+    assert np.array_equal(np.asarray(judge_picture(small)), np.asarray(small))
+
+
+def test_the_worker_and_the_judge_agree_on_their_limits(judge_worker):
+    assert service.JUDGE_PICTURE_SIDE == judge_worker.judge.PICTURE_SIDE
+    assert service.JUDGE_UNDERLAY == judge_worker.judge.UNDERLAY
+    assert service.VERDICTS == judge_worker.parse.VERDICTS
+    assert inputs.MAX_PROMPT == judge_worker.service.MAX_PROMPT == 500  # and the Studio's MAX_PROMPT_LENGTH
+    # Own texture and the most new textures a job makes: the judge has letters for them all
+    assert 1 + MAX_TEXTURES <= len(judge_worker.prompt.LETTERS)
+
+
+class Chat:
+    """
+    Stands in for Qwen3-VL in the judge worker: it reads the versions in the order they are shown (each
+    image after its "Version X:" line) and answers, as the model is asked to, in JSON with the letter of the
+    one in ``favourite``'s tint.
+    """
+
+    def __init__(self, favourite: str) -> None:
+        self.favourite = favourite
+        self.shown = []
+
+    def __call__(self, messages, max_new_tokens=1024):
+        content = messages[0]["content"]
+        letters, tints = [], []
+        for item, following in zip(content, content[1:]):
+            text = item.get("text", "").strip() if item["type"] == "text" else ""
+            if text.startswith("Version ") and following["type"] == "image":
+                letters.append(text.removeprefix("Version ").rstrip(":"))
+                tints.append(following["image"].convert("RGB").getpixel((0, 0)))
+        self.shown = [next(name for name, tint in TINTS.items() if tint == colour) for colour in tints]
+        best = letters[self.shown.index(self.favourite)]
+        answer = {letter: {"problems": "none", "verdict": "publish" if letter == best else "edits"} for letter in letters}
+        return json.dumps({**answer, "best": best, "why": f"{best} has the cleanest back"})
+
+
+@pytest.mark.parametrize("favourite, pick", [("final", 0), ("4234", 3)])
+def test_through_the_judge_workers_own_job_handling(judge_worker, favourite, pick, still_clock):
+    """The request and the answer as the judge worker reads and writes them, with a stand-in for its model."""
+    chat = Chat(favourite)
+
+    def judge(request: dict) -> dict:
+        return judge_worker.service.handle_job({"id": "fc-01K8", **request}, chat, name="8b")
+
+    out = handle_job(judged_job(), LayoutRuntime(), FakeStorage(), Packer(), judge=judge, render=Draw())
+
+    order = seeded_order(4)
+    candidates = ["final", "2234", "3234", "4234"]
+    # The model saw them in the job's order, the first under K
+    assert chat.shown == [candidates[number] for number in order]
+    assert out["judge"]["pick"] == pick and out["judge"]["order"] == order
+    assert out["judge"]["verdicts"] == ["publish" if number == pick else "edits" for number in range(4)]
+    assert out["judge"]["model"] == "8b" and isinstance(out["judge"]["seconds"], float)
+    letter = judge_worker.prompt.LETTERS[order.index(pick)]
+    assert out["judge"]["why"] == f"{letter} has the cleanest back"
+
+
+# --- The judge's inputs --------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("judge, asked", [("absent", False), (None, False), (False, False), (True, True)])
+def test_judge_is_true_or_false(judge, asked):
+    extra = {} if judge == "absent" else {"judge": judge}
+    job = parse_job(payload(**extra), fallback_id="job")
+    assert job.judge is asked and job.prompt == ""
+
+
+@pytest.mark.parametrize("judge", [1, 0, "true", "yes", [True], {"model": "8b"}])
+def test_anything_else_for_judge_is_refused_before_anything_runs(judge):
+    runtime = FakeRuntime()
+    out = handle_job(textures_job(judge=judge), runtime, FakeStorage(), Packer(), judge=FakeJudge())
+    assert out == {"error": "invalid input: judge must be true or false"} and runtime.calls == []
+
+
+def test_the_prompt_is_what_the_user_typed_for_the_judge():
+    assert parse_job(payload(judge=True, prompt=PROMPT), fallback_id="job").prompt == PROMPT
+    assert parse_job(payload(judge=True, prompt=""), fallback_id="job").prompt == ""  # a photo: none typed
+    assert parse_job(payload(judge=True, prompt=None), fallback_id="job").prompt == ""
+    assert parse_job(payload(judge=True, prompt="x" * 500), fallback_id="job").prompt == "x" * 500
+    for prompt in ("x" * 501, 42, ["a lamp"]):
+        with pytest.raises(InputError, match="^prompt must be a string of at most 500 characters$"):
+            parse_job(payload(judge=True, prompt=prompt), fallback_id="job")
+    # Without the judge it isn't read
+    assert parse_job(payload(judge=False, prompt=42), fallback_id="job").prompt == ""
+
+
+@pytest.mark.parametrize("mode", ["preview", "final"])
+def test_previews_and_finals_ignore_judge_and_prompt(mode):
+    job = parse_job({"image_base64": PICTURE, "mode": mode, "judge": "maybe", "prompt": 42}, fallback_id="job")
+    assert job.judge is False and job.prompt == ""
+    judge = FakeJudge()
+    out = handle_job({"id": "f", "input": payload(mode=mode, judge=True)}, LayoutRuntime(), FakeStorage(), Packer(), judge=judge)
+    assert "error" not in out and not {"judge", "judge_error"} & set(out) and judge.warmed == 0

@@ -779,3 +779,47 @@ def test_a_textures_job_says_how_each_texture_was_exported(postprocess, monkeypa
     final = {"id": "f", "input": {"image_base64": png(), "mode": "final", "seed": 7}}
     out = service.handle_job(final, runtime, Storage(), lambda raw, limit: raw)
     assert "error" not in out and "export" not in out and runtime.texture_layout is None
+
+
+def test_keep_layout_marks_the_last_generations_mesh_with_its_shape():
+    runtime = runtime_around(None)  # to_glb isn't needed
+    assert runtime.keep_layout(types.SimpleNamespace()) is False  # nothing generated yet: no shape
+    mesh = runtime.generate(picture(), FINAL, seed=7)
+    assert not hasattr(mesh, SHAPE)  # a final's mesh is never marked by itself
+    assert runtime.keep_layout(mesh) is True and getattr(mesh, SHAPE) is runtime.last_latent
+    # The shape's retextures carry the same latent, so a layout kept from this mesh serves them
+    assert getattr(runtime.retexture(seed=1007), SHAPE) is getattr(mesh, SHAPE)
+    assert runtime.keep_layout(("a mesh", "that takes no attributes")) is False
+
+
+def test_a_judged_textures_job_exports_the_own_texture_in_full_once_and_rebakes_every_new_one(postprocess, monkeypatch):
+    from forge3d_worker import judgeviews
+
+    monkeypatch.setitem(service.PRESETS, "final", FINAL)
+    runtime = runtime_around(postprocess)
+    drawn, requests = [], []
+
+    def draw(raw):  # the real grid, small, of each GLB as the runtime exported it
+        drawn.append(raw)
+        return judgeviews.from_glb(raw, size=48, supersample=1)
+
+    def judge(request):
+        requests.append(request)
+        return {"verdicts": ["edits"] * 4, "best": 2, "why": "M has the cleanest back", "seconds": 1.0, "model": "8b"}
+
+    job = {"image_base64": png(), "mode": "textures", "seed": 7, "count": 3, "judge": True, "prompt": "a box"}
+    storage = Storage()
+    out = service.handle_job({"id": "t", "input": job}, runtime, storage, lambda raw, limit: raw, judge=judge, render=draw)
+
+    assert "error" not in out and "judge_error" not in out and out["judge"]["pick"] == 2
+    own = out["own_texture"]["export"]
+    assert own["path"] == "to_glb" and own["captured"] is True
+    assert [texture["export"]["path"] for texture in out["textures"]] == ["rebake"] * 3
+    assert CALLS.count("uv_unwrap") == 1  # to_glb's geometry work ran once, for the final's own texture
+    # The judge saw each new texture as it was stored, and the final's own texture as the final job exports it
+    assert drawn[1:] == [storage.saved[f"ai/t/final-7-texture-{k}.glb"] for k in (1, 2, 3)]
+    final = Storage()
+    service.handle_job({"id": "f", "input": {"image_base64": png(), "mode": "final", "seed": 7}}, runtime, final, lambda raw, limit: raw)
+    assert drawn[0] == final.saved["ai/f/final-7.glb"]
+    grids = [Image.open(io.BytesIO(base64.b64decode(grid))) for grid in requests[0]["candidates_png"]]
+    assert [grid.size for grid in grids] == [(144, 96)] * 4

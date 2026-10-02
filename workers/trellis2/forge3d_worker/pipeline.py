@@ -21,7 +21,7 @@ MODEL_DIR = os.environ.get("TRELLIS2_MODEL_DIR", "/models/TRELLIS.2-4B")
 # The background-removed picture (RGBA, full frame) travels from generate() to export() on the mesh
 CUTOUT = "forge3d_cutout"
 # A retexture()'s mesh carries the Latent it was decoded from, so export() can keep that shape's texture
-# layout for its next texture (rebake.py)
+# layout for its next texture (rebake.py); keep_layout() puts it on a generated mesh
 SHAPE = "forge3d_shape"
 
 
@@ -267,7 +267,8 @@ class Trellis2Runtime:
     # layout to_glb worked out for the first (rebake.py). Experiments turn this off to compare: then every
     # export runs to_glb in full, and no layout is used or kept
     rebake_textures: bool = True
-    # The texture layout of the last retextured shape exported in full; generate() drops it (a new job)
+    # The texture layout of the last retextured shape exported in full (or of a generation's own texture that
+    # keep_layout() marked); generate() drops it (a new job)
     texture_layout: Optional[rebake.TextureLayout] = None
     # How the last export() made its mesh: {"path": "to_glb" | "rebake", "seconds": ...}, with "captured"
     # when to_glb's layout was kept, "capture_error" when it couldn't be, and "fallback" saying why a kept
@@ -553,6 +554,24 @@ class Trellis2Runtime:
             pass
         return mesh
 
+    def keep_layout(self, mesh: Any) -> bool:
+        """
+        Marks ``mesh``, the one the last generate() returned, with the shape it was made from (SHAPE), as
+        retexture() marks its meshes: export() then keeps its texture layout, and that shape's retextures
+        rebake on it. A textures job that asks the judge does this to the generation's own texture, which
+        it exports first. Nothing else does, so a final's export runs to_glb unwatched, as it always has.
+        Returns whether the mesh was marked: not when the last generation's latent wasn't kept, nor when
+        the mesh takes no attributes (its export then runs to_glb in full and keeps nothing).
+        """
+        latent = self.last_latent
+        if latent is None:
+            return False
+        try:
+            setattr(mesh, SHAPE, latent)
+        except (AttributeError, TypeError):
+            return False
+        return True
+
     def _offload(self) -> None:
         """Switches to upstream's low-VRAM mode, which puts each model on the GPU only while it runs."""
         pipeline = self.pipeline
@@ -658,9 +677,10 @@ class Trellis2Runtime:
     def _textured(self, mesh: Any, preset: Preset) -> Any:
         """
         to_glb's textured mesh for ``mesh``, noted in last_export. A mesh retexture() made carries its shape
-        (SHAPE). When the texture layout kept for that shape fits it, only its texture is sampled again
-        (rebake.py). Otherwise to_glb runs in full, watched, and its layout is kept for the shape's next
-        texture. Any other mesh (a preview's, a final's) goes through to_glb exactly as before, unwatched.
+        (SHAPE), and so does a generated one that keep_layout() marked. When the texture layout kept for that
+        shape fits it, only its texture is sampled again (rebake.py). Otherwise to_glb runs in full, watched,
+        and its layout is kept for the shape's next texture. Any other mesh (a preview's, a final's) goes
+        through to_glb exactly as before, unwatched.
         The layout only saves time: a rebake that fails falls back to to_glb in full, and a layout that
         can't be kept fails nothing.
         """

@@ -220,3 +220,22 @@ def test_the_cameras_are_the_projections():
         np.testing.assert_allclose(up, [0, 1, 0], atol=1e-9)
     right, up, towards = J._axes(0.0, 20.0)
     np.testing.assert_allclose(towards, [0, math.sin(math.radians(20)), math.cos(math.radians(20))], atol=1e-9)
+
+
+def test_from_glb_draws_an_exported_glb_as_its_mesh(monkeypatch):
+    """What a textures job draws for the judge: the GLB as exported, read back by trimesh as one mesh."""
+    mesh = box()
+    raw = mesh.export(file_type="glb")
+    drawn = J.from_glb(raw, size=64, supersample=1)
+    assert drawn.size == (192, 128) and drawn.mode == "RGB"
+    assert np.array_equal(np.asarray(drawn), np.asarray(J.turntable(mesh, size=64, supersample=1)))
+    # On a GPU, torch's cache goes back to CUDA afterwards, even when drawing fails
+    emptied = []
+    monkeypatch.setattr(J.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(J.torch.cuda, "empty_cache", lambda: emptied.append(True))
+    monkeypatch.setattr(J, "turntable", lambda mesh, **options: Image.new("RGB", (6, 4)))
+    J.from_glb(raw)
+    monkeypatch.setattr(J, "turntable", lambda mesh, **options: (_ for _ in ()).throw(ValueError("no UVs")))
+    with pytest.raises(ValueError, match="no UVs"):
+        J.from_glb(raw)
+    assert emptied == [True, True]
