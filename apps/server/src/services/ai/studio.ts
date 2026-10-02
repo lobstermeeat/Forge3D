@@ -962,10 +962,13 @@ function bestPicture(references: ReferencePicture[]): number | null {
   return best;
 }
 
-/** Network trouble between us and the workers, as opposed to a job that failed. */
+/**
+ * Network trouble between us and the workers (or storage), as opposed to a job that failed. A
+ * request that timed out counts: asking a job's state again is harmless.
+ */
 function isTransient(err: unknown): boolean {
   const message = err instanceof Error ? err.message : '';
-  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|: 5\d\d /.test(message);
+  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|timed out after|: 5\d\d /.test(message);
 }
 
 /**

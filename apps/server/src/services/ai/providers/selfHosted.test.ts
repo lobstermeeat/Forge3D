@@ -1,3 +1,4 @@
+import { createServer } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import {
   createAIOrchestrator,
@@ -5,7 +6,13 @@ import {
   multiviewEnabled,
   textureOptionsEnabled,
 } from '../index';
-import { JobEndpoint, type FetchLike } from './jobEndpoint';
+import {
+  JobEndpoint,
+  REQUEST_TIMEOUT_MS,
+  RUNSYNC_TIMEOUT_MS,
+  neverSent,
+  type FetchLike,
+} from './jobEndpoint';
 import { SelfHostedProvider, createSelfHostedProvider } from './selfHosted';
 
 interface Call {
@@ -791,5 +798,91 @@ describe('SelfHostedProvider', () => {
     expect(multiviewEnabled({ AI_MULTIVIEW: ' 1\n' })).toBe(true);
     // The mock workers have one, so development works end to end
     expect(createStudioWorkers({ AI_WORKERS_MOCK: '1' })!.multiview).toBe(true);
+  });
+});
+
+describe('JobEndpoint', () => {
+  /**
+   * A job API that answers each request after `ms` (never, without it), unless the request gives
+   * up first. `body` is what it sends; a body that never ends stalls halfway through its answer.
+   */
+  const slowHost =
+    (ms?: number, body: unknown = { id: 'fc-1', status: 'COMPLETED', output: {} }): FetchLike =>
+    (_url, init) =>
+      new Promise((resolve, reject) => {
+        const signal = init?.signal;
+        const timer =
+          ms === undefined
+            ? undefined
+            : setTimeout(() => resolve(new Response(JSON.stringify(body))), ms);
+        signal?.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        });
+      });
+
+  it('gives up on a request the job API never answers', async () => {
+    const endpoint = new JobEndpoint('https://w.modal.run/trellis2', 'token', slowHost(), 20);
+    await expect(endpoint.run({ mode: 'textures' })).rejects.toThrow(
+      'AI worker run timed out after 0.02 s',
+    );
+    await expect(endpoint.status('fc-1')).rejects.toThrow(
+      'AI worker status timed out after 0.02 s',
+    );
+    await expect(endpoint.cancel('fc-1')).rejects.toThrow('AI worker cancel timed out');
+    await expect(endpoint.warm()).rejects.toThrow('AI worker warm timed out');
+    // A run that timed out may have queued its job
+    expect(neverSent(await endpoint.run({}).catch((err: unknown) => err))).toBe(false);
+    expect(REQUEST_TIMEOUT_MS).toBe(30_000);
+  });
+
+  it('gives up on an answer that stops halfway', async () => {
+    const stalled: FetchLike = async (_url, init) => {
+      const signal = init!.signal!;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"id": "fc-1", "output": {"glb": '));
+          signal.addEventListener('abort', () => controller.error(signal.reason));
+        },
+      });
+      return new Response(body);
+    };
+    const endpoint = new JobEndpoint('https://w.modal.run/trellis2', 'token', stalled, 20);
+    await expect(endpoint.status('fc-1')).rejects.toThrow('AI worker status timed out');
+  });
+
+  it('lets the host hold runsync open, as it does for up to 90 s', async () => {
+    const endpoint = new JobEndpoint('https://w.modal.run/reference', 'token', slowHost(60), 20);
+    await expect(endpoint.runSync({ prompt: 'a lamp' })).resolves.toMatchObject({
+      status: 'COMPLETED',
+    });
+    await expect(endpoint.status('fc-1')).rejects.toThrow('timed out');
+    expect(RUNSYNC_TIMEOUT_MS).toBeGreaterThanOrEqual(150_000);
+  });
+
+  it('tells a request that never left from one that may have arrived', async () => {
+    // fetch's own error, with why it couldn't connect as its cause
+    const failed = (code: string, message: string) =>
+      new TypeError('fetch failed', { cause: Object.assign(new Error(message), { code }) });
+    expect(neverSent(failed('ECONNREFUSED', 'connect ECONNREFUSED 10.0.0.7:443'))).toBe(true);
+    expect(neverSent(failed('ENOTFOUND', 'getaddrinfo ENOTFOUND w.modal.run'))).toBe(true);
+    expect(neverSent(failed('EAI_AGAIN', 'getaddrinfo EAI_AGAIN w.modal.run'))).toBe(true);
+    expect(neverSent(failed('UND_ERR_CONNECT_TIMEOUT', 'Connect Timeout Error'))).toBe(true);
+    // A connection that dropped, a 5xx or anything else may have queued the job
+    expect(neverSent(failed('UND_ERR_SOCKET', 'other side closed'))).toBe(false);
+    expect(neverSent(failed('ECONNRESET', 'read ECONNRESET'))).toBe(false);
+    expect(neverSent(new TypeError('fetch failed'))).toBe(false);
+    expect(neverSent(new Error('AI worker run failed: 503 {"detail":"…"}'))).toBe(false);
+    expect(neverSent('connect ECONNREFUSED')).toBe(false);
+
+    // Node's own fetch, at a port nothing listens on
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as { port: number };
+    await new Promise((resolve) => server.close(resolve));
+    const endpoint = new JobEndpoint(`http://127.0.0.1:${port}/trellis2`, 'token');
+    const refused = await endpoint.run({ mode: 'textures' }).catch((err: unknown) => err);
+    expect(refused).toBeInstanceOf(TypeError);
+    expect(neverSent(refused)).toBe(true);
   });
 });

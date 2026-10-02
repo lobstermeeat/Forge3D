@@ -416,6 +416,9 @@ describe('AIStudio', () => {
       new Error('AI worker status failed: 503 {"detail":"Modal can\'t be reached"}'),
     );
     expect((await studio.get('u1', gen.id)).status).toBe('drawing');
+    // A state that didn't come in time is asked again
+    references.set('ref-1', new Error('AI worker status timed out after 30 s'));
+    expect((await studio.get('u1', gen.id)).status).toBe('drawing');
     references.set('ref-1', new Error('AI worker status failed: 404 {"detail":"unknown job"}'));
     expect((await studio.get('u1', gen.id)).status).toBe('failed');
   });
