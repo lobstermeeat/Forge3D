@@ -1,0 +1,4374 @@
+{
+ "about": "Phase 7 (textures), graded blind with the Phase 4-6 rubric (publish / edits / reject). methods: one reviewer per pair, who saw production's texture and the variant as A and B in a random order. rolls: four reviewers per texture; 'judges' are Qwen3-VL's picks (8b, and 30b in the second set), each in two orders of the candidates ('order': the textures as the judge saw them, K, L, M, N). 'own' is the generation's texture (production's); 'seed +N' a texture drawn again for the same shape with torch.manual_seed(seed + N).",
+ "methods": [
+  {
+   "object": "01-cute-low-poly-fox-sitting-down",
+   "variant": "24 steps",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "production",
+   "A": "production",
+   "why": "B's ear backs are a muddy dark maroon that reads like baked-in shadow; A's ears stay clean orange with dark tips."
+  },
+  {
+   "object": "01-cute-low-poly-fox-sitting-down",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "same",
+   "A": "production",
+   "why": "Practically identical textures; only faint shading shifts around the ears and paws, neither visibly cleaner."
+  },
+  {
+   "object": "01-cute-low-poly-fox-sitting-down",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "publish",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A's back and tail are blotchy muddy brown with a dark smear behind the head; B stays clean orange all round."
+  },
+  {
+   "object": "01-cute-low-poly-fox-sitting-down",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "publish",
+   "variant_verdict": "reject",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A's back and tail turned near-black with white smears and a face-like mark on the back of the head; B is clean orange."
+  },
+  {
+   "object": "02-red-high-top-sneaker",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A's rubber sole looks dingy pinkish-grey and its inner lining is blotchy orange-brown; B's are clean white and cream."
+  },
+  {
+   "object": "02-red-high-top-sneaker",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "publish",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A's sole and toe cap came out mint-teal and the upper magenta-pink; B keeps a red upper with white rubber."
+  },
+  {
+   "object": "02-red-high-top-sneaker",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "same",
+   "A": "variant",
+   "why": "Near-identical textures; A's laces and eyelets are a touch brighter, too small to notice in a scene."
+  },
+  {
+   "object": "02-red-high-top-sneaker",
+   "variant": "24 steps",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "same",
+   "A": "production",
+   "why": "Near-identical textures; B's laces are a shade brighter red, too small a difference to matter in a scene."
+  },
+  {
+   "object": "04-retro-arcade-machine",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "variant",
+   "A": "variant",
+   "why": "Otherwise nearly identical; A's marquee is a crisp red sign panel, while B's marquee is washed-out pale pink."
+  },
+  {
+   "object": "04-retro-arcade-machine",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "publish",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A has one side panel dark maroon while the other is salmon, plus a blotchy pink screen; B is evenly colored."
+  },
+  {
+   "object": "04-retro-arcade-machine",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "publish",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "production",
+   "why": "B's screen is a muddy brown-green smear; A's screen is a clean blank white like the picture."
+  },
+  {
+   "object": "04-retro-arcade-machine",
+   "variant": "24 steps",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "production",
+   "A": "variant",
+   "why": "Both clean; B's white screen and solid dark back look more finished than A's mint-tinted screen and dusty mauve back."
+  },
+  {
+   "object": "06-wooden-shield-with-a-lion",
+   "variant": "24 steps",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "production",
+   "why": "Backs are identical; B's lion has a clean white beard where A's is smudged grey."
+  },
+  {
+   "object": "06-wooden-shield-with-a-lion",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "variant",
+   "why": "A's back ghost lion is faint, while B's back shows a stark black-streaked lion and green scribble; A's front is duller."
+  },
+  {
+   "object": "06-wooden-shield-with-a-lion",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "variant",
+   "why": "Fronts nearly match; A's back has a larger blue-grey ghost lion plus a white blotch, more conspicuous than B's back smear."
+  },
+  {
+   "object": "06-wooden-shield-with-a-lion",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "variant",
+   "why": "A's front lion is crisper and brighter; both backs are messy, A's a dark blot, B's a streaky ghost with green scribble."
+  },
+  {
+   "object": "08-vintage-film-camera",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "same",
+   "A": "production",
+   "why": "Textures are effectively identical; only faint shading differences inside the lens, invisible at normal distance."
+  },
+  {
+   "object": "08-vintage-film-camera",
+   "variant": "24 steps",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "production",
+   "why": "Same front; B's silver back is brighter and reads cleaner, while A's back looks greyer with darker smudges."
+  },
+  {
+   "object": "08-vintage-film-camera",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "production",
+   "why": "B's black leatherette body matches the picture and hides the lumpy back; A is bare silver on back and sides."
+  },
+  {
+   "object": "08-vintage-film-camera",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "production",
+   "why": "A's lens shows dark glass; B's lens front is a flat silver disc, though B's leather-wrapped back looks nicer."
+  },
+  {
+   "object": "11-stack-of-old-books-with-a-candle",
+   "variant": "24 steps",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "production",
+   "why": "Nearly identical; B's white frost smear around the candle on the top book is slightly larger and brighter."
+  },
+  {
+   "object": "11-stack-of-old-books-with-a-candle",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "production",
+   "why": "B washes the dark brown and green middle books into pale, streaky beige, on top of the same white frost smear."
+  },
+  {
+   "object": "11-stack-of-old-books-with-a-candle",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "variant",
+   "why": "B has a white frost smear on the top book around the candle; A's covers are clean, though its candle back is baked dark."
+  },
+  {
+   "object": "11-stack-of-old-books-with-a-candle",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "production",
+   "why": "B adds orange shading patches on the candle and white glyph-like marks on the top book; A's candle is evenly colored."
+  },
+  {
+   "object": "12-skateboard-with-graffiti-art",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "reject",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "variant",
+   "why": "A's letters keep dark outlines and stay readable though washed gray; B's graffiti is an unreadable blurry white smear."
+  },
+  {
+   "object": "12-skateboard-with-graffiti-art",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "reject",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "variant",
+   "why": "A's RASK letters are soft but legible with red outlines; B's graffiti is blurred into white blobs."
+  },
+  {
+   "object": "12-skateboard-with-graffiti-art",
+   "variant": "24 steps",
+   "production_verdict": "reject",
+   "variant_verdict": "publish",
+   "preferred": "variant",
+   "A": "production",
+   "why": "B's graffiti is crisp with dark-outlined, readable RASK letters; A's whole deck graphic is a blurry white smear."
+  },
+  {
+   "object": "12-skateboard-with-graffiti-art",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "reject",
+   "variant_verdict": "publish",
+   "preferred": "variant",
+   "A": "production",
+   "why": "B's letters are sharp with dark outlines and a pink spray glow; A's deck graphic is blurred beyond reading."
+  },
+  {
+   "object": "13-cute-cartoon-car-bright-blue",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "same",
+   "A": "variant",
+   "why": "Practically identical paint, windows and trim; A only has slightly lighter hood and roof highlights, which isn't a flaw either way."
+  },
+  {
+   "object": "13-cute-cartoon-car-bright-blue",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "same",
+   "A": "production",
+   "why": "Practically identical; B's grille and hood are a touch bluer and darker, too small for a creator to notice or care."
+  },
+  {
+   "object": "13-cute-cartoon-car-bright-blue",
+   "variant": "24 steps",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "same",
+   "A": "variant",
+   "why": "Practically identical textures; only the grille shading differs slightly, with no smear or off-colour patch on either."
+  },
+  {
+   "object": "13-cute-cartoon-car-bright-blue",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "publish",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A's paint is washed-out pastel and its windows don't match (one side window black); B is clean, saturated blue with consistent windows."
+  },
+  {
+   "object": "14-bubble-tea-with-tapioca-pearls",
+   "variant": "24 steps",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "variant",
+   "why": "Nearly identical; A's tea is cooler mauve, its bottom more washed-out white, and some pearls render as hollow rings."
+  },
+  {
+   "object": "14-bubble-tea-with-tapioca-pearls",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "edits",
+   "variant_verdict": "publish",
+   "preferred": "variant",
+   "A": "variant",
+   "why": "A shows dark tapioca pearls all around in natural orange tea; B has pearls only at the front and blocky white smears."
+  },
+  {
+   "object": "14-bubble-tea-with-tapioca-pearls",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "variant",
+   "why": "A's bottom is smoother with a few pearls in most views; B shows rectangular white blocks instead of pearls on the back."
+  },
+  {
+   "object": "14-bubble-tea-with-tapioca-pearls",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "edits",
+   "variant_verdict": "edits",
+   "preferred": "variant",
+   "A": "production",
+   "why": "B shows pearls around the whole bottom despite blotchy dark streaks on the tea; A's back has blocky white smears, no pearls."
+  },
+  {
+   "object": "16-green-dragon-sitting-cartoon",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "production",
+   "A": "production",
+   "why": "B's back and tail are muddy dark green and its belly harsh orange; A is bright, even green with a cream belly."
+  },
+  {
+   "object": "16-green-dragon-sitting-cartoon",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "variant",
+   "A": "production",
+   "why": "B's crisp red eyes, white claws and striped tan belly match the picture, outweighing its darker baked shading on the back."
+  },
+  {
+   "object": "16-green-dragon-sitting-cartoon",
+   "variant": "24 steps",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "production",
+   "A": "production",
+   "why": "B is lighter green but its blush smudges around the eyes are bigger and browner; A's face is cleaner."
+  },
+  {
+   "object": "16-green-dragon-sitting-cartoon",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "publish",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A has brown smears across the cheeks and snout, dark claws and very dark green paint; B is clean, bright green."
+  },
+  {
+   "object": "18-electric-guitar",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A's neck looks washed-out mottled grey-brown and its black body carries more grey smudges; B's neck and body are cleaner."
+  },
+  {
+   "object": "18-electric-guitar",
+   "variant": "24 steps",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "same",
+   "A": "variant",
+   "why": "Practically identical textures; A has a slightly greyer patch on the lower body, invisible at normal viewing distance."
+  },
+  {
+   "object": "18-electric-guitar",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "publish",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A's pickguard is dull streaky grey instead of white and a grey smear crosses the black lower body; B is crisp."
+  },
+  {
+   "object": "18-electric-guitar",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "publish",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "production",
+   "why": "B's body turned silver-lavender fading to navy and its neck looks glassy grey, losing the black-and-white finish A keeps."
+  },
+  {
+   "object": "20-hot-air-balloon",
+   "variant": "ig2mv views steering the texture flow",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "production",
+   "A": "variant",
+   "why": "A's envelope is greyish and dull with baked highlights and only a small dark-red ring; B is warm cream with a clear red band."
+  },
+  {
+   "object": "20-hot-air-balloon",
+   "variant": "CFG 3 (guidance rescale 0.5)",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "same",
+   "A": "production",
+   "why": "Practically identical; B's gore seams are slightly higher-contrast and its skirt a bit yellower, neither better nor worse."
+  },
+  {
+   "object": "20-hot-air-balloon",
+   "variant": "24 steps",
+   "production_verdict": "publish",
+   "variant_verdict": "publish",
+   "preferred": "production",
+   "A": "variant",
+   "why": "B keeps a vivid red band above the skirt; A's band is a muddy brown-orange, otherwise identical."
+  },
+  {
+   "object": "20-hot-air-balloon",
+   "variant": "ig2mv views baked into the texture",
+   "production_verdict": "publish",
+   "variant_verdict": "edits",
+   "preferred": "production",
+   "A": "production",
+   "why": "B's envelope turns grey-blue on one side and gold on the other, with a crimson skirt; A is even warm cream all round."
+  }
+ ],
+ "rolls": [
+  {
+   "seeds": "Phase 4's",
+   "objects": {
+    "01-cute-low-poly-fox-sitting-down": {
+     "textures": {
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      }
+     }
+    },
+    "02-red-high-top-sneaker": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      }
+     }
+    },
+    "03-gaming-chair-black-and-purple": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      }
+     }
+    },
+    "04-retro-arcade-machine": {
+     "textures": {
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      }
+     }
+    },
+    "05-sci-fi-laser-pistol-white": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     }
+    },
+    "06-wooden-shield-with-a-lion": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 3
+      },
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 1
+      }
+     }
+    },
+    "07-chibi-knight-with-a-big-helmet": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     }
+    },
+    "08-vintage-film-camera": {
+     "textures": {
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 3
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     }
+    },
+    "09-donut-with-pink-frosting": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      }
+     }
+    },
+    "10-astronaut-helmet": {
+     "textures": {
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     }
+    },
+    "11-stack-of-old-books-with-a-candle": {
+     "textures": {
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 3
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     }
+    },
+    "12-skateboard-with-graffiti-art": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "reject",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "reject",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 4
+      }
+     }
+    },
+    "13-cute-cartoon-car-bright-blue": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     }
+    },
+    "14-bubble-tea-with-tapioca-pearls": {
+     "textures": {
+      "seed +3000": {
+       "verdicts": [
+        "reject",
+        "reject",
+        "reject",
+        "reject"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 4
+      }
+     }
+    },
+    "15-health-potion-in-a-round-glass": {
+     "textures": {
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 3
+      }
+     }
+    },
+    "16-green-dragon-sitting-cartoon": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 3
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     }
+    },
+    "17-bowl-of-ramen-with-an-egg": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     }
+    },
+    "18-electric-guitar": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 1
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 3
+      }
+     }
+    },
+    "19-small-cabin-in-a-snowy-forest": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     }
+    },
+    "20-hot-air-balloon": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 3
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      }
+     }
+    }
+   }
+  },
+  {
+   "seeds": "next (phase2e)",
+   "objects": {
+    "01-cute-low-poly-fox-sitting-down": {
+     "textures": {
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "own",
+         "seed +2000",
+         "seed +1000"
+        ],
+        "why": "All have same flaws; K’s smudges are least noticeable on back and sides.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +2000",
+         "own",
+         "seed +3000"
+        ],
+        "why": "K's back smudge is faintest and least washed out compared to L, M, and N's more obvious grey patches.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "own",
+         "seed +2000",
+         "seed +1000"
+        ],
+        "why": "K has the least visible texture flaws; the smudges are minimal and less distracting than in the others, making it the most usable as-is.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "seed +1000",
+         "seed +2000",
+         "own",
+         "seed +3000"
+        ],
+        "why": "M has the least visible texture flaws, with the most consistent color and cleanest eye rendering across all views.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "02-red-high-top-sneaker": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "seed +1000",
+         "seed +2000",
+         "seed +3000",
+         "own"
+        ],
+        "why": "N has clean, consistent red texture on all sides; K, L, M all have flawed back heel patches.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +3000",
+         "seed +2000",
+         "seed +1000"
+        ],
+        "why": "K has the least severe texture flaws, especially on the back, making it the most visually clean for a hobbyist.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +2000",
+         "seed +3000",
+         "own"
+        ],
+        "why": "All versions have the same flaw on the back, but K's texture is slightly more consistent and less warped than the others.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "own",
+         "seed +3000",
+         "seed +2000",
+         "seed +1000"
+        ],
+        "why": "L has the cleanest, most consistent texture with no visible smears or color errors across all views.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "03-gaming-chair-black-and-purple": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "own",
+         "seed +2000",
+         "seed +1000"
+        ],
+        "why": "All have same flaws, but K's purple is least washed out and most consistent across views.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +2000",
+         "own",
+         "seed +3000"
+        ],
+        "why": "K has the most accurate, clean, and consistent purple accents matching the reference across all views.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "own",
+        "order": [
+         "seed +3000",
+         "own",
+         "seed +2000",
+         "seed +1000"
+        ],
+        "why": "L has the most consistent, clean textures with no smears or color shifts, making it the most ready-to-use version.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +1000",
+         "seed +2000",
+         "own",
+         "seed +3000"
+        ],
+        "why": "L has the most consistent and natural purple accents with no smears or colour issues on any side, making it the cleanest and most usable version.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "04-retro-arcade-machine": {
+     "textures": {
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +2000",
+         "own",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "N has clean, consistent textures with no smears, ghosting, or color bleeding on any side.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "own",
+         "seed +2000"
+        ],
+        "why": "L has the least smears and glitches, with only faint wavy pattern on front, making it most visually clean for a hobbyist.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "own",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "All versions have similar texture flaws, but K's back and side textures are slightly less smudged and more consistent than the others.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "own",
+         "seed +2000"
+        ],
+        "why": "All versions have similar texture flaws on the back and sides, but K's texture is slightly more consistent and less smeared than the others.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "05-sci-fi-laser-pistol-white": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +3000",
+         "seed +2000"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "seed +3000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +3000",
+         "seed +2000"
+        ],
+        "why": "All versions are identical; K is chosen as the first in the sequence, with no texture flaws or inconsistencies.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "seed +3000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "All versions are identical; K is chosen as the first in the sequence, with no texture flaws or inconsistencies.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "06-wooden-shield-with-a-lion": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "reject",
+        "reject",
+        "reject",
+        "reject"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 4
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "K's lion is most recognizable on sides, while others are garbled, faded, or broken.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "M's lion is most recognizable on all sides despite flaws, while others are heavily smeared or garbled.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "L has the most coherent front lion and least severe back-side smearing, making it the only viable option for a hobbyist scene.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "M has the cleanest, most consistent texture with no smears or ghosting on the back or sides, making it the most usable version.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "07-chibi-knight-with-a-big-helmet": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +3000",
+         "seed +1000",
+         "own",
+         "seed +2000"
+        ],
+        "why": "Only N has clean, consistent textures with no smears or color bleeding on hidden surfaces.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "own",
+         "seed +1000",
+         "seed +3000"
+        ],
+        "why": "K's silver front is most consistent with the reference, despite back-side darkening and cape smudges.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +3000",
+         "seed +1000",
+         "own",
+         "seed +2000"
+        ],
+        "why": "N has the most consistent and clean textures across all angles, with no smears or color shifts, making it the most ready-to-use version.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +2000",
+         "own",
+         "seed +1000",
+         "seed +3000"
+        ],
+        "why": "N has the most consistent and clean textures across all angles, with no visible smears or color shifts on the back or sides.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "08-vintage-film-camera": {
+     "textures": {
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 3
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "M has the fewest and least distracting texture flaws compared to K, L, and N.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "K has the least texture smearing and most consistent color on visible surfaces compared to L, M, and N.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "N has the cleanest, most consistent textures with no smears or ghosting, making it the most ready-to-use version.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "N has the most consistent texture application and least visible smearing or ghosting on the back and sides compared to others.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "09-donut-with-pink-frosting": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "L has the most consistent, vibrant pink frosting and cleanest sprinkles across all views, with minimal texture flaws.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "K has the most accurate, clean, and consistent pink frosting and sprinkles across all views.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "L has the most consistent and natural-looking frosting and sprinkles with no visible texture flaws on any side.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "M has the most consistent frosting and sprinkles, with no visible texture flaws on the back or sides, making it the cleanest version.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "10-astronaut-helmet": {
+     "textures": {
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "All versions are identical; K is chosen as the first in the sequence, with no texture flaws or inconsistencies.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "All versions are identical; K is chosen as the first in the sequence, with no texture flaws or inconsistencies.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "11-stack-of-old-books-with-a-candle": {
+     "textures": {
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "L has the most consistent, readable textures on all sides, with least smearing and color distortion compared to others.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "All versions have identical texture flaws; K's candle flame is most visible, making it least broken.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "own",
+         "seed +1000",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "N has the most consistent and natural textures across all views, with no visible smears or color shifts on the back or sides.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "seed +1000",
+         "own"
+        ],
+        "why": "All versions have the same flaw, but M's texture is the most consistent and cleanest across all views, with the least visible smearing.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "12-skateboard-with-graffiti-art": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 3
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 1
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +1000",
+         "seed +3000"
+        ],
+        "why": "M's back graffiti is most legible and consistent, with least smearing or ghosting compared to others.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +3000",
+         "seed +1000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "L has the least washed-out and smeared texture on the back, with the most consistent red outline.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +1000",
+         "seed +3000"
+        ],
+        "why": "N has the most consistent and clean texture across all views, with no ghosting or smearing on the back or sides, making it the most ready-to-use model.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "seed +3000",
+         "seed +1000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "N has the most consistent and clean texture across all views, with no smearing or color issues on the back or sides.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "13-cute-cartoon-car-bright-blue": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "own",
+         "seed +1000",
+         "seed +2000"
+        ],
+        "why": "K's rear window is less washed out than others, and its bumper smudge is smaller.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "seed +1000",
+         "own",
+         "seed +3000"
+        ],
+        "why": "All have same flaws, but K's rear bumper smudge is least distracting.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "own",
+         "seed +1000",
+         "seed +2000"
+        ],
+        "why": "All versions have the same minor rear texture flaw; K is chosen as it appears slightly cleaner in the front lighting, with less visible smearing on the rear window.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "seed +1000",
+         "own",
+         "seed +3000"
+        ],
+        "why": "All versions have similar flaws, but K's texture is slightly cleaner and more consistent, with less visible smearing on the rear and sides.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "14-bubble-tea-with-tapioca-pearls": {
+     "textures": {
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "reject",
+        "reject",
+        "reject",
+        "reject"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "reject",
+        "reject",
+        "reject",
+        "reject"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "K has the most accurate texture and least visible flaws, even if minor smearing exists.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "N has clean, consistent textures with minimal smudges, accurately representing the bubble tea and pearls from all angles.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "K is the only version with recognizable liquid and pearls, despite minor texture flaws, making it the most usable for a hobbyist scene.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "N has the cleanest, most consistent texture with no smears or color errors, making it the most visually coherent and ready-to-use model.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "15-health-potion-in-a-round-glass": {
+     "textures": {
+      "seed +1000": {
+       "verdicts": [
+        "reject",
+        "reject",
+        "reject",
+        "reject"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "reject",
+        "reject",
+        "reject",
+        "reject"
+       ],
+       "picked_by": 4
+      },
+      "own": {
+       "verdicts": [
+        "reject",
+        "reject",
+        "reject",
+        "reject"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "reject",
+        "reject",
+        "reject",
+        "reject"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "own",
+         "seed +1000"
+        ],
+        "why": "M has the most consistent orange-red stains resembling the potion, even if smudged, making it closest to the reference's intent.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +1000",
+         "own",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "N has the least color variation and most consistent grey texture across all views, making it least visually flawed.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "own",
+        "order": [
+         "seed +3000",
+         "seed +2000",
+         "own",
+         "seed +1000"
+        ],
+        "why": "M has the most coherent and evenly distributed stains, with the least ghosting and most consistent texture across all views.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +1000",
+         "own",
+         "seed +2000",
+         "seed +3000"
+        ],
+        "why": "N has the cleanest, most consistent texture with no smears or ghosting, making it the most usable as-is.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "16-green-dragon-sitting-cartoon": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +2000",
+        "order": [
+         "own",
+         "seed +3000",
+         "seed +1000",
+         "seed +2000"
+        ],
+        "why": "Only N has clean, consistent textures with no smudges or washed-out areas visible from any angle.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "seed +1000",
+         "seed +3000",
+         "own"
+        ],
+        "why": "K's back smear is least severe and most consistent with the reference's clean look.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +3000",
+         "seed +1000",
+         "seed +2000"
+        ],
+        "why": "K has the least severe texture issues; the smudges are minimal and confined to the back, making it the most visually consistent and usable version.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "seed +1000",
+         "seed +3000",
+         "own"
+        ],
+        "why": "K has the most consistent texture and shading across all views, with the least visible smudges and color shifts compared to the others.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "17-bowl-of-ramen-with-an-egg": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +1000",
+         "seed +3000"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "seed +1000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +1000",
+         "seed +3000"
+        ],
+        "why": "M has the most consistent and clean textures across all views, with no visible smears or color shifts, making it the most ready-to-use version.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +3000",
+         "seed +1000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "K has the least visible texture smearing and most consistent lighting across all views, making it the most coherent for a scene.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "18-electric-guitar": {
+     "textures": {
+      "seed +2000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 1
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 1
+      },
+      "seed +1000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 2
+      },
+      "seed +3000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "seed +3000",
+         "own",
+         "seed +1000"
+        ],
+        "why": "All have same flaws, but K's smudges are least severe and most consistent across views.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "own",
+         "seed +3000",
+         "seed +2000"
+        ],
+        "why": "All have similar flaws, but K's smudges are least washed out and most consistent across views.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "seed +3000",
+         "own",
+         "seed +1000"
+        ],
+        "why": "All versions have similar texture flaws, but K's front view is slightly cleaner and more consistent with the reference, making it the least flawed.",
+        "error": null
+       },
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +1000",
+         "own",
+         "seed +3000",
+         "seed +2000"
+        ],
+        "why": "N has the cleanest, most consistent texture with no smears or color errors on the back and sides, making it the most ready-to-use model.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "19-small-cabin-in-a-snowy-forest": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "K has the least texture smearing and most consistent window and door rendering across views.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "K has the least texture flaws, especially avoiding washed-out or smudged areas on the back and sides.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "seed +2000",
+         "own"
+        ],
+        "why": "All versions have similar texture flaws, but K's front door and window details are slightly clearer and more consistent than the others.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "own",
+         "seed +2000",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "N has the most consistent and clean textures across all angles, with no smears or colour shifts, making it the most ready-to-use version.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "20-hot-air-balloon": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "seed +2000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +3000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "seed +1000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +2000",
+        "order": [
+         "seed +2000",
+         "own",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "All versions are identical; K is chosen arbitrarily as first in alphabetical order.",
+        "error": null
+       },
+       {
+        "pick": "seed +1000",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "own",
+         "seed +2000"
+        ],
+        "why": "All versions are identical; K is chosen arbitrarily as first in list.",
+        "error": null
+       }
+      ],
+      "30b": [
+       {
+        "pick": "own",
+        "order": [
+         "seed +2000",
+         "own",
+         "seed +3000",
+         "seed +1000"
+        ],
+        "why": "L has the cleanest, most consistent texture across all views with no smears or color shifts, matching the reference best.",
+        "error": null
+       },
+       {
+        "pick": "seed +3000",
+        "order": [
+         "seed +1000",
+         "seed +3000",
+         "own",
+         "seed +2000"
+        ],
+        "why": "L has the most consistent and clean texture across all views, with no visible smears or color shifts, making it the most suitable for immediate use.",
+        "error": null
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "seeds": "Phase 4's, other texture noise (seed +4000 to +6000)",
+   "objects": {
+    "01-cute-low-poly-fox-sitting-down": {
+     "textures": {
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +6000",
+        "order": [
+         "seed +6000",
+         "own",
+         "seed +5000",
+         "seed +4000"
+        ],
+        "why": "K and L are flawless; M and N have mismatched stripes on tail and legs.",
+        "error": null
+       },
+       {
+        "pick": "seed +4000",
+        "order": [
+         "seed +4000",
+         "seed +5000",
+         "own",
+         "seed +6000"
+        ],
+        "why": "K has the least washed-out white chest and least smeared patches on the back and sides compared to L, M, and N.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "02-red-high-top-sneaker": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +4000",
+        "order": [
+         "seed +4000",
+         "seed +5000",
+         "seed +6000",
+         "own"
+        ],
+        "why": "K has the least severe smears and color shifts on the back and sides compared to L, M, and N.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +6000",
+         "seed +5000",
+         "seed +4000"
+        ],
+        "why": "K's back seam smudge is least distracting compared to others' similar flaws.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "03-gaming-chair-black-and-purple": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 4
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "seed +6000",
+         "own",
+         "seed +5000",
+         "seed +4000"
+        ],
+        "why": "L has the least washed-out purple trim and cleanest texture compared to M and N, despite minor dullness.",
+        "error": null
+       },
+       {
+        "pick": "seed +4000",
+        "order": [
+         "seed +4000",
+         "seed +5000",
+         "own",
+         "seed +6000"
+        ],
+        "why": "K's purple is more consistent and vibrant than N's red, which is fainter and more washed out across views.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "04-retro-arcade-machine": {
+     "textures": {
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "seed +5000",
+         "own",
+         "seed +6000",
+         "seed +4000"
+        ],
+        "why": "L has the cleanest red body and least smearing on the back compared to K, M, and N.",
+        "error": null
+       },
+       {
+        "pick": "seed +4000",
+        "order": [
+         "seed +4000",
+         "seed +6000",
+         "own",
+         "seed +5000"
+        ],
+        "why": "K's red smears are less washed-out than N's pink ones, making it visually cleaner for a hobbyist scene.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "05-sci-fi-laser-pistol-white": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 3
+      },
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +4000",
+        "order": [
+         "own",
+         "seed +4000",
+         "seed +6000",
+         "seed +5000"
+        ],
+        "why": "L has the least smudges and color inconsistencies compared to others, despite minor flaws.",
+        "error": null
+       },
+       {
+        "pick": "seed +6000",
+        "order": [
+         "seed +5000",
+         "seed +6000",
+         "seed +4000",
+         "own"
+        ],
+        "why": "L's orange barrel tip is most consistent with the reference, and its orange surfaces are cleanest and least smudged on the sides.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "06-wooden-shield-with-a-lion": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 4
+      },
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +6000",
+        "order": [
+         "seed +6000",
+         "seed +5000",
+         "seed +4000",
+         "own"
+        ],
+        "why": "Only K has a recognizable lion on all sides, despite smudges; others are unrecognizable or garbled.",
+        "error": null
+       },
+       {
+        "pick": "seed +6000",
+        "order": [
+         "own",
+         "seed +4000",
+         "seed +5000",
+         "seed +6000"
+        ],
+        "why": "Only N has a coherent, recognizable lion on the back, while K, L, and M have garbled or wrong patterns.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "07-chibi-knight-with-a-big-helmet": {
+     "textures": {
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +6000",
+        "order": [
+         "seed +6000",
+         "seed +4000",
+         "own",
+         "seed +5000"
+        ],
+        "why": "All have same flaws, but K's front is cleanest and most faithful to reference.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "seed +5000",
+         "own",
+         "seed +4000",
+         "seed +6000"
+        ],
+        "why": "L has the least smearing and washed-out areas on the back, making it most visually clean for a hobbyist.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "08-vintage-film-camera": {
+     "textures": {
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 4
+      },
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +5000",
+         "seed +6000",
+         "seed +4000"
+        ],
+        "why": "K has the least garbled textures and most consistent, clean silver finish on visible surfaces.",
+        "error": null
+       },
+       {
+        "pick": "seed +4000",
+        "order": [
+         "seed +4000",
+         "seed +6000",
+         "seed +5000",
+         "own"
+        ],
+        "why": "K's smears are less garbled and more localized than L, M, or N's messy back textures.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "09-donut-with-pink-frosting": {
+     "textures": {
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 2
+      },
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +4000",
+         "seed +5000",
+         "seed +6000"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       },
+       {
+        "pick": "seed +6000",
+        "order": [
+         "seed +6000",
+         "seed +5000",
+         "seed +4000",
+         "own"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "10-astronaut-helmet": {
+     "textures": {
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +6000",
+        "order": [
+         "seed +6000",
+         "seed +5000",
+         "seed +4000",
+         "own"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +4000",
+         "seed +5000",
+         "seed +6000"
+        ],
+        "why": "All versions identical; K chosen arbitrarily as first in list.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "11-stack-of-old-books-with-a-candle": {
+     "textures": {
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 4
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +6000",
+        "order": [
+         "own",
+         "seed +4000",
+         "seed +5000",
+         "seed +6000"
+        ],
+        "why": "N has clean, consistent textures with no smears, ghosting, or color shifts visible from any angle.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "seed +6000",
+         "seed +5000",
+         "seed +4000",
+         "own"
+        ],
+        "why": "N's candle flame is closest to reference, and textures are least smudged or garbled on sides and backs.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "12-skateboard-with-graffiti-art": {
+     "textures": {
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +5000",
+         "seed +4000",
+         "seed +6000"
+        ],
+        "why": "All have texture flaws, but K's graffiti is least washed out and most consistent across views.",
+        "error": null
+       },
+       {
+        "pick": "seed +4000",
+        "order": [
+         "seed +6000",
+         "seed +4000",
+         "seed +5000",
+         "own"
+        ],
+        "why": "L has the most consistent graffiti texture and least smearing, even if it has a color bleed on the underside.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "13-cute-cartoon-car-bright-blue": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 3
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +5000",
+        "order": [
+         "seed +6000",
+         "own",
+         "seed +4000",
+         "seed +5000"
+        ],
+        "why": "N has the least distracting texture flaws compared to K, L, and M's smudges and marks.",
+        "error": null
+       },
+       {
+        "pick": "seed +5000",
+        "order": [
+         "seed +5000",
+         "seed +4000",
+         "own",
+         "seed +6000"
+        ],
+        "why": "K has the least severe texture flaws, with only white smears on back and side, while others have red patches or smudges.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "14-bubble-tea-with-tapioca-pearls": {
+     "textures": {
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 4
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +4000",
+        "order": [
+         "seed +4000",
+         "seed +6000",
+         "seed +5000",
+         "own"
+        ],
+        "why": "All are rejectable, but K's texture is least garbled and most consistent across views.",
+        "error": null
+       },
+       {
+        "pick": "seed +4000",
+        "order": [
+         "own",
+         "seed +5000",
+         "seed +6000",
+         "seed +4000"
+        ],
+        "why": "N has the least texture flaws and most consistent color, despite needing minor fixes.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "15-health-potion-in-a-round-glass": {
+     "textures": {
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 4
+      },
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "seed +6000",
+         "seed +5000",
+         "own",
+         "seed +4000"
+        ],
+        "why": "M has the cleanest, most consistent texture with minimal smearing or color issues visible from all angles.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "seed +4000",
+         "own",
+         "seed +5000",
+         "seed +6000"
+        ],
+        "why": "L has the least severe texture flaws and most consistent color, despite washed-out details.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "16-green-dragon-sitting-cartoon": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "edits",
+        "publish"
+       ],
+       "picked_by": 4
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +6000",
+         "seed +4000",
+         "seed +5000"
+        ],
+        "why": "K has the least washed-out textures and most consistent detail across all views, despite minor smudges.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "seed +5000",
+         "seed +4000",
+         "seed +6000",
+         "own"
+        ],
+        "why": "N has the most consistent and cleanest texture across all views, with least smearing and best color fidelity on sides.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "17-bowl-of-ramen-with-an-egg": {
+     "textures": {
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 3
+      },
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +6000",
+        "order": [
+         "own",
+         "seed +5000",
+         "seed +4000",
+         "seed +6000"
+        ],
+        "why": "All have similar flaws, but N's garnish is least garbled and most consistent across views.",
+        "error": null
+       },
+       {
+        "pick": "seed +6000",
+        "order": [
+         "seed +6000",
+         "seed +4000",
+         "seed +5000",
+         "own"
+        ],
+        "why": "K has the least severe texture flaws, with only minor smearing on the egg and garnish, making it most visually coherent.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "18-electric-guitar": {
+     "textures": {
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "own": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 4
+      },
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +5000",
+        "order": [
+         "seed +5000",
+         "seed +6000",
+         "own",
+         "seed +4000"
+        ],
+        "why": "K has fewer and less severe texture flaws, especially the smears on the back and pickguard are less pronounced than in L, M, and N.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "seed +4000",
+         "own",
+         "seed +6000",
+         "seed +5000"
+        ],
+        "why": "L has the least washed-out textures and least smearing, especially on the back, making it most visually coherent.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "19-small-cabin-in-a-snowy-forest": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      },
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "publish",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +5000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 3
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +6000",
+        "order": [
+         "seed +4000",
+         "seed +6000",
+         "seed +5000",
+         "own"
+        ],
+        "why": "L has the cleanest textures overall, with least smearing and most consistent wood grain, even if minor flaws exist.",
+        "error": null
+       },
+       {
+        "pick": "own",
+        "order": [
+         "own",
+         "seed +5000",
+         "seed +6000",
+         "seed +4000"
+        ],
+        "why": "K has the least severe texture flaws, especially on the back and sides, making it most visually clean for a hobbyist.",
+        "error": null
+       }
+      ]
+     }
+    },
+    "20-hot-air-balloon": {
+     "textures": {
+      "own": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 3
+      },
+      "seed +5000": {
+       "verdicts": [
+        "edits",
+        "publish",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +6000": {
+       "verdicts": [
+        "edits",
+        "edits",
+        "edits",
+        "edits"
+       ],
+       "picked_by": 0
+      },
+      "seed +4000": {
+       "verdicts": [
+        "publish",
+        "publish",
+        "publish",
+        "publish"
+       ],
+       "picked_by": 1
+      }
+     },
+     "judges": {
+      "8b": [
+       {
+        "pick": "seed +4000",
+        "order": [
+         "seed +5000",
+         "own",
+         "seed +6000",
+         "seed +4000"
+        ],
+        "why": "N has the least smearing and most consistent color gradient across all views, closest to the reference.",
+        "error": null
+       },
+       {
+        "pick": "seed +4000",
+        "order": [
+         "seed +4000",
+         "seed +6000",
+         "own",
+         "seed +5000"
+        ],
+        "why": "K has the least smeared and washed-out textures, especially on the sides, making it most visually coherent.",
+        "error": null
+       }
+      ]
+     }
+    }
+   }
+  }
+ ]
+}
