@@ -1,6 +1,8 @@
 # Third-party notices: judge worker
 
-The judge is an experiment (Phase 7): nothing in production calls it, and nothing it makes reaches users.
+Production runs the 8B for texture options, only when a textures job asks for the judge's pick
+(`"judge": true`): its pick, verdicts and one-sentence reason reach users as a preselected texture, and it
+makes no models or images. The 30B is for experiments only (Phase 7).
 
 | Component                                                                                                                                                                       | Used for                                    | License                     |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------- |
