@@ -89,6 +89,34 @@ export interface ModelOutput {
    * before views, which ignore them.
    */
   viewsUsed?: number;
+  /**
+   * The pipeline that made the shape, when the worker says: "512" for previews, "1024_cascade"
+   * for finals, and "512" for a final that ran out of GPU memory (see workers/README.md).
+   */
+  pipeline?: string;
+}
+
+/**
+ * More textures for a final's shape (texture options): the 3D worker's "textures" job. The final's
+ * own texture isn't among them.
+ */
+export interface TexturesOutput {
+  textures: {
+    file: WorkerFile;
+    /** The seed the texture's noise came from: the final's seed + 1000 · k, for k = 1, 2, … */
+    textureSeed: number;
+    triangles: number;
+    bytes: number;
+  }[];
+  /** The textures that failed while the others were made */
+  errors: { textureSeed: number | null; message: string }[];
+  /**
+   * The pipeline that made the shape again, when the worker says. When it isn't the final's,
+   * the textures fit another shape.
+   */
+  pipeline?: string;
+  /** GPU seconds the job took */
+  seconds: number;
 }
 
 /** Where a view of the object was drawn from, in degrees (see workers/README.md, multiview). */
@@ -151,4 +179,16 @@ export interface StudioWorkers {
     requestId: string;
   }): Promise<string>;
   model(jobId: string): Promise<WorkerJobState<ModelOutput>>;
+  /**
+   * Makes `count` more textures for a final's shape (texture options), from what the final was
+   * made from: its picture, seed and views. Only workers that can make them have these.
+   */
+  startTextures?(input: {
+    image: Buffer;
+    views?: ModelView[];
+    seed: number;
+    count: number;
+    requestId: string;
+  }): Promise<string>;
+  textures?(jobId: string): Promise<WorkerJobState<TexturesOutput>>;
 }

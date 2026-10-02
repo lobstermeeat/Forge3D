@@ -128,6 +128,23 @@ export const aiGenerations = pgTable('ai_generations', {
   previewTriangles: integer('preview_triangles'),
   finalUrl: text('final_url'),
   finalTriangles: integer('final_triangles'),
+  /**
+   * The pipeline that made the final, when the worker said: "1024_cascade", or "512" when it ran
+   * out of GPU memory. Texture options made by another pipeline fit another shape.
+   */
+  finalPipeline: text('final_pipeline'),
+  /**
+   * Texture options (AI_TEXTURE_OPTIONS, on by default): more textures for the final's shape, made
+   * after it, for the user to choose from. running | done | failed; null when none were asked for.
+   * They never fail the generation.
+   */
+  texturesStatus: text('textures_status'),
+  /** The textures job while it runs */
+  texturesJobId: text('textures_job_id'),
+  /** The textures made, besides the final's own: model file, triangles and the noise's seed */
+  textures: jsonb('textures').$type<{ url: string; triangles: number; textureSeed: number }[]>(),
+  /** Why there are no textures to choose from, or why some of them couldn't be made */
+  texturesError: text('textures_error'),
   /** Attribution shown with the model, such as "Built with DINOv3" (a license requirement) */
   credits: jsonb('credits').$type<string[]>(),
   resultAssetId: uuid('result_asset_id').references(() => assets.id),

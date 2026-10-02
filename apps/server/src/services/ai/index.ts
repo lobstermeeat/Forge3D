@@ -11,7 +11,13 @@ export { SelfHostedProvider, createSelfHostedProvider } from './providers/selfHo
 export { JobEndpoint } from './providers/jobEndpoint';
 export { MockWorkers } from './providers/mock';
 export { AIStudio, StudioError } from './studio';
-export type { GenerationView, GenerationStatus, RunningStatus } from './studio';
+export type {
+  GenerationView,
+  GenerationStatus,
+  RunningStatus,
+  TextureOption,
+  TexturesStatus,
+} from './studio';
 export type {
   AIProvider,
   GenerationRequest,
@@ -55,6 +61,17 @@ export function multiviewEnabled(env: Record<string, string | undefined> = proce
   return env['AI_MULTIVIEW']?.trim() === '1';
 }
 
+/**
+ * Texture options: after each final, TRELLIS.2 makes 3 more textures for its shape and the
+ * creator picks one in the panel. On by default; AI_TEXTURE_OPTIONS=0 (or false) turns it off.
+ */
+export function textureOptionsEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const value = env['AI_TEXTURE_OPTIONS']?.trim().toLowerCase();
+  return value !== '0' && value !== 'false';
+}
+
 let studio: AIStudio | null = null;
 
 export function getStudio(): AIStudio {
@@ -71,6 +88,7 @@ export function getStudio(): AIStudio {
       store: drizzleGenerationStore(db),
       storage: getStorage(),
       multiview,
+      textureOptions: textureOptionsEnabled(),
     });
   }
   return studio;
