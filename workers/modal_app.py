@@ -41,7 +41,9 @@ import modal
 WORKERS = pathlib.Path(__file__).parent
 MODELS = "/models"
 OUTPUTS = "/outputs"
-APP_NAME = "orainge-ai"
+# Production's app. ORAINGE_APP_NAME runs the same code under another name, for a staging copy that
+# never touches production's deployment (a re-test as an ephemeral `modal run`, say)
+APP_NAME = os.environ.get("ORAINGE_APP_NAME", "orainge-ai")
 
 # Pinned exactly like trellis2/Dockerfile (tests/test_modal_app.py keeps them in sync)
 TORCH = ("torch==2.6.0", "torchvision==0.21.0")
