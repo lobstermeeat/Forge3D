@@ -9,6 +9,7 @@ import { modelName } from '@/editor/modelName';
 import { photoToDataUrl } from '@/editor/photo';
 import { TEXTURES_POLL_MS, texturesRunning, type TextureChoice } from '@/editor/textureOptions';
 import type { EditorActions } from '@/hooks/useEditorActions';
+import { useRecommendedTexture } from '@/hooks/useRecommendedTexture';
 import { useAIStore } from '@/stores/aiStore';
 import { useEditorStore } from '@/stores/editorStore';
 import { logOutput } from '@/stores/outputStore';
@@ -107,6 +108,7 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
     watched,
     watch,
     markPlaced,
+    markTextureChosen,
     restored,
     markRestored,
   } = useAIStore();
@@ -145,6 +147,11 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
   const keep = trpc.ai.keep.useMutation({ onSuccess: show, onError });
   const retry = trpc.ai.retry.useMutation({ onSuccess: show, onError });
   const busy = start.isPending || pick.isPending || keep.isPending || retry.isPending;
+  // Tells the server which texture went in the scene, and by whom; the generation comes back
+  const { mutate: recordTexture } = trpc.ai.chooseTexture.useMutation({
+    onSuccess: (next) => utils.ai.get.setData({ id: next.id }, next),
+    onError,
+  });
 
   // Start FLUX while the user types: after a quiet spell it takes about 45 s before it can draw
   const { mutate: warm } = trpc.ai.warm.useMutation();
@@ -213,6 +220,25 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
   // best start for 3D (if the worker rated them). The user can still choose any.
   const preselected = g?.status === 'picking' ? g.recommended : null;
   useEffect(() => setPicked(preselected), [g?.id, g?.status, preselected]);
+
+  // The generation's model in the scene, read on each render (the panel re-renders as the scene
+  // changes), so it follows Undo
+  const sceneEntity = g ? actions.findModelEntity(g.id) : null;
+  const sceneUrl = sceneEntity ? (actions.modelOf(sceneEntity)?.url ?? null) : null;
+
+  // The judge's pick is the default texture (AI_TEXTURE_JUDGE=1): when the options arrive, the
+  // model switches to it once, as picking it would (Undo says "Use texture 3"), unless the creator
+  // chose a texture first. While the scene plays it waits, and switches when the scene stops.
+  const recommendation = useRecommendedTexture(g, {
+    sceneUrl,
+    playing,
+    apply: (texture) => {
+      if (!g || !sceneEntity) return;
+      const model = { ...modelData(g, 'final'), url: texture.url };
+      actions.replaceModel(sceneEntity, model, `texture ${texture.number}`);
+      recordTexture({ id: g.id, number: texture.number, by: 'judge' });
+    },
+  });
 
   const elapsed = useElapsed(`${g?.id}:${g?.status}`, !!g && RUNNING.has(g.status));
 
@@ -375,13 +401,16 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
   let card: React.ReactNode = null;
   if (g) {
     const running = RUNNING.has(g.status);
-    const entityId = actions.findModelEntity(g.id);
+    const entityId = sceneEntity;
     const title = g.source === 'photo' ? 'From a photo' : `“${g.prompt}”`;
-    // A texture option swaps the model in the scene in place, or places it if it isn't there
+    // A texture option swaps the model in the scene in place, or places it if it isn't there.
+    // The creator's choice is remembered, so the judge's pick never goes over it
     const chooseTexture = (choice: TextureChoice) => {
       const model = { ...modelData(g, 'final'), url: choice.url };
+      if (g.final) markTextureChosen(g.final.url);
       if (entityId) actions.replaceModel(entityId, model, `texture ${choice.number}`);
       else actions.insertModel(model, modelName(g.prompt));
+      recordTexture({ id: g.id, number: choice.number, by: 'creator' });
     };
     card = (
       <section className="f3-ai-card" aria-live="polite" aria-label="Current AI model">
@@ -481,8 +510,9 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
             </p>
             <TextureOptions
               generation={g}
-              sceneUrl={entityId ? actions.modelOf(entityId)?.url : null}
+              sceneUrl={sceneUrl}
               disabled={playing}
+              switched={recommendation === 'applied'}
               onChoose={chooseTexture}
             />
             {!entityId && (
