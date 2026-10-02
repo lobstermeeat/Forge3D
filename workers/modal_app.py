@@ -595,6 +595,46 @@ class MultiView:
         return True
 
 
+def geometry_views_handler() -> Callable[[dict], dict]:
+    """GeometryViews' job handler: MV-Adapter's image+geometry model, loaded, behind handle_geometry_job."""
+    from multiview_worker.geometry import GeometryViewGenerator
+    from multiview_worker.service import handle_geometry_job
+
+    _require_weights("multiview")
+    generator = GeometryViewGenerator(MODELS)
+    return lambda job: handle_geometry_job(job, generator)
+
+
+@app.cls(
+    image=multiview_image,
+    gpu=MULTIVIEW_GPU,
+    cpu=2.0,
+    memory=16384,  # as MultiView: SDXL's fp16 weights and the adapter pass through RAM
+    volumes={MODELS: models},
+    timeout=300,
+    startup_timeout=600,
+    scaledown_window=30,  # experiments call it in bursts; idle time is billed
+    max_containers=1,
+)
+class GeometryViews:
+    """
+    Experiments only, nothing in production calls it: six views of a given mesh drawn from a picture
+    by MV-Adapter's image+geometry model (ig2mv, Apache-2.0, on SDXL). The caller renders the mesh's
+    position and normal maps; the job and its result are in multiview/multiview_worker/service.py
+    (handle_geometry_job), and README.md has the conventions:
+
+        modal_app.GeometryViews().generate.remote({"image_base64": …, "control_pngs": […], "seed": 0})
+    """
+
+    @modal.enter()
+    def load(self) -> None:
+        self.handle = geometry_views_handler()
+
+    @modal.method()
+    def generate(self, job: dict) -> dict:
+        return run_job(self.handle, job)
+
+
 # In download order: Pixal3D's script reuses the TRELLIS.2 worker's DINOv3, BiRefNet and decoders
 WEIGHT_SCRIPTS = {
     "trellis2": "/root/weights/trellis2.py",
@@ -614,7 +654,7 @@ WEIGHT_SCRIPTS = {
 )
 def download_models(which: str = "all", force: bool = False) -> None:
     """
-    Downloads the pinned weights (about 115 GB, 44 GB of it Pixal3D's two sets) into the orainge-models
+    Downloads the pinned weights (about 119 GB, 44 GB of it Pixal3D's two sets) into the orainge-models
     volume. CPU only.
     """
     if which != "all" and which not in WEIGHT_SCRIPTS:
