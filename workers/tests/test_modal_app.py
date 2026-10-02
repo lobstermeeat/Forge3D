@@ -50,7 +50,10 @@ def test_defines_the_workers_the_api_and_the_helpers():
     assert isinstance(modal_app.FluxSchnell, modal.Cls)
     assert isinstance(modal_app.MultiView, modal.Cls)
     assert isinstance(modal_app.GeometryViews, modal.Cls)
-    assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d"]  # download order
+    assert isinstance(modal_app.Judge8B, modal.Cls) and isinstance(modal_app.Judge30B, modal.Cls)
+    # Download order; the judge's last, and only when asked for
+    assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d", "judge"]
+    assert modal_app.EXPERIMENT_WEIGHTS == ("judge",)
     assert isinstance(modal_app.download_models, modal.Function)
     assert isinstance(modal_app.api, modal.Function)
     assert isinstance(modal_app.make_model, modal.Function)
@@ -187,6 +190,110 @@ def test_geometry_views_loads_the_model_once_and_handles_jobs(tmp_path, monkeypa
     out = handle({"id": "fc-01K6", "image_base64": base64.b64encode(picture.getvalue()).decode(), "control_pngs": control})
     assert len(out["views"]) == 6 and out["timings"] == {"views_s": 1.0} and built == [str(models)]
     assert handle({"id": "fc-01K7", "control_pngs": control}) == {"error": "invalid input: image_base64 must be a base64 string"}
+
+
+# The judge: Qwen3-VL in two sizes, for experiments only
+
+
+def test_the_judges_are_small_experiment_workers_one_class_per_size():
+    """The judge's image and a GPU per size, one container each that soon scales down; production never calls them."""
+    tree = ast.parse((WORKERS / "modal_app.py").read_text())
+    classes = {node.name: node for node in tree.body if isinstance(node, ast.ClassDef)}
+    for name, size in (("Judge8B", "8b"), ("Judge30B", "30b")):
+        decorator = classes[name].decorator_list[0]
+        options = {keyword.arg: keyword.value for keyword in decorator.keywords}
+        assert ast.unparse(options["gpu"]) == f"JUDGE_GPUS['{size}']" and ast.unparse(options[None]) == "JUDGE_OPTIONS"
+        assert [node.name for node in classes[name].body if isinstance(node, ast.FunctionDef)] == ["load", "judge"]
+        assert f"judge_handler('{size}')" in ast.unparse(classes[name])
+    # 17.5 GB of weights fit an L40S; 62 GB need an H100's 80
+    assert modal_app.JUDGE_GPUS == {"8b": "L40S", "30b": "H100"}
+    options = modal_app.JUDGE_OPTIONS
+    assert options["image"] is modal_app.judge_image and options["max_containers"] == 1
+    assert options["scaledown_window"] <= 60 and options["volumes"] == {modal_app.MODELS: modal_app.models}
+    assert "secrets" not in options  # results come back inline, never to R2
+    api = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "api")
+    assert "Judge" not in ast.unparse(api)
+    builds = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "build_images")
+    assert "('judge', judge_image)" in ast.unparse(builds)
+
+
+def test_judge_class_picks_the_class_for_a_size():
+    assert modal_app.judge_class("8b") is modal_app.Judge8B and modal_app.judge_class("30b") is modal_app.Judge30B
+    with pytest.raises(ValueError, match="8b, 30b, not '70b'"):
+        modal_app.judge_class("70b")
+
+
+def test_the_judge_image_installs_its_pinned_requirements():
+    requirements = (WORKERS / "judge" / "requirements.txt").read_text()
+    assert "transformers==4.57.6" in requirements and "accelerate==" in requirements  # Qwen3-VL: 4.57 on
+    assert re.search(r"pip_install_from_requirements\(str\(WORKERS / \"judge\" / \"requirements.txt\"\)\)", (WORKERS / "modal_app.py").read_text())
+    # The revisions the notice records are the ones the download script pins
+    notice = (WORKERS / "judge" / "NOTICE.md").read_text()
+    script = (WORKERS / "judge" / "scripts" / "download_weights.py").read_text()
+    for revision in re.findall(r'"Qwen/Qwen3-VL-[\w-]+", "([0-9a-f]{40})"', script):
+        assert f"`{revision}`" in notice
+    assert len(re.findall(r'"Qwen/Qwen3-VL-[\w-]+", "([0-9a-f]{40})"', script)) == 2
+
+
+def test_the_judge_loads_its_model_once_and_handles_jobs(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(WORKERS / "judge"))
+    from PIL import Image
+
+    from judge_worker import model as judge_model
+
+    built = []
+
+    class Model:
+        path = "/models/Qwen3-VL-30B-A3B-Instruct"
+        load_seconds = 42.0
+
+        def __init__(self, which, models_root, **options):
+            built.append((which, models_root))
+
+        def __call__(self, messages, max_new_tokens=1024):
+            return '{"K": "edits", "L": "publish", "best": "L", "why": "cleaner back"}'
+
+    monkeypatch.setattr(judge_model, "QwenVL", Model)
+    models = tmp_path / "models"
+    models.mkdir()
+    monkeypatch.setattr(modal_app, "MODELS", str(models))
+    with pytest.raises(RuntimeError, match="download_models --which judge"):
+        modal_app.judge_handler("30b")
+
+    (models / ".judge-weights").write_text("digest")
+    handle = modal_app.judge_handler("30b")
+    assert built == [("30b", str(models))]
+
+    def png(colour):
+        buffer = io.BytesIO()
+        Image.new("RGB", (48, 32), colour).save(buffer, format="PNG")
+        return base64.b64encode(buffer.getvalue()).decode()
+
+    # run_job adds the call's id to the job
+    job = {"id": "fc-01K6", "picture_png": png("white"), "candidates_png": [png("red"), png("blue")], "prompt": "a lamp"}
+    out = handle(job)
+    assert out["best"] == 1 and out["verdicts"] == ["edits", "publish"] and out["model"] == "30b"
+    assert out["why"] == "cleaner back" and built == [("30b", str(models))]
+    assert handle({"id": "fc-01K7", "candidates_png": []}) == {"error": "invalid input: picture_png must be a base64 string"}
+
+
+@pytest.mark.filterwarnings("ignore:The download_models function is executing locally")
+def test_downloading_all_leaves_the_judge_out(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(modal_app, "_download", lambda name, force: fetched.append(name))
+
+    class Volume:
+        def commit(self):
+            fetched.append("commit")
+
+    monkeypatch.setattr(modal_app, "models", Volume())
+    modal_app.download_models.local(which="all")
+    assert [name for name in fetched if name != "commit"] == ["trellis2", "reference", "multiview", "pixal3d"]
+    fetched.clear()
+    modal_app.download_models.local(which="judge")
+    assert fetched == ["judge", "commit"]
+    with pytest.raises(SystemExit, match="--which must be all, trellis2, reference, multiview, pixal3d, judge"):
+        modal_app.download_models.local(which="qwen")
 
 
 # Two models in one container: TRELLIS.2 for previews, Pixal3D for finals
