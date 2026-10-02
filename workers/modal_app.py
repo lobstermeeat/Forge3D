@@ -13,11 +13,13 @@ this computer sleeps or goes offline, and `--run NAME` continues a run from its 
 step. `make_set` does the same for every line of a test set, and workers/gallery/ turns the
 results into a review page.
 
-Previews are TRELLIS.2's '512' pipeline; finals go through the Pixal3D recipe (README.md, "The
-recipe"): TRELLIS.2's '512' preview at the job's seed, the picture's camera found against it, Pixal3D's
+Previews are TRELLIS.2's '512' pipeline, and so are finals ('1024_cascade') unless the app is deployed
+with ORAINGE_FINAL_MODEL=pixal3d: then finals go through the Pixal3D recipe (README.md, "The recipe"),
+TRELLIS.2's '512' preview at the job's seed, the picture's camera found against it, Pixal3D's
 multi-view weights with the picture as their one view (the single-view weights for a thin, flat
 object), levelled, then the usual export. Both run in the Trellis2 container, so the server's contract
-(worker "trellis2", mode "preview" | "final") is unchanged.
+(worker "trellis2", mode "preview" | "final") is the same either way. Phase 6's re-test kept TRELLIS.2
+as the default: the recipe fixed made-up backs but lost more on textures (README.md, "The recipe").
 
 The GPU code is the same as in the RunPod images (trellis2/, flux-schnell/); only the entry
 points differ. The job API (job_api.py) speaks RunPod's protocol, so the server's client works
@@ -34,7 +36,7 @@ import re
 import threading
 import time
 import traceback
-from typing import Any, Callable, Collection, Optional
+from typing import Any, Callable, Collection, Optional, Sequence
 
 import modal
 
@@ -68,14 +70,18 @@ UTILS3D_COMMIT = "3fab839f0be9931dac7c8488eb0e1600c236e183"  # what that MoGe pi
 # pictures, the single-view set for thin, flat objects: pixal3d_worker/thin.py)
 PIXAL3D_WEIGHTS = "all"
 
-# Which model makes finals: Pixal3D (the recipe), or TRELLIS.2 alone as before Phase 6. Read when the
-# app is deployed and baked into the TRELLIS.2 image, so production goes back with one env change:
-#     ORAINGE_FINAL_MODEL=trellis2 modal deploy workers/modal_app.py
-# Previews are always TRELLIS.2's, and so are finals while Pixal3D's weights or models can't be loaded.
-FINAL_MODELS = ("pixal3d", "trellis2")
+# Which model makes finals: TRELLIS.2 (the default), or Pixal3D (the recipe), which Phase 6's re-test
+# found no better overall (README.md, "The recipe"). Read when the app is deployed and baked into the
+# images, so switching is one env change:
+#     ORAINGE_FINAL_MODEL=pixal3d modal deploy workers/modal_app.py
+# Previews are always TRELLIS.2's, and so are finals while Pixal3D's weights or models can't be loaded
+# (the result's "fallback" says why).
+FINAL_MODELS = ("trellis2", "pixal3d")
 FINAL_MODEL = os.environ.get("ORAINGE_FINAL_MODEL", FINAL_MODELS[0])
 if FINAL_MODEL not in FINAL_MODELS:
     raise SystemExit(f"ORAINGE_FINAL_MODEL must be one of {', '.join(FINAL_MODELS)}, not {FINAL_MODEL!r}")
+# The weights a final needs besides TRELLIS.2's
+FINAL_WEIGHTS = ("pixal3d",) if FINAL_MODEL == "pixal3d" else ()
 
 # 48 GB cards keep every TRELLIS.2 model on the GPU. An A10 (24 GB) costs about half as much per
 # second but is slower and needs TRELLIS2_LOW_VRAM = "1"; 1024³ finals may run out of memory there.
@@ -222,7 +228,8 @@ api_image = (
 )
 
 # For `make`, which only coordinates the GPU workers
-light_image = modal.Image.debian_slim(python_version="3.11")
+# make_model runs here, and fetches Pixal3D's weights for finals only when they make them
+light_image = modal.Image.debian_slim(python_version="3.11").env({"ORAINGE_FINAL_MODEL": FINAL_MODEL})
 
 
 def run_job(handle: Callable[[dict], dict], job: dict) -> dict:
@@ -349,6 +356,10 @@ class ModelPool:
         self._failed[name] = reason
         print(f"[orainge] {name} is not available, so finals are made with trellis2: {reason}")
 
+    def failure(self, name: str) -> Optional[str]:
+        """Why `name` was counted out (its weights missing, or its build failed), or None."""
+        return self._failed.get(name)
+
     @property
     def loaded(self) -> set[str]:
         """The models a job can ask for: those built, and those still being built (use() waits for them)."""
@@ -403,7 +414,9 @@ def handle_with_models(
     ``handlers`` holds each model's handle_job (production's for TRELLIS.2; the Pixal3D worker's, which
     binds a job's views and reports the recipe's camera, pose, level, weights and thin). A final that
     Pixal3D can't make for want of GPU memory, even after its own low-VRAM retry, is made with TRELLIS.2
-    instead, which says so in ``"fallback"``: a model the user keeps is worth more than an error.
+    instead, with Pixal3D's models off the GPU meanwhile (which also clears the stale CUDA error a
+    CuMesh failure leaves), and says so in ``"fallback"``: a model the user keeps is worth more than an
+    error. A final made with TRELLIS.2 because the final model isn't there says why in ``"fallback"`` too.
     """
     name = choose_model(job, final_model, pool.loaded)
     runtime = pool.use(name)
@@ -413,13 +426,36 @@ def handle_with_models(
     if name != "trellis2" and _ran_out_of_memory(result):
         reason = str(result["error"])
         print(f"[orainge] {name} ran out of GPU memory; making this final with trellis2 instead: {reason}")
-        name, runtime = "trellis2", pool.use("trellis2")
-        result = handlers[name](job, runtime, storage, pack)
+        failed = runtime
+        _call_quietly(failed, "_offload")
+        try:
+            name, runtime = "trellis2", pool.use("trellis2")
+            result = handlers[name](job, runtime, storage, pack)
+        finally:
+            _call_quietly(failed, "_restore")
         if "error" not in result:
             result["fallback"] = reason
+    elif name == "trellis2" and final_model != "trellis2" and _is_final(job) and "error" not in result:
+        result["fallback"] = pool.failure(final_model) or f"{final_model} is not loaded"
     if "error" not in result:
         result["model"] = name
     return result
+
+
+def _is_final(job: dict) -> bool:
+    payload = job.get("input")
+    return not isinstance(payload, dict) or payload.get("mode", "final") == "final"
+
+
+def _call_quietly(runtime: Any, method: str) -> None:
+    """Moves a runtime's models (``_offload``/``_restore``) if it can; a failure there only costs speed."""
+    move = getattr(runtime, method, None)
+    if not callable(move):
+        return
+    try:
+        move()
+    except Exception as err:  # noqa: BLE001 - the job's own result matters more
+        print(f"[orainge] {method} failed: {type(err).__name__}: {err}")
 
 
 @app.cls(
@@ -441,8 +477,8 @@ def handle_with_models(
 class Trellis2:
     """
     Image to textured, web-packed GLB. Input and output as in README.md (Job contracts). Previews are
-    TRELLIS.2's and finals go through the Pixal3D recipe (or TRELLIS.2: FINAL_MODEL), in one container,
-    so a preview's seed carries into its final the way it always has.
+    TRELLIS.2's, and so are finals unless FINAL_MODEL is "pixal3d" (the recipe), in one container, so a
+    preview's seed carries into its final the way it always has.
     """
 
     @modal.enter()
@@ -663,6 +699,7 @@ def run_pipeline(
     save: Callable[[], Any],
     pick: Optional[int] = None,
     pictures_only: bool = False,
+    final_weights: Sequence[str] = (),
 ) -> dict:
     """
     Prompt or image -> reference images -> preview GLB -> (optionally) final GLB, written into
@@ -672,7 +709,8 @@ def run_pipeline(
     The reference picture the worker scored best goes on to 3D (the first, if it didn't score
     them) unless `pick` names another (1-4), the way a user picks one in the Studio.
     `pictures_only` stops before 3D, so the pictures can be looked at first; running again with
-    `pick` then makes the model.
+    `pick` then makes the model. `final_weights` are what a final needs besides TRELLIS.2's (Pixal3D's
+    when it makes finals), fetched before the final even when the run continues an earlier one.
     """
     folder.mkdir(parents=True, exist_ok=True)
     progress_file = folder / "progress.json"
@@ -741,12 +779,15 @@ def run_pipeline(
             raise RuntimeError(result["error"])
         return result
 
+    ensured: set[str] = set()
+
     def weights() -> dict:
         names = ["trellis2", "reference"] if prompt else ["trellis2"]
         if final:
-            names.append("pixal3d")  # finals go through the Pixal3D recipe (TRELLIS.2 alone without them)
+            names.extend(final_weights)
         for name in names:
             ensure_weights(name)
+            ensured.add(name)
         return {}
 
     def reference_images() -> dict:
@@ -817,6 +858,10 @@ def run_pipeline(
         return state
     attempt("preview", model("preview"))
     if final:
+        # A run continued with --final (its weights step done earlier, for a preview) still needs them
+        for name in final_weights:
+            if name not in ensured:
+                ensure_weights(name)
         attempt("final", model("final"))
     return state
 
@@ -849,6 +894,7 @@ def make_model(
         save=outputs.commit,
         pick=pick or None,
         pictures_only=pictures_only,
+        final_weights=FINAL_WEIGHTS,
     )
 
 
@@ -1054,7 +1100,7 @@ def make_set(prompts: str, final: bool = True, name: str = "", pictures_only: bo
     if any("prompt" in run for run in runs):
         download_models.remote(which="all")
     else:
-        for which in ["trellis2", "pixal3d"] if final else ["trellis2"]:
+        for which in ["trellis2", *FINAL_WEIGHTS] if final else ["trellis2"]:
             download_models.remote(which=which)
     # All at once, so every run finishes before the copies start and the map closes cleanly
     arguments = set_arguments(names, runs, existing, final, chosen, pictures_only)

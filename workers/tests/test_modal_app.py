@@ -36,6 +36,13 @@ def test_pixal3d_pins_match_its_notice():
     assert modal_app.FINAL_MODEL in modal_app.FINAL_MODELS
 
 
+def test_finals_are_trellis2s_unless_deployed_with_pixal3d(monkeypatch):
+    """Phase 6's re-test kept TRELLIS.2 as the default; ORAINGE_FINAL_MODEL=pixal3d switches to the recipe."""
+    assert modal_app.FINAL_MODELS[0] == "trellis2"
+    if "ORAINGE_FINAL_MODEL" not in __import__("os").environ:
+        assert modal_app.FINAL_MODEL == "trellis2" and modal_app.FINAL_WEIGHTS == ()
+
+
 def test_defines_the_workers_the_api_and_the_helpers():
     assert isinstance(modal_app.Trellis2, modal.Cls)
     assert isinstance(modal_app.FluxSchnell, modal.Cls)
@@ -246,13 +253,52 @@ def test_finals_fall_back_to_trellis2_when_pixal3d_is_not_there(capsys):
     pool.count_out("pixal3d", "its weights are missing")
     handlers = Handlers({"trellis2": {"glb": "t", "pipeline": "1024_cascade"}})
     result = modal_app.handle_with_models(job("final"), pool, "pixal3d", handlers, None, None)
-    assert result == {"glb": "t", "pipeline": "1024_cascade", "model": "trellis2"}
+    # The result says why the final isn't Pixal3D's, so a silent switch shows in every result
+    assert result == {"glb": "t", "pipeline": "1024_cascade", "model": "trellis2", "fallback": "its weights are missing"}
     assert trellis2.log == []  # TRELLIS.2 keeps the GPU to itself
+    # Previews never say so: they are TRELLIS.2's anyway
+    preview = modal_app.handle_with_models(job("preview"), pool, "pixal3d", handlers, None, None)
+    assert "fallback" not in preview
 
     # Deployed with ORAINGE_FINAL_MODEL=trellis2: Pixal3D is never asked for
     pool = pool_with_both()
     result = modal_app.handle_with_models(job("final"), pool, "trellis2", handlers, None, None)
-    assert result["model"] == "trellis2" and pool.resident == "trellis2"
+    assert result["model"] == "trellis2" and pool.resident == "trellis2" and "fallback" not in result
+
+
+class MovableRuntime(FakeRuntime):
+    """A runtime whose models can go to the CPU and back (Pixal3D's _offload and _restore)."""
+
+    def _offload(self):
+        self.log.append("offload")
+
+    def _restore(self):
+        self.log.append("restore")
+
+
+def test_a_pixal3d_out_of_memory_fallback_runs_with_pixal3ds_models_off_the_gpu():
+    """Its _offload also clears the stale CUDA error a CuMesh failure leaves; _restore brings it back after."""
+    trellis2, pixal3d = FakeRuntime("trellis2"), MovableRuntime("pixal3d")
+    pool = modal_app.ModelPool(trellis2)
+    pool.load_later("pixal3d", lambda: pixal3d)
+    order = []
+    oom = {"error": "export failed: RuntimeError: [CuMesh] CUDA error: out of memory"}
+
+    class Recording(Handlers):
+        def __getitem__(self, name):
+            handle = super().__getitem__(name)
+
+            def recorded(job, runtime, storage, pack):
+                order.append((name, list(pixal3d.log)))
+                return handle(job, runtime, storage, pack)
+
+            return recorded
+
+    handlers = Recording({"pixal3d": oom, "trellis2": {"glb": "t"}})
+    result = modal_app.handle_with_models(job("final"), pool, "pixal3d", handlers, None, None)
+    assert result == {"glb": "t", "model": "trellis2", "fallback": oom["error"]}
+    assert order == [("pixal3d", []), ("trellis2", ["offload"])]
+    assert pixal3d.log == ["offload", "restore"]
 
 
 def test_build_pixal3d_shares_the_containers_trellis2(monkeypatch):
@@ -353,9 +399,9 @@ def run(folder, workers, **kwargs):
 def test_prompt_run_saves_every_step(tmp_path):
     workers = FakeWorkers()
     folder = tmp_path / "run-1"
-    state = run(folder, workers, prompt="a brass pocket watch", final=True)
+    state = run(folder, workers, prompt="a brass pocket watch", final=True, final_weights=("pixal3d",))
 
-    # The weights for every step, Pixal3D's because a final is asked for
+    # The weights for every step, Pixal3D's because it makes the final
     assert workers.calls[:3] == [("weights", "trellis2"), ("weights", "reference"), ("weights", "pixal3d")]
     assert workers.calls[3] == (
         "reference",
@@ -392,6 +438,24 @@ def test_prompt_run_saves_every_step(tmp_path):
     assert preview_step["model"] == "trellis2"
     assert "views_used" not in final_step and "fallback" not in final_step
     assert not {"weights", "thin", "camera", "pose", "level"} & set(preview_step)
+
+
+def test_a_run_continued_with_a_final_fetches_the_final_models_weights(tmp_path):
+    """`make --run NAME --final` after a preview-only run: its weights step is done, Pixal3D's aren't."""
+    workers = FakeWorkers()
+    folder = tmp_path / "run-1"
+    run(folder, workers, image=b"img", image_name="pic.png", final_weights=("pixal3d",))
+    assert ("weights", "pixal3d") not in workers.calls  # no final, so no Pixal3D
+
+    workers.calls.clear()
+    run(folder, workers, final=True, final_weights=("pixal3d",))
+    assert [call[0] if call[0] != "weights" else call for call in workers.calls] == [("weights", "pixal3d"), "trellis"]
+
+
+def test_finals_by_trellis2_fetch_nothing_more(tmp_path):
+    workers = FakeWorkers()
+    run(tmp_path / "run-1", workers, image=b"img", image_name="pic.png", final=True)
+    assert [call for call in workers.calls if call[0] == "weights"] == [("weights", "trellis2")]
 
 
 def test_an_interrupted_run_continues_where_it_stopped(tmp_path):
@@ -464,7 +528,8 @@ def test_pictures_first_then_the_picked_one_becomes_3d(tmp_path):
     workers = FakeWorkers()
     folder = tmp_path / "run-7"
     state = run(folder, workers, prompt="a lamp", final=True, pictures_only=True)
-    assert [name for name, _ in workers.calls] == ["weights", "weights", "weights", "reference"]
+    assert workers.calls[:2] == [("weights", "trellis2"), ("weights", "reference")]
+    assert [name for name, _ in workers.calls] == ["weights", "weights", "reference"]
     assert state["input"] == "reference-5.png" and "preview" not in state["steps"]
 
     # Like a user in the Studio: the second picture goes on to 3D, preview and final
@@ -768,7 +833,8 @@ def test_make_set_runs_every_line_and_reports_failures(tmp_path, monkeypatch, ca
     assert "make_set --prompts" in out and "--name s" in out
 
 
-def test_a_set_of_photos_fetches_trellis2_and_pixal3d_for_finals(tmp_path, monkeypatch):
+@pytest.mark.parametrize("final_weights", [(), ("pixal3d",)])
+def test_a_set_of_photos_fetches_the_weights_its_finals_need(final_weights, tmp_path, monkeypatch):
     photo = tmp_path / "cat.png"
     photo.write_bytes(b"png")
     listing = tmp_path / "set.txt"
@@ -790,9 +856,11 @@ def test_a_set_of_photos_fetches_trellis2_and_pixal3d_for_finals(tmp_path, monke
     monkeypatch.setattr(modal_app, "outputs", Outputs({}))
     monkeypatch.setattr(modal_app, "download_models", Download())
     monkeypatch.setattr(modal_app, "make_model", MakeModel())
+    monkeypatch.setattr(modal_app, "FINAL_WEIGHTS", final_weights)  # deployed with ORAINGE_FINAL_MODEL=pixal3d, or not
     monkeypatch.chdir(tmp_path)
     modal_app.make_set.info.raw_f(prompts=str(listing), final=True, name="s")
-    assert calls == ["trellis2", "pixal3d"]  # no FLUX for photos; Pixal3D's after TRELLIS.2's, which it reuses
+    # No FLUX for photos; Pixal3D's after TRELLIS.2's (which it reuses) when Pixal3D makes the finals
+    assert calls == ["trellis2", *final_weights]
     calls.clear()
     modal_app.make_set.info.raw_f(prompts=str(listing), final=False, name="s")
     assert calls == ["trellis2"]

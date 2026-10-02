@@ -91,6 +91,10 @@ class FakePipeline:
         activations = Activations()
         self.activations.append(weakref.ref(activations))
         outcome = self.outcomes[len(self.runs) - 1]
+        if outcome.startswith("stranded-"):
+            # Upstream's low-VRAM stage moved its model to the GPU, then failed before moving it back
+            self.models["shape_slat_flow_model_1024"].to("cuda")
+            outcome = outcome[len("stranded-"):]
         if outcome != "mesh":
             raise failure(outcome, len(self.runs))
         return [outcome]
@@ -274,6 +278,31 @@ def test_sleep_puts_the_models_off_the_gpu_for_good_and_wake_brings_them_back():
     assert not runtime.asleep and pipeline.low_vram is False and pipeline.weights() == {"cuda"}
     assert runtime.generate(cutout(), PRESETS["final"], seed=7) == "mesh"
     assert pipeline.runs[-1]["low_vram"] is False
+
+
+@pytest.mark.parametrize("why", ["deployed in low-VRAM mode", "asleep"])
+def test_a_model_a_failed_stage_left_on_the_gpu_goes_back_to_the_cpu(why, capsys):
+    """Upstream's low-VRAM stages move their model back without a finally; the restore does it instead."""
+    pipeline = FakePipeline(outcomes=["stranded-oom", "mesh"], low_vram=why != "asleep")
+    runtime = runtime_around(pipeline)
+    if why == "asleep":
+        runtime.sleep()
+
+    assert runtime.generate(cutout(), PRESETS["final"], seed=7) == "mesh"
+    assert runtime.pipeline_used == "512"
+    assert pipeline.low_vram is True and pipeline.weights() == {"cpu"}
+
+
+def test_freeing_gpu_memory_clears_a_stale_cuda_error(monkeypatch, capsys):
+    """CuMesh never resets CUDA's error flag; the next run's first kernel would report it."""
+    import forge3d_worker.pipeline as pipeline_module
+
+    monkeypatch.setattr(pipeline_module, "clear_cuda_error", lambda: "CUDA error: out of memory")
+    pipeline = FakePipeline(outcomes=["cumesh-oom", "mesh"], low_vram=True)
+    assert runtime_around(pipeline).generate(cutout(), PRESETS["final"], seed=7) == "mesh"
+    assert "[forge3d] cleared a stale CUDA error before going on: CUDA error: out of memory" in capsys.readouterr().out
+    monkeypatch.undo()
+    assert pipeline_module.clear_cuda_error() is None  # without CUDA (these tests) there is nothing to clear
 
 
 @pytest.mark.parametrize("kind", ["oom", "cumesh-oom"])

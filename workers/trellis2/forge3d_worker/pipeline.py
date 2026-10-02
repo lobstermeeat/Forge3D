@@ -141,6 +141,30 @@ def is_out_of_memory(err: BaseException) -> bool:
 FALLBACK_PIPELINE = {"1024_cascade": "512"}
 
 
+def clear_cuda_error() -> Optional[str]:
+    """
+    Resets the CUDA runtime's sticky "last error", returning the message it held, or None.
+
+    CuMesh checks its own cudaMalloc calls and raises a RuntimeError when one fails, but never calls
+    cudaGetLastError, which is what resets the runtime's per-thread error flag. Torch's next kernel
+    launch check then reports that stale flag as "CUDA error: out of memory" with the GPU all but
+    empty, so a retry or a fallback after it dies on its first tensor op (Phase 5's logs: only the
+    second retry got through, because the first had consumed the flag). A tiny launch here consumes it
+    instead: the check raises, the flag is clear, and the error is swallowed. Nothing to do without CUDA.
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        return None
+    try:
+        torch.cuda.synchronize()
+        torch.zeros(1, device="cuda").fill_(1)  # the launch check is what reads and resets the flag
+        torch.cuda.synchronize()
+        return None
+    except RuntimeError as err:
+        return _one_line(err)
+
+
 class Trellis2Runtime:
     """Holds the loaded pipeline between jobs (one per worker process)."""
 
@@ -320,19 +344,26 @@ class Trellis2Runtime:
     def _free_gpu_memory() -> None:
         """
         Frees what a failed run left in reference cycles, then hands torch's cached blocks (the weights'
-        old ones included, after an offload) back to CUDA: CuMesh allocates outside that cache.
+        old ones included, after an offload) back to CUDA: CuMesh allocates outside that cache. Then
+        clears CUDA's stale error flag (clear_cuda_error), so the run after a CuMesh failure can start.
         """
         import torch
 
         gc.collect()
         torch.cuda.empty_cache()
+        stale = clear_cuda_error()
+        if stale:
+            print(f"[forge3d] cleared a stale CUDA error before going on: {stale}")
 
     def _restore(self) -> None:
         """
         Every model back where __init__ put them: on the GPU, unless the runtime is deployed in low-VRAM mode
-        (TRELLIS2_LOW_VRAM=1) or asleep, when nothing moves.
+        (TRELLIS2_LOW_VRAM=1) or asleep. Then everything goes back to the CPU instead: upstream's low-VRAM
+        stages move their model to the GPU and back without a ``finally``, so a stage that failed leaves
+        its model on the GPU.
         """
         if self.asleep or self.low_vram_configured:
+            self._offload()
             return
         self.pipeline.low_vram = False
         self.pipeline.cuda()

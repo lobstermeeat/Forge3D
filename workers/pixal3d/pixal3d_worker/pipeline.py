@@ -33,6 +33,7 @@ from PIL import Image
 
 from forge3d_worker.inputs import InputError
 from forge3d_worker.pipeline import CUTOUT, Trellis2Runtime, _configure_environment, _one_line, is_out_of_memory
+from forge3d_worker.pipeline import clear_cuda_error  # noqa: F401 - _free_gpu_memory's, patched by tests
 from forge3d_worker.pipeline import MODEL_DIR as TRELLIS2_MODEL_DIR
 from forge3d_worker.settings import PRESETS, Preset
 
@@ -196,31 +197,6 @@ def load_naf(naf_dir: str = NAF_DIR, weights: str = NAF_WEIGHTS) -> Any:
     model.eval()
     model.requires_grad_(False)
     return model
-
-
-def clear_cuda_error() -> Optional[str]:
-    """
-    Resets the CUDA runtime's sticky "last error", returning the message it held, or None.
-
-    CuMesh checks its own cudaMalloc calls and raises a RuntimeError when one fails, but never calls
-    cudaGetLastError, which is what resets the runtime's per-thread error flag. Torch's next kernel
-    launch check then reports that stale flag as "CUDA error: out of memory" with the GPU all but
-    empty, and a retry with the models off the GPU dies on its first tensor op (the 11 books' export
-    in the first run; the same pattern in Phase 5's logs, where only the second retry got through,
-    because the first had consumed the flag). A tiny launch here consumes it instead: the check
-    raises, the flag is clear, and the error is swallowed. Nothing to do without CUDA.
-    """
-    import torch
-
-    if not torch.cuda.is_available():
-        return None
-    try:
-        torch.cuda.synchronize()
-        torch.zeros(1, device="cuda").fill_(1)  # the launch check is what reads and resets the flag
-        torch.cuda.synchronize()
-        return None
-    except RuntimeError as err:
-        return _one_line(err)
 
 
 PROJ_MODULE = "pixal3d.trainers.flow_matching.mixins.image_conditioned_proj"
