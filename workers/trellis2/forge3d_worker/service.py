@@ -137,6 +137,8 @@ def make_textures(spec: Job, runtime: Runtime, storage: Storage, pack: Pack) -> 
     and stored as a final is, at ``spec.texture_key(k)``. The final's own texture isn't exported again: the
     creator has it. A texture that fails is listed in ``texture_errors`` and the others go on; when none is
     made, the job fails. A runtime that can't retexture (the Pixal3D worker's) is refused before anything runs.
+    Each texture's ``export`` says how its export ran (Trellis2Runtime's last_export): the first runs to_glb
+    in full and keeps the shape's texture layout, the others only sample their texture onto it ("rebake").
     """
     if not callable(getattr(runtime, "retexture", None)):
         return {"error": TEXTURES_NEED_TRELLIS2}
@@ -174,7 +176,7 @@ def make_textures(spec: Job, runtime: Runtime, storage: Storage, pack: Pack) -> 
                 raw, triangles = timed("export_s", runtime.export, mesh, preset)
             finally:
                 del mesh  # off the GPU before the next texture is sampled
-            notes = _export_notes(runtime)
+            notes = {**_export_notes(runtime), **_export_path(runtime)}
             refresh = refresh or _gpu_fault(notes)
             packed = timed("pack_s", pack, raw, preset.texture_size)
             stored = timed("upload_s", storage.put, spec.texture_key(number), packed, "model/gltf-binary")
@@ -194,7 +196,7 @@ def make_textures(spec: Job, runtime: Runtime, storage: Storage, pack: Pack) -> 
                 "bytes": len(packed),
                 "raw_bytes": len(raw),
                 "triangles": triangles,
-                **notes,  # "projection" and "floaters", as a final has them
+                **notes,  # "projection" and "floaters", as a final has them, and "export"
             }
         )
 
@@ -251,6 +253,15 @@ def _export_notes(runtime: Any) -> dict:
         if isinstance(value, dict) and value:
             notes[key] = value
     return notes
+
+
+def _export_path(runtime: Any) -> dict:
+    """
+    How the runtime's last export() made its model (Trellis2Runtime's last_export), as ``export``:
+    ``{"path": "to_glb" | "rebake", "seconds": ...}``. Only when there is one; textures jobs only.
+    """
+    value = getattr(runtime, "last_export", None)
+    return {"export": dict(value)} if isinstance(value, dict) and value else {}
 
 
 def _gpu_fault(notes: dict) -> bool:
