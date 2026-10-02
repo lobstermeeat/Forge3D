@@ -9,6 +9,8 @@ import {
   LIMITS,
   StudioError,
   TEXTURE_COUNT,
+  TEXTURES_START_MS,
+  TEXTURES_TIMEOUT_MS,
   VIEWS_TIMEOUT_MS,
   WARM_INTERVAL_MS,
   type GenerationRecord,
@@ -1203,6 +1205,11 @@ describe('AIStudio texture options', () => {
         code: 'ECONNREFUSED',
       }),
     });
+  /** What fetch throws when the connection drops once the request is out */
+  const reset = () =>
+    new TypeError('fetch failed', {
+      cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }),
+    });
 
   it('makes 3 more textures for a done final, from what the final was made from', async () => {
     const t = setup();
@@ -1407,30 +1414,163 @@ describe('AIStudio texture options', () => {
     });
   });
 
-  it('waits out network trouble, starting or polling the textures', async () => {
-    const t = setup();
-    t.control.texturesStartError = new Error('fetch failed');
-    let gen = await finished(t);
-    // Still to start: the next poll tries again
-    expect(gen).toMatchObject({ status: 'done', textures: { status: 'running' } });
-    expect(t.store.rows.get(gen.id)!.texturesJobId).toBeNull();
-    delete t.control.texturesStartError;
-    gen = await t.studio.get('u1', gen.id);
-    const jobId = texturesJob(t, gen);
-    expect(jobId).toMatch(/^textures-/);
+  it('tries a start again only while it never reached the workers, for 2 minutes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let now = Date.parse('2026-10-01T12:00:00Z');
+      vi.setSystemTime(now);
+      const t = setup();
+      // The job API can't be connected to, so no job was queued: the next poll tries again
+      t.control.texturesStartError = refused();
+      let gen = await finished(t);
+      expect(gen).toMatchObject({ status: 'done', textures: { status: 'running' } });
+      expect(t.store.rows.get(gen.id)!.texturesJobId).toBeNull();
+      vi.setSystemTime(now + TEXTURES_START_MS - 1000);
+      expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+      delete t.control.texturesStartError;
+      gen = await t.studio.get('u1', gen.id);
+      expect(texturesJob(t, gen)).toMatch(/^textures-/);
+      expect(texturesStarts(t)).toHaveLength(1);
 
-    t.textures.set(
-      jobId,
-      new Error('AI worker status failed: 503 {"detail":"Modal can\'t be reached"}'),
+      // Storage trouble before anything is sent is tried again the same way
+      const other = await finalReady(t, 'u2');
+      await t.studio.get('u2', other.id);
+      const read = t.storage.read;
+      t.storage.read = async () => {
+        throw new Error('read ECONNRESET');
+      };
+      expect((await t.studio.get('u2', other.id)).textures?.status).toBe('running');
+      t.storage.read = read;
+      expect(texturesJob(t, await t.studio.get('u2', other.id))).toMatch(/^textures-/);
+      expect(warn).not.toHaveBeenCalled();
+
+      // But not from 2 minutes after the final on
+      now += 60 * 60 * 1000;
+      vi.setSystemTime(now);
+      t.control.texturesStartError = refused();
+      const late = await finished(t, 'u3');
+      expect(late.textures?.status).toBe('running');
+      vi.setSystemTime(now + TEXTURES_START_MS);
+      expect(await t.studio.get('u3', late.id)).toMatchObject({
+        status: 'done',
+        textures: { status: 'failed', options: [], error: 'fetch failed' },
+      });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(late.id), 'fetch failed');
+
+      // A start first made later than that (the panel was closed, say) is made all the same
+      delete t.control.texturesStartError;
+      const reopened = await finalReady(t, 'u4');
+      await t.studio.get('u4', reopened.id);
+      vi.setSystemTime(now + 10 * TEXTURES_START_MS);
+      expect(texturesJob(t, await t.studio.get('u4', reopened.id))).toMatch(/^textures-/);
+      expect(texturesStarts(t)).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never starts a textures job on every poll while starts fail', async () => {
+    const t = setup();
+    const stock = t.workers.startTextures!.bind(t.workers);
+    // The job API queued the job, but its answer was lost on the way back: a 503 from the gateway,
+    // a connection reset after the request went out, or no answer in time
+    let failure: Error = new Error(
+      'AI worker run failed: 503 {"detail":"Modal can\'t be reached right now; try again"}',
     );
-    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+    t.workers.startTextures = async (input) => {
+      await stock(input);
+      throw failure;
+    };
+    const gen = await finalReady(t);
+    expect(await t.studio.get('u1', gen.id)).toMatchObject({ textures: { status: 'running' } });
+    for (let poll = 0; poll < 20; poll++) await t.studio.get('u1', gen.id);
+    // One GPU job (about 2 minutes of the TRELLIS.2 container), and the panel stops waiting
+    expect(texturesStarts(t)).toHaveLength(1);
+    expect(await t.studio.get('u1', gen.id)).toMatchObject({
+      status: 'done',
+      error: null,
+      textures: { status: 'failed', options: [], error: expect.stringContaining('503') },
+    });
+
+    for (failure of [reset(), new Error('AI worker run timed out after 30 s')]) {
+      const other = await finished(t, 'u2');
+      for (let poll = 0; poll < 5; poll++) await t.studio.get('u2', other.id);
+      expect((await t.studio.get('u2', other.id)).textures).toMatchObject({
+        status: 'failed',
+        error: failure.message,
+      });
+    }
+    expect(texturesStarts(t)).toHaveLength(3);
+  });
+
+  it('waits out network trouble while the textures job runs', async () => {
+    const t = setup();
+    const gen = await finished(t);
+    const jobId = texturesJob(t, gen);
+    for (const trouble of [
+      new Error('AI worker status failed: 503 {"detail":"Modal can\'t be reached"}'),
+      new Error('AI worker status timed out after 30 s'),
+      reset(),
+    ]) {
+      t.textures.set(jobId, trouble);
+      expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+    }
     t.textures.set(jobId, { status: 'done', output: texturesOutput([5242]) });
     expect((await t.studio.get('u1', gen.id)).textures).toMatchObject({
       status: 'done',
       options: [{ textureSeed: 5242 }],
     });
-    expect(t.started.filter((s) => s.kind === 'textures')).toHaveLength(1);
+    expect(texturesStarts(t)).toHaveLength(1);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('stops a textures job that takes longer than 15 minutes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const start = Date.parse('2026-10-01T12:00:00Z');
+      vi.setSystemTime(start);
+      const t = setup();
+      const gen = await finished(t);
+      const jobId = texturesJob(t, gen);
+      vi.setSystemTime(start + TEXTURES_TIMEOUT_MS - 1000);
+      expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+      t.textures.set(jobId, new Error('AI worker status timed out after 30 s'));
+      expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+
+      t.textures.set(jobId, { status: 'running' });
+      vi.setSystemTime(start + TEXTURES_TIMEOUT_MS);
+      expect(await t.studio.get('u1', gen.id)).toMatchObject({
+        status: 'done',
+        final: { url: `https://files.test/ai/${gen.id}/final-4242.glb` },
+        textures: {
+          status: 'failed',
+          options: [],
+          error: 'the textures took longer than 15 minutes',
+        },
+      });
+      // It bills while it runs, so it's stopped
+      expect(t.cancelled).toEqual([`model:${jobId}`]);
+      expect(t.store.rows.get(gen.id)).toMatchObject({ status: 'done', texturesJobId: null });
+
+      // Network trouble past the time limit ends them too, and stops the job, which may still run
+      const other = await finished(t, 'u2');
+      const otherJob = texturesJob(t, other);
+      t.textures.set(otherJob, new Error('AI worker status failed: 503 {"detail":"…"}'));
+      vi.setSystemTime(start + 2 * TEXTURES_TIMEOUT_MS);
+      expect((await t.studio.get('u2', other.id)).textures).toMatchObject({
+        status: 'failed',
+        error: expect.stringContaining('503'),
+      });
+      expect(t.cancelled).toEqual([`model:${jobId}`, `model:${otherJob}`]);
+
+      // Textures done by then are still offered
+      const third = await finished(t, 'u3');
+      t.textures.set(texturesJob(t, third), { status: 'done', output: texturesOutput([5242]) });
+      vi.setSystemTime(start + 4 * TEXTURES_TIMEOUT_MS);
+      expect((await t.studio.get('u3', third.id)).textures?.status).toBe('done');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('never records a textures job started for one final on the next', async () => {

@@ -3,7 +3,7 @@ import { and, desc, eq, getTableColumns, isNull } from 'drizzle-orm';
 import type { Database } from '../../db';
 import { schema } from '../../db';
 import type { StorageProvider } from '../storage';
-import type { FetchLike } from './providers/jobEndpoint';
+import { neverSent, type FetchLike } from './providers/jobEndpoint';
 import type {
   ModelView,
   StudioWorkers,
@@ -35,7 +35,7 @@ import type {
  * the 20 test prompts the final's own texture was good enough to publish 10 times, and the best
  * of four 16 times. The final is done and usable at once: the poll that finds it done returns it,
  * and the next one starts the textures job, which has its own state (texturesStatus) and never
- * fails the generation.
+ * fails the generation. It has TEXTURES_TIMEOUT_MS to finish.
  *
  * Every job is started and then polled by `get`, so no request waits on a GPU. Pictures, views
  * and models are copied into the server's storage, so scenes keep working after the workers
@@ -181,6 +181,17 @@ export const VIEWS_TIMEOUT_MS = 3 * 60 * 1000;
  * Each takes about 30 s of GPU, after about 30 s to make the shape again.
  */
 export const TEXTURE_COUNT = 3;
+/**
+ * How long after the final is done the polls try again to start its textures job, when a start
+ * never reached the workers (they couldn't be connected to). A start that may have reached them
+ * isn't tried again at all: see startTextures.
+ */
+export const TEXTURES_START_MS = 2 * 60 * 1000;
+/**
+ * How long a textures job may take from its start before it is stopped and the final keeps its own
+ * texture alone. It takes about 1-2 minutes, a few more from cold or behind other jobs.
+ */
+export const TEXTURES_TIMEOUT_MS = 15 * 60 * 1000;
 
 /** The texture options' columns when a final is done and its textures job is still to start */
 const TEXTURES_TO_START = {
@@ -606,22 +617,32 @@ export class AIStudio {
   /**
    * Moves the texture options on once the final is done: starts their job, then polls it and
    * copies the textures into storage. They only add choices, so nothing here fails the
-   * generation: when they can't be made, the reason is kept as texturesError.
+   * generation: when they can't be made, the reason is kept as texturesError. A job that takes
+   * longer than TEXTURES_TIMEOUT_MS is stopped, so the panel never waits for ever.
    */
   private async advanceTextures(record: GenerationRecord): Promise<GenerationRecord> {
     const jobId = record.texturesJobId;
     if (!jobId) return this.startTextures(record);
+    // Nothing writes the row while the job runs, so updatedAt is when it was started
+    const overdue = Date.now() - record.updatedAt.getTime() >= TEXTURES_TIMEOUT_MS;
     let state: WorkerJobState<TexturesOutput>;
     try {
       const workers = this.workers();
       if (!workers.textures) throw new Error("This server's workers don't make texture options");
       state = await workers.textures(jobId);
     } catch (err) {
-      // Couldn't reach the workers: try again on the next poll
-      if (isTransient(err)) return record;
+      // Couldn't reach the workers: try again on the next poll, while there's time
+      if (isTransient(err) && !overdue) return record;
+      // It may still run (and bill), and nothing will wait for it now
+      if (overdue) this.cancel('model', jobId);
       return this.texturesFailed(record, err);
     }
-    if (state.status === 'running') return record;
+    if (state.status === 'running') {
+      if (!overdue) return record;
+      this.cancel('model', jobId);
+      const minutes = Math.round(TEXTURES_TIMEOUT_MS / 60_000);
+      return this.texturesFailed(record, `the textures took longer than ${minutes} minutes`);
+    }
     if (state.status === 'failed') return this.texturesFailed(record, state.message);
     const { output } = state;
     // A final that ran out of GPU memory is made by the "512" pipeline, and so is a shape made
@@ -636,8 +657,8 @@ export class AIStudio {
     try {
       made = await this.storeTextures(record, output);
     } catch (err) {
-      // Network trouble while copying them: try again on the next poll
-      if (isTransient(err)) return record;
+      // Network trouble while copying them: try again on the next poll, while there's time
+      if (isTransient(err) && !overdue) return record;
       return this.texturesFailed(record, err);
     }
     if (!made.options.length) {
@@ -659,27 +680,31 @@ export class AIStudio {
    * Starts the textures job for a done final, from what the final was made from: the picture,
    * its seed and its views. Overlapping polls can both start one: the first is kept, and the other
    * stopped, as is one started for a final that has been replaced since.
+   *
+   * The job API's run isn't idempotent: a start that fails once its request may have arrived (a
+   * 5xx, a connection reset, a timeout) may have queued a job all the same, so it ends the texture
+   * options instead of queueing another one on every poll. Only a start that never reached the
+   * workers is tried again, by the polls within TEXTURES_START_MS of the final.
    */
   private async startTextures(record: GenerationRecord): Promise<GenerationRecord> {
+    // Nothing writes the row between the final and its textures job, so updatedAt is when the
+    // final was done
+    const retry = Date.now() - record.updatedAt.getTime() < TEXTURES_START_MS;
+    let workers: StudioWorkers;
+    let input: TexturesInput;
+    try {
+      workers = this.workers();
+      input = await this.texturesInput(record);
+    } catch (err) {
+      // Nothing was sent: storage trouble is tried again on the next poll, for a while
+      return isTransient(err) && retry ? record : this.texturesFailed(record, err);
+    }
     let jobId: string;
     try {
-      const workers = this.workers();
-      if (!this.textureOptions() || !workers.startTextures) {
-        throw new Error('Texture options are off on this server');
-      }
-      if (record.seed === null) throw new Error("The final's seed is missing");
-      const views = await this.readViews(record.views);
-      jobId = await workers.startTextures({
-        image: await this.readStored(record.imageUrl),
-        ...(views ? { views } : {}),
-        seed: record.seed,
-        count: TEXTURE_COUNT,
-        requestId: record.id,
-      });
+      // texturesInput checked that the workers make texture options
+      jobId = await workers.startTextures!(input);
     } catch (err) {
-      // Couldn't reach the workers: try again on the next poll
-      if (isTransient(err)) return record;
-      return this.texturesFailed(record, err);
+      return neverSent(err) && retry ? record : this.texturesFailed(record, err);
     }
     const started = await this.deps.store.finishTextures(
       record.id,
@@ -690,6 +715,20 @@ export class AIStudio {
     // Another poll's job was recorded first, or the final has been replaced since
     this.cancel('model', jobId);
     return this.find(record.userId, record.id);
+  }
+
+  /** What a done final was made from, for its textures job. Throws when it can't be had. */
+  private async texturesInput(record: GenerationRecord): Promise<TexturesInput> {
+    if (!this.textureOptions()) throw new Error('Texture options are off on this server');
+    if (record.seed === null) throw new Error("The final's seed is missing");
+    const views = await this.readViews(record.views);
+    return {
+      image: await this.readStored(record.imageUrl),
+      ...(views ? { views } : {}),
+      seed: record.seed,
+      count: TEXTURE_COUNT,
+      requestId: record.id,
+    };
   }
 
   /** Ends the texture options with none to choose from, logging why and keeping it. */
@@ -885,6 +924,9 @@ export class AIStudio {
     return this.deps.workers;
   }
 }
+
+/** What a textures job is started with */
+type TexturesInput = Parameters<NonNullable<StudioWorkers['startTextures']>>[0];
 
 /** The views as stored with the generation, and as sent to the 3D worker */
 interface DrawnViews {
