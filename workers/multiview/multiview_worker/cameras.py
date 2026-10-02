@@ -23,6 +23,15 @@ azimuths shifted by -90°). Its world is right-handed with +Z up and the object 
 - The picture's object is centred and scaled so that its longer side spans 90% of the frame (691
   px, 0.99 world units); the 0° view keeps that framing and the other views share its scale, so a
   wide object can overflow the frame at 45° and 315°.
+
+MV-Adapter's image+geometry model (geometry.py) draws a given mesh from six other cameras of the same
+kind (`IG2MV_*`, as upstream's scripts/inference_ig2mv_sdxl.py calls `get_orthogonal_camera`): front,
+right, back and left at elevation 0, then one from straight above and one from straight below
+(elevation ±89.99, azimuth 180). `camera_to_world(azimuth, elevation)` gives each. Seen from above,
+the front (-Y) is at the top of the image and +X on its left; seen from below, the front is at the
+bottom and +X again on the left. The order is part of the model: its attention runs along image rows
+across the four level views, and along image columns across the back, top and bottom views and the
+front mirrored, which all have -X as image right.
 """
 
 from __future__ import annotations
@@ -39,6 +48,10 @@ DISTANCE = 1.8
 FILL = 0.9  # the picture's object, longer side, as a share of the frame
 # MV-Adapter's azimuth 0 looks from +X; its inference script subtracts 90° so that 0 is the front
 AZIMUTH_OFFSET = -90
+# The image+geometry model's six views, in its order
+IG2MV_VIEWS = ("front", "right", "back", "left", "top", "bottom")
+IG2MV_AZIMUTHS = (0, 90, 180, 270, 180, 180)
+IG2MV_ELEVATIONS = (0, 0, 0, 0, 89.99, -89.99)
 
 
 def camera_to_world(azimuth: float, elevation: float = ELEVATION, distance: float = DISTANCE) -> np.ndarray:

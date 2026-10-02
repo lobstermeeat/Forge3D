@@ -4,6 +4,7 @@
 | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | [MV-Adapter](https://github.com/huanngzh/MV-Adapter) code (vendored subset in `mvadapter/`, see its `NOTICE.md`)  | Image-to-multiview pipeline                    | Apache-2.0                                                                                                |
 | [MV-Adapter weights](https://huggingface.co/huanngzh/mv-adapter) (`mvadapter_i2mv_sdxl.safetensors`)              | The multi-view adapter                         | Apache-2.0                                                                                                |
+| [MV-Adapter weights](https://huggingface.co/huanngzh/mv-adapter) (`mvadapter_ig2mv_sdxl.safetensors`)             | Views of a given mesh (experiments only)       | Apache-2.0                                                                                                |
 | [Stable Diffusion XL base 1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) (fp16 files)      | The image model the adapter extends            | [CreativeML Open RAIL++-M](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md) |
 | [SDXL-VAE-FP16-Fix](https://huggingface.co/madebyollin/sdxl-vae-fp16-fix)                                         | Decoding the views in fp16                     | MIT                                                                                                       |
 | [BiRefNet](https://huggingface.co/ZhengPeng7/BiRefNet)                                                            | Cutting out the picture and the views          | MIT                                                                                                       |
@@ -17,6 +18,7 @@ the terms of service must include them before this worker serves users. Nothing 
 asks for attribution on the outputs.
 
 Not used: MV-Adapter's mesh tools and texturing pipeline, which need nvdiffrast (research use
-only) and can segment with RMBG-2.0 (CC BY-NC).
+only) and can segment with RMBG-2.0 (CC BY-NC). For the image+geometry adapter the caller renders the
+mesh's position and normal maps itself, with the TRELLIS.2 worker's torch rasteriser.
 
 This summary is not legal advice; have counsel confirm it before launch.

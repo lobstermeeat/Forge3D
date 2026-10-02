@@ -348,6 +348,75 @@ them to its code.
   views that show its long axis (a stack of books at 45° and 315°; a car in all four side views, wheels
   cut). A view's cutout touching the frame edge means "unknown beyond here", not the object's edge.
 
+### Views of a given mesh (experiments only)
+
+MV-Adapter's image+geometry model ("ig2mv", `mvadapter_ig2mv_sdxl.safetensors`) draws six views of a
+mesh it is given, from a picture of the object: the views follow the mesh, so they can be baked onto
+its texture. `multiview/multiview_worker/geometry.py` runs it as MV-Adapter's
+`scripts/inference_ig2mv_sdxl.py` does, except that the caller renders the mesh (upstream renders
+with nvdiffrast, which is never installed here; the TRELLIS.2 worker's torch rasteriser,
+`rasterize_depth` and `rasterize_faces` in `trellis2/forge3d_worker/projection.py`, can). On
+Modal it is the `GeometryViews` class: MultiView's image on an A10G, one container that scales down
+after 30 s idle. Nothing in production calls it. A `modal run` script calls it as
+`modal_app.GeometryViews().generate.remote(job)` with
+
+```json
+{
+  "image_base64": "…",
+  "control_pngs": ["…12 base64 PNGs…"],
+  "prompt": "a wooden shield with a lion",
+  "seed": 0,
+  "steps": 30,
+  "guidance": 3.0,
+  "reference_scale": 1.0,
+  "control_scale": 1.0
+}
+```
+
+where only `image_base64` and `control_pngs` are needed (the rest are the defaults shown, except
+`prompt`, which is "high quality" by default; steps 1–100, guidance 0–20, scales 0–3). It returns
+`{"views": [six base64 RGB PNGs], "seconds", "timings"}`, or `{"error": "invalid input: …" |
+"generation failed: …"}`. The views are 768 x 768, drawn on mid-gray with lighting, in the cameras'
+order; the caller knows the mesh's masks.
+
+The conventions, copied from upstream's script and its training config:
+
+- **Cameras**, in this order: front, right, back, left, top, bottom (`cameras.py`: `IG2MV_VIEWS`,
+  `IG2MV_AZIMUTHS = (0, 90, 180, 270, 180, 180)`, `IG2MV_ELEVATIONS = (0, 0, 0, 0, 89.99, -89.99)`,
+  `camera_to_world`). Upstream: `get_orthogonal_camera(elevation_deg=[0, 0, 0, 0, 89.99, -89.99],
+  distance=[1.8] * 6, left=-0.55, right=0.55, bottom=-0.55, top=0.55, azimuth_deg=[x - 90 for x in
+  [0, 90, 180, 270, 180, 180]])`. They are the views' cameras above (same world, distance, frame and
+  pixel grid, row 0 at the top), plus one looking down with the front at the image's top and +X on
+  its left, and one looking up with the front at the bottom and +X on the left. The order matters:
+  the model's attention runs along rows across the four level views and along columns across the
+  back, top, bottom and the mirrored front.
+- **The mesh** goes where upstream's `load_mesh(path, rescale=True)` puts it: scaled so that its
+  largest |coordinate| is 0.5, without re-centring, and turned from glTF's +Y up to +Z up, a glTF point
+  (x, y, z) becoming (x, -z, y) (`mesh_to_world`, `gltf_to_world` for normals). glTF's front (+Z) then
+  faces the front camera. TRELLIS.2's finals are centred and mostly have the pictured side there (the
+  Phase 5 arcade machine and shield do), but a picture taken from high above can leave it facing up:
+  Phase 5's guitar, pictured lying down, has its strings in the top and back views.
+- **The control maps** are in that world, not relative to the camera: per view, channels 0–2 are the
+  surface position + 0.5 and channels 3–5 the unit normal / 2 + 0.5, clamped to [0, 1], and both are
+  0.5 where no surface is (upstream renders with `normal_background=0.0`; positions are 0 there). That
+  is `encode_control`, giving the (6, 6, 768, 768) array `draw_views` takes. MV-Adapter's training data
+  is encoded the same way (world positions + 0.5; world normals, `use_camera_space_normal` off; 0.5
+  for the background). Upstream interpolates the mesh's vertex normals and normalises them per pixel.
+- **Transport**: `pack_control` turns the array into the job's 12 PNGs (8-bit RGB): the six position
+  maps, then the six normal maps, each in view order; `unpack_control` reverses it. 8 bits keep
+  positions within 0.002 units (1.4 px) and normals within 0.004; a TRELLIS.2 final's maps are
+  0.4–1.3 MB of base64.
+- **Settings**: those of the views above (BiRefNet's cutout of the picture framed by `preprocess_image`
+  on mid-gray, ShiftSNR with shift scale 8, the fp16-fix VAE, guidance 3, the negative prompt), 30 steps
+  (the script's default is 50; the training config evaluates at 30), and control and reference scales 1.
+
+Checked on MV-Adapter's own demo mesh (`assets/demo/ig2mv/1ccd5c1563ea4f5fb8152eac59dabd5c.glb`):
+its maps rendered this way outline the six views upstream drew for it (`…_mv.png`) at a silhouette IoU
+of 0.96–0.98 in every view, against 0.38–0.55 with the rows flipped, top and bottom swapped or right
+and left swapped. The weights come with `download_models --which multiview` (3.6 GB more; a volume
+filled before Phase 7 needs that run again). Licenses as for the views above: MV-Adapter's code and
+weights are Apache-2.0, SDXL's license is CreativeML Open RAIL++-M.
+
 ### The Pixal3D worker
 
 `pixal3d/pixal3d_worker/service.py` is the `trellis2` contract with Pixal3D behind it, plus views. With
@@ -449,7 +518,9 @@ alike (with the recipe on, its container makes the finals with Pixal3D).
    sets (about 44 GB: the multi-view set for most pictures, the single-view set for thin, flat
    objects), MoGe-2 and NAF, and reuses the TRELLIS.2 weights' decoders, DINOv3 and BiRefNet, so it
    comes after `--which trellis2`. Add `--which multiview` only if the server will run with
-   `AI_MULTIVIEW=1`. Without `--which`, `download_models` fetches all four sets, about 115 GB (Pixal3D's two flow-model sets are 44 GB of it).
+   `AI_MULTIVIEW=1` (it also fetches the image+geometry adapter the experiments use, 3.6 GB). Without
+   `--which`, `download_models` fetches all four sets, about 119 GB (Pixal3D's two flow-model sets are
+   44 GB of it).
 
 5. Update the server's database. From Phase 6 on, the server reads the `views` and `views_error`
    columns of `ai_generations` (`apps/server/src/db/schema.ts`) even with `AI_MULTIVIEW` off, so
@@ -721,7 +792,8 @@ Never installed: NATTEN (not a licensing matter; the one call NAF makes is compu
 The multiview worker ([`multiview/NOTICE.md`](multiview/NOTICE.md)), off by default, runs MV-Adapter
 (Apache-2.0; its pipeline code is vendored in `multiview/mvadapter/` without the nvdiffrast-based mesh
 tools) on Stable Diffusion XL 1.0, whose CreativeML Open RAIL++-M license has use-based restrictions
-that Orainge's terms of service must pass on to users before the worker serves them.
+that Orainge's terms of service must pass on to users before the worker serves them. The same applies
+to MV-Adapter's image+geometry adapter (Apache-2.0), which only the experiments' `GeometryViews` runs.
 
 ## Tests
 
@@ -748,7 +820,9 @@ of model, the container's model pool, the fallbacks to TRELLIS.2 and what they r
 run fetches, the recipe's preview, levelling and its gate, the thin rule and the weight swap,
 Pixal3D's cameras and views, the NATTEN stand-in (against NATTEN's own definition) and the weights
 scripts' pins. The multiview tests hold its cameras to MV-Adapter's code and cover the reference
-picture's preparation and job handling. Before the first
+picture's preparation and job handling, and for the image+geometry model the control maps' encoding
+and transport, the mesh's placement (against upstream's `load_mesh`), the call into the pipeline and
+its jobs, all with stand-ins for diffusers and the weights. Before the first
 production deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine
 that has nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real
 hardware.
