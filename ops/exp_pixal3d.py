@@ -9,6 +9,7 @@ Phase 6, PIXAL3D line: Pixal3D (TencentARC, MIT) on Modal. Does its multi-view m
     modal run ops/exp_pixal3d.py::experiment --plan mvchoice --out ops-out/private
     modal run ops/exp_pixal3d.py::experiment --plan posed --out ops-out/private        # run 3
     modal run ops/exp_pixal3d.py::experiment --plan final20 --out ops-out/private      # run 4
+    modal run ops/exp_pixal3d.py::experiment --plan final20auto --only 05,01 --out ops-out/private  # run 5
 
 An ephemeral app (orainge-exp-pixal3d; nothing is deployed) with one or two L40S, running workers/pixal3d
 through its handle_job as a worker would: the Phase 2 picture and its phase2d seed, mode "final",
@@ -30,6 +31,10 @@ production's export and packing. Plans:
   multi-view weights with the picture as their one view, the model levelled by that elevation, then
   the full export. Runs are named phase2f-NN-<slug> and written to /outputs/phase6/pixal3d/final20/.
   final20single is the same on the single-view weights (phase2fs-NN-<slug>).
+- final20auto (run 5): the recipe with the worker's rule for thin, flat objects (pixal3d_worker/thin.py):
+  the multi-view runtime loads the single-view flow models too and builds a picture with them when
+  TRELLIS.2's preview is flat (bounding box smallest/largest <= 0.20: shield, skateboard, pistol).
+  Runs are named phase2fa-NN-<slug>; the result records "weights" and "thin".
 
 Every multi-view result is checked against its views: the packed final is rendered from each view's
 camera and its silhouette compared with the view's (IoU). Results go to the volume,
@@ -312,7 +317,9 @@ STARTED = time.time()
     image=pixal3d_image,
     gpu="L40S",
     cpu=4.0,
-    memory=49152,  # TRELLIS.2 for the previews lives on the CPU between uses (level="preview")
+    # TRELLIS.2 for the previews lives on the CPU between uses (level="preview"), and so do the
+    # single-view flow models a multi-view runtime keeps for thin objects (thin="on")
+    memory=65536,
     volumes={prod.MODELS: prod.models, prod.OUTPUTS: prod.outputs, prod.CACHE: prod.cache},
     timeout=3600,
     startup_timeout=1200,
@@ -324,6 +331,8 @@ class Pixal3D:
     # How a single picture's model is levelled: "preview" (TRELLIS.2's '512' preview, the picture's camera
     # found against it: production's way), "given" (the job's Phase 5 pose) or "none"
     level: str = modal.parameter(default="none")
+    # The rule for thin, flat objects (pixal3d_worker.thin): "off", "on" (the worker's THIN_RATIO) or a ratio
+    thin: str = modal.parameter(default="off")
 
     @modal.enter()
     def load(self) -> None:
@@ -332,13 +341,17 @@ class Pixal3D:
         if not WEIGHTS_MARKER.exists():
             raise RuntimeError("Pixal3D weights missing: modal run ops/exp_pixal3d.py::download")
         prod.merge_tuning(prod.LOCAL_TUNING, prod.SHARED_TUNING)
-        from pixal3d_worker.pipeline import Pixal3DRuntime
+        from pixal3d_worker.pipeline import THIN_RATIO, Pixal3DRuntime
 
+        thin_ratio = None if self.thin in ("off", "") else THIN_RATIO if self.thin == "on" else float(self.thin)
         started = time.time()
-        self.runtime = Pixal3DRuntime(multiview=self.weights == "multiview", level=self.level)
+        self.runtime = Pixal3DRuntime(multiview=self.weights == "multiview", level=self.level, thin_ratio=thin_ratio)
         self.load_seconds = round(time.time() - started, 1)
         self.gpu = torch.cuda.get_device_name()
-        print(f"[pixal3d] {self.weights} weights (level {self.level}) on {self.gpu} after {time.time() - STARTED:.0f} s")
+        print(
+            f"[pixal3d] {self.weights} weights (level {self.level}, thin rule {self.thin}) on {self.gpu} "
+            f"after {time.time() - STARTED:.0f} s"
+        )
 
     @modal.method()
     def make(self, job: dict) -> dict:
@@ -428,7 +441,7 @@ class Pixal3D:
             "pipeline": result.get("pipeline"),
             "views_used": result.get("views_used"),
         }
-        for key in ("projection", "camera", "pose", "level"):
+        for key in ("projection", "camera", "pose", "level", "weights", "thin"):
             if result.get(key):
                 step[key] = result[key]
         steps = {"final": step}
@@ -471,6 +484,8 @@ class Pixal3D:
                 "camera": result.get("camera"),
                 "pose": result.get("pose"),
                 "level": result.get("level"),
+                "weights": result.get("weights"),
+                "thin": result.get("thin"),
                 "peak_gpu_gb": round(torch.cuda.max_memory_reserved() / 2**30, 1),
                 "load_seconds": self.load_seconds,
                 "container_seconds": round(time.time() - STARTED, 1),
@@ -528,6 +543,14 @@ PLANS: dict[str, dict] = {
         "level": "preview",
         "jobs": [{"number": n, "variant": "phase2fs", "name_like_source": "phase2fs"} for n in ALL],
     },
+    # Run 5: the recipe with the thin-object rule (the worker's default): the single-view flow models
+    # loaded beside the multi-view ones and swapped in when the preview is flat (05, 06, 12)
+    "final20auto": {
+        "weights": "multiview",
+        "level": "preview",
+        "thin": "on",
+        "jobs": [{"number": n, "variant": "phase2fa", "name_like_source": "phase2fa"} for n in ALL],
+    },
     # The single-view weights on the rest of the controls (run 2)
     "controls": {"weights": "single", "jobs": [{"number": n, "variant": "single"} for n in MORE_CONTROLS]},
     # Consistent views of known models: the rebuild must line up with them (cameras and framing)
@@ -581,8 +604,13 @@ def experiment(plan: str, out: str = "ops-out/private", only: str = "", containe
         if job.get("name_like_source"):  # phase2f-NN-<slug>: Phase 6's final of the phase2 picture
             job["run_name"] = pictures[number].replace("phase2-", job["name_like_source"] + "-", 1)
         jobs.append(job)
-    print(f"[pixal3d] {plan}: {len(jobs)} jobs on {settings['weights']} weights (level {settings.get('level', 'none')})")
-    worker = Pixal3D(weights=settings["weights"], level=settings.get("level", "none"))
+    if only:  # in the order given: with the thin rule, a thin object first exercises the swap and the one after it the swap back
+        jobs.sort(key=lambda job: only.split(",").index(job["number"]))
+    print(
+        f"[pixal3d] {plan}: {len(jobs)} jobs on {settings['weights']} weights (level {settings.get('level', 'none')}, "
+        f"thin rule {settings.get('thin', 'off')})"
+    )
+    worker = Pixal3D(weights=settings["weights"], level=settings.get("level", "none"), thin=settings.get("thin", "off"))
     summaries = []
     failures = 0
 
@@ -619,3 +647,5 @@ def experiment(plan: str, out: str = "ops-out/private", only: str = "", containe
     pathlib.Path(f"ops-out/pixal3d-{plan}.json").write_text(json.dumps(summaries, indent=2))
     ages = [s.get("container_seconds", 0) for s in summaries if "error" not in s]
     print(f"[pixal3d] {plan}: {len(ages)} of {len(jobs)} made; the container was up {max(ages, default=0):.0f} s")
+    if jobs and not ages:
+        raise SystemExit(f"[pixal3d] {plan}: nothing was made")  # so run.sh can fall back
