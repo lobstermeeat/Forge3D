@@ -676,7 +676,9 @@ JUDGE_OPTIONS = dict(
     volumes={MODELS: models},
     timeout=900,
     startup_timeout=1200,  # the 30B's 62 GB come off the volume before the first job
-    scaledown_window=60,  # experiments call it in bursts; idle time is billed
+    # Experiments call it as each object is made, a minute or so apart: idle time is billed, but a 30B
+    # cold start (62 GB off the volume) costs more
+    scaledown_window=300,
     max_containers=1,
 )
 

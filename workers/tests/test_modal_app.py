@@ -209,7 +209,8 @@ def test_the_judges_are_small_experiment_workers_one_class_per_size():
     assert modal_app.JUDGE_GPUS == {"8b": "L40S", "30b": "H100"}
     options = modal_app.JUDGE_OPTIONS
     assert options["image"] is modal_app.judge_image and options["max_containers"] == 1
-    assert options["scaledown_window"] <= 60 and options["volumes"] == {modal_app.MODELS: modal_app.models}
+    # Warm between objects a minute or so apart, but not idle for long: idle time is billed
+    assert options["scaledown_window"] <= 300 and options["volumes"] == {modal_app.MODELS: modal_app.models}
     assert "secrets" not in options  # results come back inline, never to R2
     api = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "api")
     assert "Judge" not in ast.unparse(api)
