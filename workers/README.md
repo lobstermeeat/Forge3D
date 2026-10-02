@@ -65,7 +65,19 @@ and the result's optional `projection` field says why (`applied`, `reason`, `iou
 `image_base64` can replace `image_url`, which is only fetched from hosts listed in
 `ALLOWED_IMAGE_HOSTS`. `seed` is optional (a random one is returned). Outputs are stored at
 `ai/<request_id>/<mode>-<seed>.glb`, so every result has its own URL and caches never serve a
-stale one. Output:
+stale one.
+
+`views` (optional) adds up to 8 other pictures of the object, such as the multiview worker's, so
+TRELLIS.2 doesn't have to invent its back and sides:
+`"views": [{ "image_url" | "image_base64", "azimuth": 180, "elevation": 0, "weight"?: 1 }]`, with
+azimuth 0 the side the main picture shows. Each is cut out and cropped like the main picture (the same
+size limits apply), and all of them steer TRELLIS.2's three flows together (see
+`trellis2/forge3d_worker/multiview.py`); the main picture still counts most (`settings.MULTIVIEW`), and it
+alone is painted onto the final. Send the same views with the preview and the final, so the final keeps
+the previewed shape. TRELLIS.2 builds what the views show, good or bad, and the Phase 6 tests found that
+the multiview worker's four views at 0, 90, 180 and 270 are the ones to send: its 45 and 315 drawings
+made every object worse. Generation takes about one more single-picture pass per view (4 views: 3.3 to
+4.7 times a single picture's time on an L40S). Output:
 
 ```json
 {
@@ -80,6 +92,7 @@ stale one. Output:
   "raw_bytes": 3012345,
   "triangles": 30000,
   "pipeline": "512",
+  "views_used": 0,
   "timings": { "generate_s": 9.8, "export_s": 4.1, "compress_s": 2.2, "upload_s": 0.3 },
   "credits": ["Built with DINOv3", "3D generation: TRELLIS.2 (Microsoft, MIT)"]
 }
@@ -92,6 +105,11 @@ preview's `"512"` pipeline and exported with the final's settings, and reports `
 same seed gives that pipeline the shape the user approved in the preview, and its memory use is known to
 fit, while TRELLIS.2's cascade has no cheaper setting for a 1024³ final (see `FALLBACK_PIPELINE` in
 `trellis2/forge3d_worker/pipeline.py`).
+
+`views_used` is how many of the job's `views` helped make the model: 0 without views, and fewer than
+sent when a view is left out: one with no object in it, or one whose object runs off the frame
+(TRELLIS.2 crops to the object, so a view clipped at its edge reads as a whole object with a side cut
+off, and the model comes out crumpled; `CLIPPED_EDGE` in `pipeline.py`).
 
 Finals also carry `projection`, whether the picture was painted onto the model (see above); its
 time is part of `export_s`.
