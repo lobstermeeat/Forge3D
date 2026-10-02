@@ -1,0 +1,231 @@
+[
+  {
+    "run": "phase2fa-05-sci-fi-laser-pistol-white",
+    "variant": "phase2fa",
+    "seed": 1127065796,
+    "seconds": 62.9,
+    "timings": {
+      "generate_s": 40.335,
+      "export_s": 21.343,
+      "compress_s": 1.186,
+      "upload_s": 0.002
+    },
+    "triangles": 98493,
+    "views_used": 0,
+    "pipeline": "pixal3d-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9769,
+      "colour": 0.6772,
+      "coverage": 0.0984,
+      "pose": {
+        "azimuth": 0.0,
+        "elevation": 9.4,
+        "roll": 0.0,
+        "fov": 23.1,
+        "scale": 1.006,
+        "shift": [
+          0.0,
+          -0.0031
+        ]
+      },
+      "mode": "detail only",
+      "decals": 120,
+      "seconds": 0.881
+    },
+    "camera": {
+      "fov_deg": 25.83,
+      "tilt": {
+        "elevation": 10.0,
+        "roll": 0.1,
+        "source": "preview"
+      }
+    },
+    "pose": {
+      "applied": true,
+      "reason": "found",
+      "pose": {
+        "azimuth": 177.5,
+        "elevation": 10.0,
+        "roll": 0.1,
+        "fov": 34.9,
+        "scale": 1.008,
+        "shift": [
+          0.0012,
+          0.0008
+        ]
+      },
+      "iou": 0.9381,
+      "colour": 0.6098,
+      "runner_up": {
+        "view": {
+          "azimuth": 210.0,
+          "elevation": -13.8,
+          "roll": 8.0,
+          "fov": 0.0,
+          "scale": 0.956,
+          "shift": [
+            0.015,
+            0.0
+          ]
+        },
+        "iou": 0.8667,
+        "colour": 0.485,
+        "score_gap": 0.0658,
+        "angle": 40.6
+      },
+      "rivals": [],
+      "seconds": 14.4,
+      "preview": {
+        "pipeline": "512",
+        "bytes": 3396244
+      }
+    },
+    "level": {
+      "applied": true,
+      "elevation": 10.0,
+      "roll": 0.1,
+      "recentred": [
+        -0.0214,
+        -0.0157,
+        0.0113
+      ]
+    },
+    "weights": "single",
+    "thin": {
+      "extents": [
+        0.1447,
+        0.8602,
+        1.0027
+      ],
+      "ratio": 0.1443,
+      "threshold": 0.2,
+      "thin": true,
+      "source": "preview",
+      "decided": true
+    },
+    "peak_gpu_gb": 28.5,
+    "load_seconds": 254.4,
+    "container_seconds": 326.7,
+    "gpu": "NVIDIA L40S"
+  },
+  {
+    "run": "phase2fa-01-cute-low-poly-fox-sitting-down",
+    "variant": "phase2fa",
+    "seed": 783047822,
+    "seconds": 62.8,
+    "timings": {
+      "generate_s": 35.43,
+      "export_s": 26.365,
+      "compress_s": 1.024,
+      "upload_s": 0.001
+    },
+    "triangles": 96002,
+    "views_used": 0,
+    "pipeline": "pixal3d-1024_cascade",
+    "projection": {
+      "applied": true,
+      "reason": "applied",
+      "iou": 0.9881,
+      "colour": 0.8401,
+      "coverage": 0.1419,
+      "pose": {
+        "azimuth": 0.6,
+        "elevation": -0.6,
+        "roll": 0.0,
+        "fov": 29.0,
+        "scale": 1.011,
+        "shift": [
+          -0.0005,
+          -0.0044
+        ]
+      },
+      "mode": "recolour and detail",
+      "recoloured": [
+        {
+          "from": "#d74c12",
+          "to": "#cb5f02",
+          "share": 0.655
+        },
+        {
+          "from": "#341704",
+          "to": "#362213",
+          "share": 0.083
+        }
+      ],
+      "decals": 64,
+      "seconds": 1.097
+    },
+    "camera": {
+      "fov_deg": 25.58,
+      "tilt": {
+        "elevation": -0.6,
+        "roll": 0.5,
+        "source": "preview"
+      }
+    },
+    "pose": {
+      "applied": true,
+      "reason": "found",
+      "pose": {
+        "azimuth": 25.0,
+        "elevation": -0.6,
+        "roll": 0.5,
+        "fov": 23.1,
+        "scale": 0.997,
+        "shift": [
+          -0.0006,
+          -0.0006
+        ]
+      },
+      "iou": 0.972,
+      "colour": 0.7758,
+      "runner_up": {
+        "view": {
+          "azimuth": 352.5,
+          "elevation": 0.0,
+          "roll": -12.0,
+          "fov": 56.7,
+          "scale": 1.062,
+          "shift": [
+            0.0,
+            -0.0187
+          ]
+        },
+        "iou": 0.8758,
+        "colour": 0.2938,
+        "score_gap": 0.1332,
+        "angle": 34.7
+      },
+      "rivals": [],
+      "seconds": 15.9,
+      "preview": {
+        "pipeline": "512",
+        "bytes": 2677736
+      }
+    },
+    "level": {
+      "applied": false,
+      "elevation": -0.6,
+      "roll": 0.5
+    },
+    "weights": "multiview",
+    "thin": {
+      "extents": [
+        0.9136,
+        0.9223,
+        1.0
+      ],
+      "ratio": 0.9137,
+      "threshold": 0.2,
+      "thin": false,
+      "source": "preview",
+      "decided": true
+    },
+    "peak_gpu_gb": 28.6,
+    "load_seconds": 254.4,
+    "container_seconds": 392.8,
+    "gpu": "NVIDIA L40S"
+  }
+]
