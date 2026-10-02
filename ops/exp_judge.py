@@ -173,11 +173,13 @@ def make_object(
     mesh = runtime.generate(picture, preset, seed)
     summary["generate_s"] = round(time.time() - clock, 1)
     summary["pipeline"] = getattr(runtime, "pipeline_used", None)
-    export("t9roll0", mesh)
-    for k in range(1, int(job.get("count", 3)) + 1):
+    tag = job.get("tag", "t9roll")
+    export(f"{tag}0", mesh)
+    first = int(job.get("first", 1))  # texture k draws from seed + ROLL_SEED * k, for k from first on
+    for number, k in enumerate(range(first, first + int(job.get("count", 3))), 1):
         clock = time.time()
         made = runtime.retexture(seed=seed + ROLL_SEED * k)
-        export(f"t9roll{k}", made, retexture_s=round(time.time() - clock, 1), retexture=runtime.last_retexture)
+        export(f"{tag}{number}", made, retexture_s=round(time.time() - clock, 1), retexture=runtime.last_retexture, texture_seed=seed + ROLL_SEED * k)
 
     # 2. Each candidate as the judges see it
     variants = list(raws)
@@ -309,6 +311,8 @@ def judges(
     sizes: str = ",".join(SIZES),
     orders: int = 2,
     prompts: str = str(PROMPTS),
+    first: int = 1,
+    tag: str = "t9roll",
 ) -> None:
     chosen = [size.strip() for size in sizes.split(",") if size.strip()]
     for size in chosen:
@@ -323,7 +327,7 @@ def judges(
     if missing:
         print(f"{LOG} no {prefix} run for {', '.join(missing)}")
     jobs = [
-        {"number": n, "source": pictures[n], "prompt": typed.get(n, ""), "count": count, "sizes": chosen, "orders": orders}
+        {"number": n, "source": pictures[n], "prompt": typed.get(n, ""), "count": count, "sizes": chosen, "orders": orders, "first": first, "tag": tag}
         for n in numbers
         if n in pictures
     ]
