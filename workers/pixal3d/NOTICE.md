@@ -1,9 +1,12 @@
-# Third-party notices: Pixal3D worker (experimental)
+# Third-party notices: Pixal3D worker
 
 **Built with DINOv3.**
 
-The Pixal3D worker runs the components below, on top of everything the TRELLIS.2 worker runs
-(see `../trellis2/NOTICE.md`; its export, texture bake stand-in and packing are reused as they are).
+The Pixal3D worker makes Orainge's finals on Modal, in the TRELLIS.2 worker's container
+(`../modal_app.py`; see "The recipe" in `../README.md`). It runs the components below, on top of
+everything the TRELLIS.2 worker runs (see `../trellis2/NOTICE.md`; its export, texture bake stand-in
+and packing are reused as they are). Both of Pixal3D's weight sets are used: the multi-view set for
+most pictures, the single-view set for thin, flat objects.
 
 | Component | Pinned at | Used for | License |
 | --- | --- | --- | --- |

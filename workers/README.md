@@ -3,17 +3,17 @@
 Orainge generates 3D models with its own models on serverless GPUs, billed only while they
 work. There are no third-party AI APIs involved.
 
-| Worker                          | Model                         | Job                      | GPU                                              |
-| ------------------------------- | ----------------------------- | ------------------------ | ------------------------------------------------ |
-| [`trellis2/`](trellis2)         | TRELLIS.2-4B (MIT)            | image to textured GLB    | 24 GB+ Ampere/Ada/Hopper (L40S, RTX 4090, A100…) |
-| [`flux-schnell/`](flux-schnell) | FLUX.1 [schnell] (Apache-2.0) | text to reference images | 48 GB (L40S, A6000, A40)                         |
-| [`multiview/`](multiview)       | MV-Adapter on SDXL 1.0        | picture to six views     | 24 GB (A10G)                                     |
-| [`pixal3d/`](pixal3d)           | Pixal3D (MIT), experimental   | image, or image and views around it, to textured GLB | 48 GB (L40S) with the models resident; 24 GB in low-VRAM mode (untested) |
+| Worker                          | Model                         | Job                                                | GPU                                              |
+| ------------------------------- | ----------------------------- | -------------------------------------------------- | ------------------------------------------------ |
+| [`trellis2/`](trellis2)         | TRELLIS.2-4B (MIT)            | image to textured GLB: previews (finals on RunPod) | 24 GB+ Ampere/Ada/Hopper (L40S, RTX 4090, A100…) |
+| [`pixal3d/`](pixal3d)           | Pixal3D (MIT) on TRELLIS.2    | image to textured GLB: finals on Modal             | 48 GB (L40S); finals peak at 28–31 GB            |
+| [`flux-schnell/`](flux-schnell) | FLUX.1 [schnell] (Apache-2.0) | text to reference images                           | 48 GB (L40S, A6000, A40)                         |
+| [`multiview/`](multiview)       | MV-Adapter on SDXL 1.0        | picture to six views (off by default)              | 24 GB (A10G)                                     |
 
 They run on [Modal](https://modal.com) (`modal_app.py`, the simplest way to start) or on
-RunPod serverless (the Dockerfiles; the multiview worker has none yet). Both hosts speak the same
-job protocol, so the server talks to either through `apps/server/src/services/ai`
-(`SelfHostedProvider`).
+RunPod serverless (the Dockerfiles; the multiview and Pixal3D workers have none yet, so on RunPod
+the finals are TRELLIS.2's). Both hosts speak the same job protocol, so the server talks to either
+through `apps/server/src/services/ai` (`SelfHostedProvider`).
 
 ## The flow: spend GPU time only on results people keep
 
@@ -23,8 +23,11 @@ job protocol, so the server talks to either through `apps/server/src/services/ai
 2. **User picks one → preview** (`mode: "preview"`): TRELLIS.2 at 512³, 30k triangles, 1K
    textures.
 3. **User keeps it → final** (`mode: "final"`, _same seed_): 1024³ cascade, 100k triangles,
-   2K textures. The same seed gives the same coarse structure, so the final refines the preview
-   the user approved.
+   2K textures. On Modal, Pixal3D makes it from the same picture and seed (The recipe, below). It
+   is the same object as the preview, but rebuilt by another model, so it can differ from the
+   preview in detail. With TRELLIS.2 alone (on RunPod, or deployed with
+   `ORAINGE_FINAL_MODEL=trellis2`), the same seed gives the same coarse structure, so the final
+   refines the preview the user approved.
 4. Both passes are packed for the browser with gltfpack: meshopt geometry, WebP colour textures
    and KTX2 (UASTC) metallic-roughness at a quarter of the colour's size. The editor's
    `AssetLoader` decodes them; the decoders are served from `/decoders/` by the client's Vite
@@ -51,9 +54,76 @@ angles, near outlines, depth edges and misfits, and at specular highlights on gl
 the texture got a paint's colour wrong (a near-black "cola" milk tea, a red fox pictured orange), that
 paint takes the picture's colour, fading round the sides instead of ending in a seam. It never fails
 a job: when the silhouettes don't match closely (IoU under 0.93), another camera fits as well but
-would paint a different shape, or too little would change, the texture is left as TRELLIS.2 made it,
+would paint a different shape, or too little would change, the texture is left as the model made it,
 and the result's optional `projection` field says why (`applied`, `reason`, `iou`, `colour`, `pose`,
-`seconds`). Previews skip it: it adds a few seconds and the preview is only for choosing.
+`seconds`). Previews skip it: it adds a few seconds and the preview is only for choosing. Pixal3D's
+finals go through the same export, after they are levelled (The recipe, step 4).
+
+## The recipe: how finals are made on Modal
+
+Phase 5's finals, made by TRELLIS.2 alone, invented wrong backs: the arcade machine's back was a dark
+smear with a ghost of its front, the camera's back caved in or sprouted parts a camera doesn't have,
+and the shield's back carried a crude ghost of its lion. In the Phase 6 experiments, Pixal3D
+(TencentARC; TRELLIS.2 with pixel-aligned image features) fixed those backs when it was given the
+picture as its one view and its model was levelled afterwards. So on Modal a final made from the
+picture alone, which is every final unless the server runs with `AI_MULTIVIEW=1` (see The Pixal3D
+worker), goes through these steps (`pixal3d/pixal3d_worker/pipeline.py`, `Pixal3DRuntime.generate`).
+They run in the TRELLIS.2 worker's container, so the server's contract is unchanged: it asks the
+`trellis2` worker for a `"final"`. Previews are TRELLIS.2's `512` pipeline, as before.
+
+1. **TRELLIS.2's preview at the job's seed.** TRELLIS.2's `512` pipeline on the same picture and
+   seed (the preview the user kept, made again), exported as previews are.
+2. **The picture's camera.** The projection's silhouette search places the picture against that
+   preview, which gives the camera's elevation and roll (`pixal3d_worker/level.py`,
+   `estimate_pose`); MoGe-2 gives its field of view. The search must pass the projection's own gate
+   (silhouette IoU at least 0.93, and no camera far from the winner that fits as well but sees
+   another shape, unless it agrees on the tilt within 5°), and a camera placed more than 10° below
+   the horizon isn't trusted. A failed gate, or a failed preview, means no levelling, and the result
+   says why.
+3. **Pixal3D's multi-view weights, with the picture as their one view.** On the side the picture
+   doesn't show they invent far less than Pixal3D's single-view weights (a plain back on the helmet,
+   a proper rear on the car, a white bowl all round the ramen). Thin, flat objects are the exception:
+   the multi-view weights made the shield a hollow tray and the skateboard a doubled deck, and the
+   single-view weights build both cleanly. The preview decides (`pixal3d_worker/thin.py`): when the
+   smallest extent of its axis-aligned bounding box is at most `PIXAL3D_THIN_RATIO` (default 0.20;
+   `none` turns the rule off) of the largest, the single-view weights build the final. On the
+   twenty-prompt test set (`test-sets/phase2.txt`) that is the shield (0.10), the skateboard (0.14)
+   and the pistol (0.15), which looks as good either way; next come the arcade machine (0.37) and
+   the sneaker (0.40), and everything else is at least 0.46. The box is axis-aligned on purpose: the
+   guitar, pictured on the diagonal, measures 0.89, and the multi-view weights build it cleanly.
+   The single-view flow models wait in RAM and are swapped onto the GPU for a thin object (a few
+   seconds each way); the decoders, DINOv3, NAF and the background remover are shared.
+4. **Levelled.** Pixal3D builds the model aligned to the picture's camera. It has no notion of
+   gravity, so an object pictured from 30° above would come out leaning 30° towards the viewer. The
+   mesh is turned back by the camera's elevation and roll before the projection
+   (`pixal3d_worker/level.py`; tilts under 1° are left alone).
+5. **The usual export**, at the final's settings: `to_glb`, unpremultiply (texels the texture pass
+   returned darkened by a stray alpha), the picture projected onto the side it shows, smoothed
+   shading normals, gltfpack.
+
+**The final no longer strictly keeps the approved shape.** The preview is TRELLIS.2's and the final
+is Pixal3D's rebuild from the same picture and seed: the same object, but it can differ in detail
+from the preview the user kept.
+
+**Going back, and fallbacks.** `ORAINGE_FINAL_MODEL=trellis2 modal deploy workers/modal_app.py`
+makes finals with TRELLIS.2 alone again; the variable is read when the app is deployed, so deploy
+again without it to return to Pixal3D. If Pixal3D's weights are missing, or Pixal3D fails to load,
+finals are made with TRELLIS.2 and the container's log says why. A Pixal3D final that runs out of GPU
+memory gets one retry in Pixal3D's low-VRAM mode; if that runs out too, TRELLIS.2 makes the final and
+the result says so in `fallback`. Other Pixal3D failures come back as errors, as TRELLIS.2's do.
+Results name the model that made them in `model`.
+
+**One container, two models** (`ModelPool` in `modal_app.py`). TRELLIS.2 loads first and stays on
+the GPU, so previews start as soon as it is up. Pixal3D is built in a background thread (about 90 s)
+and the first final waits for it. When Pixal3D takes its first final, TRELLIS.2 goes to sleep for
+good: its models move to RAM and it runs in upstream's low-VRAM mode (each model on the GPU only for
+its stage). Later previews take a few seconds longer, and the recipe's own preview runs that way
+anyway; nothing is swapped back and forth between jobs. A TRELLIS.2 final that runs out of memory
+while its models are already off the GPU (on an A10, or asleep) goes straight to the `512` pipeline
+(see `pipeline` under Job contracts). The container has 48 GB of RAM (`memory=49152`: TRELLIS.2
+asleep and the single-view flow models wait there) and a 15-minute timeout. Pixal3D's finals peak at
+28–31 GB of GPU memory on an L40S and take about 45–103 s of GPU in all, the recipe's own preview
+included. A final that has to start a container also waits for both models to load.
 
 ## Job contracts
 
@@ -66,7 +136,7 @@ and the result's optional `projection` field says why (`applied`, `reason`, `iou
 `image_base64` can replace `image_url`, which is only fetched from hosts listed in
 `ALLOWED_IMAGE_HOSTS`. `seed` is optional (a random one is returned). Outputs are stored at
 `ai/<request_id>/<mode>-<seed>.glb`, so every result has its own URL and caches never serve a
-stale one.
+stale one. On Modal the same input makes finals through the recipe above.
 
 `views` (optional) adds up to 8 other pictures of the object, such as the multiview worker's, so
 TRELLIS.2 doesn't have to invent its back and sides:
@@ -74,11 +144,12 @@ TRELLIS.2 doesn't have to invent its back and sides:
 azimuth 0 the side the main picture shows. Each is cut out and cropped like the main picture (the same
 size limits apply), and all of them steer TRELLIS.2's three flows together (see
 `trellis2/forge3d_worker/multiview.py`); the main picture still counts most (`settings.MULTIVIEW`), and it
-alone is painted onto the final. Send the same views with the preview and the final, so the final keeps
-the previewed shape. TRELLIS.2 builds what the views show, good or bad, and the Phase 6 tests found that
-the multiview worker's four views at 0, 90, 180 and 270 are the ones to send: its 45 and 315 drawings
-made every object worse. Generation takes about one more single-picture pass per view (4 views: 3.3 to
-4.7 times a single picture's time on an L40S). Output:
+alone is painted onto the final. Send the same views with the preview and the final, so a TRELLIS.2
+final keeps the previewed shape (on Modal a final's views go to Pixal3D, see The Pixal3D worker below).
+TRELLIS.2 builds what the views show, good or bad, and the Phase 6 tests found that the multiview
+worker's four views at 0, 90, 180 and 270 are the ones to send: its 45 and 315 drawings made every
+object worse. Generation takes about one more single-picture pass per view (4 views: 3.3 to 4.7 times a
+single picture's time on an L40S). Output:
 
 ```json
 {
@@ -93,19 +164,26 @@ made every object worse. Generation takes about one more single-picture pass per
   "raw_bytes": 3012345,
   "triangles": 30000,
   "pipeline": "512",
+  "model": "trellis2",
   "views_used": 0,
   "timings": { "generate_s": 9.8, "export_s": 4.1, "compress_s": 2.2, "upload_s": 0.3 },
   "credits": ["Built with DINOv3", "3D generation: TRELLIS.2 (Microsoft, MIT)"]
 }
 ```
 
-`pipeline` is the TRELLIS.2 pipeline that made the model: `"512"` for previews, `"1024_cascade"` for
-finals. A job that runs out of GPU memory is retried once in low-VRAM mode (the models visit the GPU
-one at a time). A final that runs out even then is made once more, still in low-VRAM mode, with the
-preview's `"512"` pipeline and exported with the final's settings, and reports `"pipeline": "512"`. The
-same seed gives that pipeline the shape the user approved in the preview, and its memory use is known to
-fit, while TRELLIS.2's cascade has no cheaper setting for a 1024³ final (see `FALLBACK_PIPELINE` in
+`pipeline` is the pipeline that made the model: `"512"` for previews, `"1024_cascade"` for TRELLIS.2's
+finals, `"pixal3d-1024_cascade"` for the recipe's. A TRELLIS.2 job that runs out of GPU memory is
+retried once in low-VRAM mode (the models visit the GPU one at a time). A final that runs out even then
+is made once more, still in low-VRAM mode, with the preview's `"512"` pipeline and exported with the
+final's settings, and reports `"pipeline": "512"`. A final that runs out while TRELLIS.2's models are
+already off the GPU (deployed in low-VRAM mode, or asleep beside Pixal3D) goes to that pipeline at once.
+The same seed gives that pipeline the shape the user approved in the preview, and its memory use is known
+to fit, while TRELLIS.2's cascade has no cheaper setting for a 1024³ final (see `FALLBACK_PIPELINE` in
 `trellis2/forge3d_worker/pipeline.py`).
+
+`model` (Modal only) is the model that made it, `"trellis2"` or `"pixal3d"`. A final is TRELLIS.2's when
+the app is deployed with `ORAINGE_FINAL_MODEL=trellis2`, when Pixal3D's weights are missing or it failed
+to load, and when Pixal3D ran out of GPU memory, in which case `fallback` holds Pixal3D's error.
 
 `views_used` is how many of the job's `views` helped make the model: 0 without views, and fewer than
 sent when a view is left out: one with no object in it, or one whose object runs off the frame
@@ -114,6 +192,43 @@ off, and the model comes out crumpled; `CLIPPED_EDGE` in `pipeline.py`).
 
 Finals also carry `projection`, whether the picture was painted onto the model (see above); its
 time is part of `export_s`.
+
+A final made by the recipe has the same fields, with Pixal3D in its `credits`, and says what the recipe
+did. For example:
+
+```json
+{
+  "mode": "final",
+  "triangles": 100000,
+  "pipeline": "pixal3d-1024_cascade",
+  "model": "pixal3d",
+  "weights": "multiview",
+  "thin": { "extents": [0.46, 0.81, 1.0], "ratio": 0.46, "threshold": 0.2, "thin": false, "source": "preview", "decided": true },
+  "camera": { "fov_deg": 29.4, "tilt": { "elevation": 21.2, "roll": -0.8, "source": "preview" } },
+  "pose": { "applied": true, "reason": "found", "pose": { "azimuth": 4.0, "elevation": 21.2, "roll": -0.8, "…": "…" }, "iou": 0.968, "…": "…" },
+  "level": { "applied": true, "elevation": 21.2, "roll": -0.8, "recentred": [0.0, 0.0121, -0.0043] },
+  "views_used": 0,
+  "credits": ["Built with DINOv3", "3D generation: Pixal3D (Tencent, MIT) on TRELLIS.2 (Microsoft, MIT)"],
+  "…": "…"
+}
+```
+
+- `weights`: which of Pixal3D's weight sets built it, `"multiview"`, or `"single"` for a thin, flat
+  object.
+- `thin`: what the preview measured: its bounding box's `extents` (smallest first), their `ratio`
+  (smallest over largest), the `threshold`, whether that made it `thin`, the `source` (`"preview"`), and
+  whether the measurement `decided` the weights (not when the rule is off).
+- `camera`: the picture's camera: `fov_deg` from MoGe-2, and the `tilt` the model was levelled by
+  (`elevation` and `roll` in degrees, 0 when the search didn't pass its gate, and their `source`).
+- `pose`: the search that placed the picture against the preview: whether it passed the gate
+  (`applied`) and why not (`reason`), the camera it found (`pose`: `azimuth`, `elevation`, `roll`,
+  `fov`, `scale`, `shift`), its silhouette `iou` and `colour` score, the best distinct `runner_up`,
+  the `rivals` it weighed, the `seconds` the preview and the search took, and the `preview` itself
+  (`pipeline`, `bytes`). A failed preview leaves only `applied`, `reason`, `pose` and `seconds`, and
+  then there is no `thin`.
+- `level`: what the export turned: whether it did (`applied`), by how much (`elevation`, `roll`),
+  and, when it did, how far it moved the model back to the origin (`recentred`).
+- `views_used` is 0: the recipe builds from the picture alone.
 
 With `AI_MULTIVIEW=1` on the server (see The Studio's AI panel), both the preview and the final also
 get the picture's other sides from the `multiview` worker, the same views for both:
@@ -131,7 +246,8 @@ Each view has `image_base64` or `image_url`, like the picture; the server sends 
 (a few MB more per job; RunPod takes at most 10 MB in a `/run` request). The picture stays the main image,
 and the projection still paints from it. The result reports how many views the model was built from as
 `"views_used": 6`. A worker from before views ignores them and leaves that out, and the server then logs
-a warning.
+a warning. On Modal the preview is TRELLIS.2's, steered by the views, and the final is Pixal3D's, which
+takes the redrawn front as its main view (see The Pixal3D worker).
 
 `flux-schnell` input: `{ "prompt": "a brass pocket watch", "count": 4, "seed": 5, "request_id": "gen_42" }`.
 Output: `{ "images": [{ "key", "url", "seed" }, …], "prompt", "seconds" }`.
@@ -198,8 +314,13 @@ them to its code.
   The other views share it, so an object that is deeper than it is wide overflows the frame in the
   views that show its long axis (a stack of books at 45° and 315°; a car in all four side views, wheels
   cut). A view's cutout touching the frame edge means "unknown beyond here", not the object's edge.
-`pixal3d` (experimental; nothing in `modal_app.py` runs it yet) takes `trellis2`'s input, plus
-optionally the views the `multiview` worker draws around the picture:
+
+### The Pixal3D worker
+
+`pixal3d/pixal3d_worker/service.py` is the `trellis2` contract with Pixal3D behind it, plus views. The
+TRELLIS.2 container hands it the finals (`handle_with_models` in `modal_app.py`); it has no endpoint
+or Dockerfile of its own. Besides `trellis2`'s input it takes, optionally, the views the `multiview`
+worker draws around the picture:
 
 ```json
 {
@@ -217,46 +338,27 @@ the picture's own view redrawn, positive azimuth towards the picture's right, 18
 `multiview` worker's convention). `camera` is optional and says how wide their frame is in their
 own units (MV-Adapter's `0.55` by default); it only ends up in the result, because the worker
 rescales the views' world from their silhouettes so the object fills Pixal3D's cube the way its
-training objects did (`pixal3d_worker/views.py: fit_camera`). With views, both the preview and the
-final are built from the picture and the views with Pixal3D's multi-view weights; the picture
-stays the main image, and the final's projection still paints from it. The result is `trellis2`'s
-with `"pipeline": "pixal3d-1024_cascade"` or `"pixal3d-mv-1024_cascade"` (Pixal3D has no 512
-pipeline: a preview is the final's generation exported lighter), `"views_used"` (how many of the
-job's views went in; 0 without views), and `"camera"`: for a picture alone its field of view from
-MoGe-2 (`fov_deg`), for views the frame used (`half_extent`), the object's longest extent in the
-views' units (`extent`) and which views cut it off (`cut_off`, when they do). A job that runs out
-of GPU memory gets one retry in Pixal3D's low-VRAM mode. In the Phase 6 experiments a final took
-15–40 s to generate alone and 40–70 s with six views, plus 15–25 s to export, at 28–31 GB of GPU
-memory on an L40S with everything resident; loading the models takes about 90 s.
+training objects did (`pixal3d_worker/views.py: fit_camera`).
 
-A picture alone is built in its camera's frame (Pixal3D has no notion of gravity: an object
-pictured from above would lean towards the viewer by that elevation), so the worker levels it.
-It runs TRELLIS.2's `512` preview of the same picture and seed first (the preview the user
-approves; `TRELLIS2_MODEL_DIR`, loaded beside Pixal3D and kept off the GPU between uses), finds
-the picture's camera against it with the projection's silhouette search, and turns the model by
-that elevation and roll before the picture is painted on (`pixal3d_worker/level.py`). The result
-carries `"camera"."tilt"` (what it was turned by and where that came from), `"pose"` (the search:
-`pose`, `iou`, `colour`, `runner_up`, whether it passed the gate and why not) and `"level"` (what
-the export turned). The gate is the projection's own (silhouette IoU at least 0.93, no rival camera
-seeing another shape) plus a guard against cameras placed more than 10 degrees below the horizon;
-a failed gate, or a failed preview, means no levelling, reported. `PIXAL3D_LEVEL=none` turns it
-off; `given` takes a pose the caller sets (experiments). The preview adds 15–25 s to a final on an
-L40S (generation 5–10 s, export 8–12 s, the search 1–2 s) and about 90 s to the container's start.
+Without views a picture goes through the recipe above. With views (on Modal, a final while the server
+runs with `AI_MULTIVIEW=1`), Pixal3D's multi-view weights build the model from all of them, without
+the recipe's preview, levelling or thin rule, since the views are level already. The redrawn front
+(azimuth 0), when there is one, is Pixal3D's main view; the user's picture is still what the
+projection paints onto the final. The result has `"pipeline": "pixal3d-mv-1024_cascade"`,
+`"weights": "multiview"`, `"views_used"` (how many of the job's views went in) and `"camera"`: the
+views' angles (`views`), the frame used (`half_extent`, and the job's `given_half_extent`), the
+object's longest extent in the views' units (`extent`), whether the frame was `rescaled`, and which
+views cut the object off (`cut_off`, when they do). In the Phase 6 experiments a final with six views
+took 40–70 s to generate. Pixal3D has no 512 pipeline: a preview sent to this worker is the final's
+generation exported lighter (production never sends it one). A job that runs out of GPU memory gets
+one retry in Pixal3D's low-VRAM mode.
 
-A picture alone is built with Pixal3D's multi-view weights as a one-view set (they invent far less
-on the unseen side than the single-view weights: a plain back on a helmet, a proper rear on a car),
-except for thin, flat objects, which those weights build hollow or doubled (a shield became a tray,
-a skateboard two decks) and the single-view weights build cleanly. The same TRELLIS.2 preview
-decides: when the smallest extent of its axis-aligned bounding box is at most `PIXAL3D_THIN_RATIO`
-(default 0.20; `none` turns the rule off) of the largest, the single-view weights build the final
-(`pixal3d_worker/thin.py`; on the twenty test previews: shield 0.10, skateboard 0.14, pistol 0.15,
-then arcade 0.37 and everything else higher). A multi-view worker therefore loads the single-view
-flow models too (about 90 s more at start; the decoders and the rest are shared), keeps them on the
-CPU and swaps them onto the GPU for such a job (a few seconds each way). The result carries
-`"weights"` (`"single"` or `"multiview"`) and `"thin"` (the preview's `extents`, `ratio`,
-`threshold`, whether it was `thin` and whether that `decided`). Jobs with views always use the
-multi-view weights. Without a preview (`PIXAL3D_LEVEL` not `preview`) nothing is measured and the
-worker's own weights build the model.
+The experiments build their runtime with `runtime_from_env`, set by `PIXAL3D_*` variables
+(`PIXAL3D_WEIGHTS`, `PIXAL3D_LEVEL`: `preview`, `none`, or `given` for a pose the caller sets,
+`PIXAL3D_FOV_DEG`, `PIXAL3D_MAIN`, `PIXAL3D_AZIMUTHS`, `PIXAL3D_LOW_VRAM`, `PIXAL3D_THIN_RATIO`).
+The Modal container builds its own in `modal_app.py` (`build_pixal3d`): the multi-view weights with
+the single-view set beside them, everything on the GPU, levelled against the container's own
+TRELLIS.2. Of those variables only `PIXAL3D_THIN_RATIO`, from the container's environment, changes it.
 
 Invalid input (including an image where no object stands out from the background) comes back
 as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`. After
@@ -272,13 +374,14 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
 `modal_app.py` defines the workers, a volume for the weights and a small job API
 (`job_api.py`) with the same routes as a RunPod endpoint (`/run`, `/runsync`, `/status/{id}`,
 `/cancel/{id}`), under `/trellis2`, `/reference` and `/multiview`, plus `/warm`, which starts a
-worker's container ahead of a job without waiting for it.
+worker's container ahead of a job without waiting for it. `/trellis2` takes previews and finals
+alike; its container makes the finals with Pixal3D (The recipe).
 
 1. On Hugging Face, request access to
    [DINOv3](https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m) (Meta approves it
    manually, so do this first) and accept the
    [FLUX.1 [schnell]](https://huggingface.co/black-forest-labs/FLUX.1-schnell) terms. Create a
-   read token.
+   read token. The other weights (Pixal3D, MoGe-2, NAF, MV-Adapter, SDXL) need no request.
 2. Install the CLI and log in (from the repository root; the same commands work in PowerShell):
 
    ```sh
@@ -299,7 +402,34 @@ worker's container ahead of a job without waiting for it.
    (You can also create them in the Modal dashboard under Secrets; its Hugging Face template
    makes `huggingface-secret` with the key `HF_TOKEN`.)
 
-4. Build and deploy. This is the only step that needs this computer online: it takes 20–40
+4. Download the weights into the `orainge-models` volume. This runs in Modal's cloud, on a CPU;
+   with `--detach` it keeps going if this computer goes offline, and running it again resumes an
+   interrupted download:
+
+   ```sh
+   modal run --detach workers/modal_app.py::download_models --which trellis2
+   modal run --detach workers/modal_app.py::download_models --which reference
+   modal run --detach workers/modal_app.py::download_models --which pixal3d
+   ```
+
+   `--which pixal3d` fetches both of Pixal3D's weight sets (about 44 GB: the multi-view set for
+   most pictures, the single-view set for thin, flat objects), MoGe-2 and NAF. It reuses the
+   TRELLIS.2 weights' decoders, DINOv3 and BiRefNet, so it comes after `--which trellis2`. Add
+   `--which multiview` only if the server will run with `AI_MULTIVIEW=1`. Without `--which`,
+   `download_models` fetches all four, about 80 GB. Without Pixal3D's weights everything still
+   deploys and runs, with TRELLIS.2 making the finals.
+
+5. Update the server's database. From Phase 6 on, the server reads the `views` and `views_error`
+   columns of `ai_generations` (`apps/server/src/db/schema.ts`) even with `AI_MULTIVIEW` off, so
+   push the schema to its database before the updated server runs:
+
+   ```sh
+   DATABASE_URL=postgresql://… pnpm --filter @forge3d/server exec drizzle-kit push
+   ```
+
+   (In PowerShell: `$env:DATABASE_URL = "postgresql://…"; pnpm --filter @forge3d/server exec drizzle-kit push`.)
+
+6. Build and deploy. This is the only step that needs this computer online: it takes 20–40
    minutes the first time (the TRELLIS.2 image compiles CUDA extensions). If the connection
    drops, run it again; finished build steps are kept.
 
@@ -308,35 +438,49 @@ worker's container ahead of a job without waiting for it.
    ```
 
    Give the server the URL it prints (`https://<workspace>--orainge-ai-api.modal.run`) as
-   `AI_WORKERS_URL` and the same token as `AI_WORKERS_TOKEN` (see `.env.example`).
+   `AI_WORKERS_URL` and the same token as `AI_WORKERS_TOKEN` (see `.env.example`). The deploy
+   also prints which model makes the finals. To make them with TRELLIS.2 alone (see The recipe,
+   Going back):
 
-5. Make a model. This runs entirely in Modal's cloud, and with `--detach` it keeps going if
+   ```sh
+   ORAINGE_FINAL_MODEL=trellis2 modal deploy workers/modal_app.py
+   ```
+
+7. Make a model. This runs entirely in Modal's cloud, and with `--detach` it keeps going if
    this computer sleeps or goes offline:
 
    ```sh
    modal run --detach workers/modal_app.py::make --prompt "a brass pocket watch" --final
    ```
 
-   The first run downloads the weights (about 60 GB, 10–30 minutes) into the `orainge-models`
-   volume; later runs start within a couple of minutes. Each step is saved in the
+   A run first downloads any weights it needs that the `orainge-models` volume doesn't have yet
+   (a final needs Pixal3D's); later runs start within a couple of minutes. Each step is saved in the
    `orainge-outputs` volume under the run's name: the reference images, `preview-<seed>.glb`,
    `final-<seed>.glb` and `progress.json`. If you are still connected at the end, they are also
-   copied to `orainge-outputs/<run>/` here.
+   copied to `orainge-outputs/<run>/` here. `progress.json` keeps each step's timings, triangles and
+   `pipeline`, and for the final also its `projection`, the `model` that made it, any `fallback`,
+   and the recipe's `weights`, `thin`, `camera`, `pose` and `level` (as in the result, under Job
+   contracts).
 
-   | To…                                  | Run                                                                          |
-   | ------------------------------------ | ---------------------------------------------------------------------------- |
-   | See what's ready, running or failed  | `python workers/modal_app.py status`                                         |
-   | Continue an unfinished run           | `modal run --detach workers/modal_app.py::make --run <name>`                 |
-   | Make the final of a previewed run    | the same, with `--final`                                                     |
-   | Start from your own image            | `make --image photo.png` instead of `--prompt`                               |
-   | Choose which picture becomes 3D      | `make --prompt "…" --pictures-only`, then `make --run <name> --pick 3`       |
-   | Make a whole test set                | `modal run --detach workers/modal_app.py::make_set --prompts <file>`         |
-   | Download a run                       | `modal volume get orainge-outputs <name> .`                                  |
-   | Fetch FLUX while Meta reviews DINOv3 | `modal run --detach workers/modal_app.py::download_models --which reference` |
+   | To…                                  | Run                                                                                    |
+   | ------------------------------------ | -------------------------------------------------------------------------------------- |
+   | See what's ready, running or failed  | `python workers/modal_app.py status`                                                   |
+   | Continue an unfinished run           | `modal run --detach workers/modal_app.py::make --run <name>`                           |
+   | Make the final of a previewed run    | the same, with `--final`                                                               |
+   | Start from your own image            | `make --image photo.png` instead of `--prompt`                                         |
+   | Choose which picture becomes 3D      | `make --prompt "…" --pictures-only`, then `make --run <name> --pick 3`                 |
+   | Make a whole test set                | `modal run --detach workers/modal_app.py::make_set --prompts <file>`                   |
+   | Re-test beside production            | `ORAINGE_APP_NAME=orainge-staging modal run --detach workers/modal_app.py::make_set …` |
+   | Download a run                       | `modal volume get orainge-outputs <name> .`                                            |
+   | Fetch FLUX while Meta reviews DINOv3 | `modal run --detach workers/modal_app.py::download_models --which reference`           |
 
    A continued run skips every finished step, so finished work is never paid for twice. The GLBs are
    meshopt/KTX2-compressed: open them in the Orainge editor (File › Import model) or another
    viewer that supports those extensions.
+
+   `ORAINGE_APP_NAME` runs the same code under another app name (production's is `orainge-ai`), for
+   a staging copy that never touches production's deployment, such as a re-test as an ephemeral
+   `modal run`. It shares production's volumes: the weights, the outputs and the kernel caches.
 
 **Without your computer:** the `AI ops (Modal)` GitHub workflow runs the same commands on
 GitHub's servers. Add the repository secrets `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` (Modal >
@@ -364,14 +508,17 @@ run's reference images, triangles, file size, GPU time and cost, with a 3D viewe
 zoom, wireframe) for each final. It needs `pnpm install` and Playwright's Chromium, which
 `ops/gallery.sh` installs on GitHub's servers; serve the page over http(s) to use the viewer.
 
-**Settings** (in `modal_app.py`): both workers run on an L40S (48 GB), scale to zero, stay warm
-for 60 s after their last job (idle time is billed; a cold start takes about a minute) and are
-capped at 2 TRELLIS.2 containers and 1 FLUX container to bound spending. The multiview worker
-runs on an A10G (24 GB; it peaks at 19 GiB) with 1 container. `TRELLIS2_GPU = "A10"`
+**Settings** (in `modal_app.py`): the TRELLIS.2 and FLUX workers run on an L40S (48 GB), scale to
+zero, stay warm for 60 s after their last job (idle time is billed; a cold start takes about a
+minute) and are capped at 2 TRELLIS.2 containers and 1 FLUX container to bound spending. The
+TRELLIS.2 container also makes Pixal3D's finals, so it has 48 GB of RAM and a 15-minute timeout (a
+Pixal3D final, its out-of-memory retry and a TRELLIS.2 fallback fit well inside). The multiview
+worker runs on an A10G (24 GB; it peaks at 19 GiB) with 1 container. `TRELLIS2_GPU = "A10"`
 costs about half as much per second but is slower and has only 24 GB; set
-`TRELLIS2_LOW_VRAM = "1"` with it. Compiled GPU kernels and FlexGEMM's kernel tuning are kept
-in the `orainge-cache` volume, so only the first containers spend time compiling and
-benchmarking them.
+`TRELLIS2_LOW_VRAM = "1"` with it. Pixal3D's finals are untested on an A10 (they peak at 28–31 GB
+with its models on the GPU); `ORAINGE_FINAL_MODEL=trellis2` keeps the finals TRELLIS.2's there.
+Compiled GPU kernels and FlexGEMM's kernel tuning are kept in the `orainge-cache` volume, so only
+the first containers spend time compiling and benchmarking them.
 
 **R2 storage** (for production): put the storage variables from the RunPod table below in a
 Modal secret, then deploy with its name in `ORAINGE_R2_SECRET`:
@@ -399,34 +546,40 @@ A container that has scaled to zero takes about 45 s (FLUX) to 100 s (TRELLIS.2)
 on Modal the server starts them early: FLUX when the panel opens, and TRELLIS.2 while the
 pictures are drawn. Each user starts each worker this way at most once every 2 minutes. A
 container started for nothing costs what a cold start does (about $0.08, see Cost). RunPod has
-no such route, so there the first job after a quiet spell still waits for its container.
+no such route, so there the first job after a quiet spell still waits for its container. A final
+that has to start the TRELLIS.2 container also waits about 90 s for Pixal3D to load.
 
 The server needs `AI_WORKERS_URL` and `AI_WORKERS_TOKEN` (Modal, above) or the RunPod variables,
 and the `ai_generations` table as in `apps/server/src/db/schema.ts`
-(`pnpm --filter @forge3d/server exec drizzle-kit push` in development). Pictures and models are
-copied into the server's storage (`UPLOAD_DIR`), so they outlive the workers' outputs. Each
-user can have 3 models in progress and 30 an hour until credits exist
-(`apps/server/src/services/ai/studio.ts`).
+(`pnpm --filter @forge3d/server exec drizzle-kit push` in development; Deploying on Modal, step 5,
+for production). Pictures and models are copied into the server's storage (`UPLOAD_DIR`), so they
+outlive the workers' outputs. Each user can have 3 models in progress and 30 an hour until credits
+exist (`apps/server/src/services/ai/studio.ts`).
 
-**The other sides (`AI_MULTIVIEW=1`, off by default).** TRELLIS.2 invents the sides a picture doesn't
-show. With `AI_MULTIVIEW=1` on the server, the picked picture (or the uploaded photo) first goes to the
-`multiview` worker, which draws it from 6 sides; the panel shows "Drawing the other sides", then builds
-the preview from the picture and the views, with the views as small thumbnails under the picture while
-the preview and the final are made. The views are copied into the server's storage and kept with the
-generation (the `views` and `views_error` columns: run `drizzle-kit push` as above after updating), so
-the final and Try again use the same ones, and picking another picture draws new ones.
+**The other sides (`AI_MULTIVIEW=1`, off by default).** The 3D models invent the sides a picture
+doesn't show. With `AI_MULTIVIEW=1` on the server, the picked picture (or the uploaded photo) first
+goes to the `multiview` worker, which draws it from 6 sides; the panel shows "Drawing the other
+sides", then builds the preview (TRELLIS.2) and the final (on Modal, Pixal3D's multi-view weights)
+from the picture and the views, with the views as small thumbnails under the picture while the
+preview and the final are made. It is off by default because the views were often wrong (the arcade
+machine's knobby back, the camera's second lens) and the models build what the views show, while the
+recipe's finals do without them. The views are copied into the server's storage and kept with the
+generation (the `views` and `views_error` columns), so the final and Try again use the same ones, and
+picking another picture draws new ones.
 
-The views only help, so they never fail a generation. If their job can't start, fails, comes back
-broken or takes longer than 3 minutes (it is then cancelled), the preview is made from the picture
-alone; the server logs why and keeps it as `views_error`, and the panel says the back is guessed.
-While FLUX draws, the server starts the multiview worker as well as TRELLIS.2, and starts TRELLIS.2
-again when the views start for users who took over 2 minutes to pick; the panel starts the multiview
-worker while the user chooses a photo. A generation drawing its views counts as one in progress.
+The views are optional, so they never fail a generation. If their job can't start, fails, comes back
+broken or takes longer than 3 minutes (`VIEWS_TIMEOUT_MS`; it is then cancelled), the preview is made
+from the picture alone; the server logs why and keeps it as `views_error`, and the panel says the back
+is guessed. While FLUX draws, the server starts the multiview worker as well as TRELLIS.2, and starts
+TRELLIS.2 again when the views start for users who took over 2 minutes to pick; the panel starts the
+multiview worker while the user chooses a photo. A generation drawing its views counts as one in
+progress.
 
 On Modal the server calls the job API's `multiview` worker (`/multiview/run`, `/status`, `/cancel`
-and `/warm`), which `modal_app.py` has to register next to `trellis2` and `reference`; until it does,
-each views job fails to start (404) and the model is made from the picture alone. On RunPod, give the
-server `RUNPOD_MULTIVIEW_ENDPOINT_ID`; without it the step is skipped.
+and `/warm`), which `modal_app.py` registers next to `trellis2` and `reference`. It needs the
+multiview weights (`download_models --which multiview`); without them each views job fails and the
+model is made from the picture alone. On RunPod, give the server `RUNPOD_MULTIVIEW_ENDPOINT_ID`;
+without it the step is skipped.
 
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
 labelled pictures (rated, with the second always the best) and return a small house model after
@@ -436,6 +589,9 @@ back blue), except for a photo under 128 px, whose model is then made from the p
 It refuses to run in production.
 
 ## Deploying on RunPod
+
+The images hold TRELLIS.2 and FLUX only, so on RunPod every final is TRELLIS.2's 1024³ cascade, as
+before Phase 6, and results carry no `model`.
 
 1. Hugging Face access as in Modal step 1.
 2. Build and push the images. The token is a build secret, so it never lands in a layer:
@@ -478,20 +634,25 @@ which is what the Dockerfile and `modal_app.py` do; a mismatch shows up as an AB
 ## Cost (estimates to check against real `timings`)
 
 Modal on 29 Sep 2026: L40S $0.000542/s ($1.95/h), plus $0.047 per CPU core-hour and $0.008 per
-GiB-hour of memory, so about $2.30/h per worker container as configured.
+GiB-hour of memory, so about $2.30/h for a FLUX container and $2.50/h for a TRELLIS.2 container
+(4 cores and 48 GiB of RAM) as configured.
 
-| Step (Modal, L40S)                                | Time (estimate) | Cost        |
-| ------------------------------------------------- | --------------- | ----------- |
-| 4 reference images                                | 10–20 s         | ~$0.01      |
-| Preview                                           | 20–40 s         | ~$0.01–0.03 |
-| Final                                             | 1–2 min         | ~$0.04–0.08 |
-| Cold start and 60 s idle, per container scaled up | ~2 min          | ~$0.08      |
-| Six views (multiview, A10G at ~$1.30/h all-in)    | 46 s            | ~$0.02      |
+| Step (Modal, L40S)                                       | Time (estimate) | Cost        |
+| -------------------------------------------------------- | --------------- | ----------- |
+| 4 reference images                                       | 10–20 s         | ~$0.01      |
+| Preview                                                  | 20–40 s         | ~$0.01–0.03 |
+| Final, the recipe (its own preview, Pixal3D, the export) | 45–103 s        | ~$0.03–0.07 |
+| Final, TRELLIS.2 alone                                   | 1–2 min         | ~$0.04–0.08 |
+| Cold start and 60 s idle, per container scaled up        | ~2 min          | ~$0.08      |
+| Pixal3D loading, when a final starts a container         | ~90 s           | ~$0.06      |
+| Six views (multiview, A10G at ~$1.30/h all-in)           | 46 s            | ~$0.02      |
 
-The GPU work in a prompt-to-final run comes to about $0.06–0.12. At low traffic each run also
-pays for its cold starts: one FLUX and one TRELLIS.2 container, plus a second TRELLIS.2 start if
-the final comes more than 60 s after the preview. That makes roughly $0.22–0.36 a run, so the
-free $30 covers about 80–140 runs a month while testing, and more once steady traffic keeps
+Pixal3D adds about a minute of L40S to each final (its generation and export), plus the recipe's
+own `512` preview, in place of TRELLIS.2's cascade. The views run only with `AI_MULTIVIEW=1`. The GPU
+work in a prompt-to-final run comes to about $0.05–0.11. At low traffic each run also pays for its
+cold starts: one FLUX and one TRELLIS.2 container, plus a second TRELLIS.2 start, with Pixal3D
+loading, if the final comes more than 60 s after the preview. That makes roughly $0.21–0.41 a run,
+so the free $30 covers about 70–140 runs a month while testing, and more once steady traffic keeps
 containers warm. RunPod list prices on 29 Sep 2026: RTX 4090 $1.10/h serverless ($0.74/h
 always-on), RTX 5090 $1.58/h ($0.99/h), L40S $1.75/h, RTX A6000/A40 $1.22/h; once the free
 credits are used up, its cheaper GPUs make each job cheaper.
@@ -501,39 +662,53 @@ before export). Cold starts add model-loading time on the first job after scalin
 
 ## Licenses
 
-See [`trellis2/NOTICE.md`](trellis2/NOTICE.md). In short: every component is MIT, BSD or
-Apache-2.0 except DINOv3, whose license requires showing **"Built with DINOv3"** (it is in the
-editor's File › About dialog, and each result carries `credits` to show next to generated
-models). Excluded on purpose: nvdiffrast/nvdiffrec (research-only; replaced by
-`trellis2/forge3d_worker/uv_raster.py`), RMBG-2.0 (non-commercial; replaced by BiRefNet),
-FLUX.1 [dev] (non-commercial) and Hunyuan3D 2.1 (not licensed in South Korea, the EU or the UK).
-The experimental Pixal3D worker adds Pixal3D (MIT), MoGe-2 (MIT), NAF (Apache-2.0) and
-utils3d (MIT), all pinned, and reuses the TRELLIS.2 worker's decoders, DINOv3 and BiRefNet; see
-[`pixal3d/NOTICE.md`](pixal3d/NOTICE.md) for what it leaves out (RMBG-2.0, nvdiffrast, NATTEN).
+See [`trellis2/NOTICE.md`](trellis2/NOTICE.md) and [`pixal3d/NOTICE.md`](pixal3d/NOTICE.md). In
+short: every component is MIT, BSD or Apache-2.0 except DINOv3, whose license requires showing
+**"Built with DINOv3"** (it is in the editor's File › About dialog, and each result carries
+`credits` to show next to generated models), and SDXL under the multiview worker (below).
 
-The multiview worker ([`multiview/NOTICE.md`](multiview/NOTICE.md)) runs MV-Adapter (Apache-2.0; its
-pipeline code is vendored in `multiview/mvadapter/` without the nvdiffrast-based mesh tools) on Stable
-Diffusion XL 1.0, whose CreativeML Open RAIL++-M license has use-based restrictions that Orainge's terms
-of service must pass on to users before the worker serves them.
+The finals' Pixal3D (TencentARC) is MIT since 2026-05-21; its code is pinned at commit
+`f7cf38429b0bd264f1995f0f8743a88b1c728b94` and its weights at revision
+`b0cb2e1b794cab9aa0ac38a95d794a4d9337437f`. With it come MoGe-2 and the utils3d it pins (MIT) and
+NAF (Apache-2.0), all pinned, and it reuses the TRELLIS.2 worker's decoders, DINOv3 and BiRefNet.
+The About dialog lists TRELLIS.2 (previews), Pixal3D (finals) and MoGe-2, and a Pixal3D final's
+`credits` name Pixal3D.
+
+Never installed: NATTEN (not a licensing matter; the one call NAF makes is computed in PyTorch,
+`pixal3d/pixal3d_worker/neighborhood.py`), nvdiffrast and nvdiffrec (research-only; replaced by
+`trellis2/forge3d_worker/uv_raster.py`), RMBG-2.0 (non-commercial; replaced by BiRefNet), FLUX.1
+[dev] (non-commercial) and Hunyuan3D 2.1 (not licensed in South Korea, the EU or the UK).
+
+The multiview worker ([`multiview/NOTICE.md`](multiview/NOTICE.md)), off by default, runs MV-Adapter
+(Apache-2.0; its pipeline code is vendored in `multiview/mvadapter/` without the nvdiffrast-based mesh
+tools) on Stable Diffusion XL 1.0, whose CreativeML Open RAIL++-M license has use-based restrictions
+that Orainge's terms of service must pass on to users before the worker serves them.
 
 ## Tests
 
 ```sh
 pip install -r workers/requirements-dev.txt
-python -m pytest workers/tests                 # the job API and modal_app.py
+python -m pytest workers/tests                 # the job API and modal_app.py: the model pool, the fallbacks, make
 python -m pytest workers/trellis2/tests        # CPU only; set GLTFPACK_BIN to include gltfpack
 python -m pytest workers/flux-schnell/tests
+python -m pytest workers/pixal3d/tests         # CPU only (torch, trimesh): the recipe on a fake pipeline
 python -m pytest workers/multiview/tests       # torch for the camera checks; no GPU or weights
-python -m pytest workers/pixal3d/tests         # CPU only: cameras, views, the NATTEN stand-in, the runtime on a fake pipeline
 ```
 
-Run the folders separately: they share test file names.
+Run the folders separately: they share test file names. Each suite also runs from inside its folder
+(`cd workers/pixal3d && python -m pytest`). With `TRELLIS2_SRC` pointing at a TRELLIS.2 checkout, the
+trellis2 tests also run the views through TRELLIS.2's own samplers, not only a reduction of them;
+without diffusers installed, one multiview camera check is skipped.
 
 The tests cover input validation, job handling, the out-of-memory retry and fallback, shading
 normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API, the
 nvdiffrast stand-in (against a brute-force rasterizer and analytic results) and the picture
 projection (synthetic models pictured from known cameras: the camera found, the colours painted,
-the fall-backs). Before the first
+the fall-backs). For the finals they cover, on fakes, the choice of model, the container's model
+pool and the fallbacks to TRELLIS.2, the recipe's preview, levelling and its gate, the thin rule and
+the weight swap, Pixal3D's cameras and views, the NATTEN stand-in (against NATTEN's own definition)
+and the weights scripts' pins. The multiview tests hold its cameras to MV-Adapter's code and cover
+the reference picture's preparation and job handling. Before the first
 production deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine
 that has nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real
 hardware.
