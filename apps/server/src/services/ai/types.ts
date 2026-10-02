@@ -94,6 +94,11 @@ export interface ModelOutput {
    * for finals, and "512" for a final that ran out of GPU memory (see workers/README.md).
    */
   pipeline?: string;
+  /**
+   * The model that made it, when the host says: "trellis2", or "pixal3d" for a final with the
+   * recipe on. Orainge's job API on Modal says; RunPod and older workers leave it out.
+   */
+  model?: string;
 }
 
 /**

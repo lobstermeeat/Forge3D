@@ -40,6 +40,8 @@ interface Trellis2Output {
   views_used?: unknown;
   /** The pipeline that made the shape, e.g. "1024_cascade" */
   pipeline?: unknown;
+  /** The model that made it, "trellis2" or "pixal3d" (Orainge's job API on Modal only) */
+  model?: unknown;
   error?: string;
 }
 
@@ -188,6 +190,7 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
         credits: output.credits,
         ...(viewsUsed === undefined ? {} : { viewsUsed }),
         ...(typeof output.pipeline === 'string' ? { pipeline: output.pipeline } : {}),
+        ...(typeof output.model === 'string' ? { model: output.model } : {}),
       };
     });
   }

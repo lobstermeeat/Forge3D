@@ -684,8 +684,12 @@ describe('SelfHostedProvider', () => {
         status: 'COMPLETED',
         output: { error: 'texture options need TRELLIS.2 finals' },
       },
-      // A final says which pipeline made it
-      { id: 'fc-final', status: 'COMPLETED', output: { ...trellisOutput, pipeline: '512' } },
+      // A final says which pipeline made it, and on Modal which model
+      {
+        id: 'fc-final',
+        status: 'COMPLETED',
+        output: { ...trellisOutput, pipeline: '512', model: 'trellis2' },
+      },
       { id: 'fc-tex-2', status: 'IN_QUEUE' },
     ]);
     const provider = createSelfHostedProvider(
@@ -736,7 +740,7 @@ describe('SelfHostedProvider', () => {
     });
     expect(await provider.model('fc-final')).toMatchObject({
       status: 'done',
-      output: { seed: 77, pipeline: '512' },
+      output: { seed: 77, pipeline: '512', model: 'trellis2' },
     });
     // Without views, none are sent
     await provider.startTextures({ image: picture, seed: 77, count: 1, requestId: 'gen-7' });
@@ -776,15 +780,21 @@ describe('SelfHostedProvider', () => {
     });
   });
 
-  it('makes texture options unless AI_TEXTURE_OPTIONS is 0 or false', () => {
+  it('makes texture options unless AI_TEXTURE_OPTIONS is 0, false, off or no', () => {
     expect(textureOptionsEnabled({})).toBe(true);
     expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: '' })).toBe(true);
     expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: '1' })).toBe(true);
     expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'true' })).toBe(true);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'on' })).toBe(true);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'yes' })).toBe(true);
     expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: '0' })).toBe(false);
     expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: ' 0\n' })).toBe(false);
     expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'false' })).toBe(false);
     expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'FALSE' })).toBe(false);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'off' })).toBe(false);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'Off' })).toBe(false);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'no' })).toBe(false);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: ' NO ' })).toBe(false);
     // The mock workers make them too, so development works end to end
     expect(createStudioWorkers({ AI_WORKERS_MOCK: '1' })!.startTextures).toBeTypeOf('function');
   });

@@ -5,6 +5,7 @@ import { schema } from '../../db';
 import type { StorageProvider } from '../storage';
 import { neverSent, type FetchLike } from './providers/jobEndpoint';
 import type {
+  ModelOutput,
   ModelView,
   StudioWorkers,
   TexturesOutput,
@@ -35,7 +36,8 @@ import type {
  * the 20 test prompts the final's own texture was good enough to publish 10 times, and the best
  * of four 16 times. The final is done and usable at once: the poll that finds it done returns it,
  * and the next one starts the textures job, which has its own state (texturesStatus) and never
- * fails the generation. It has TEXTURES_TIMEOUT_MS to finish.
+ * fails the generation. It has TEXTURES_TIMEOUT_MS to finish. A final another model made
+ * (Pixal3D's) gets none: retexturing is TRELLIS.2's.
  *
  * Every job is started and then polled by `get`, so no request waits on a GPU. Pictures, views
  * and models are copied into the server's storage, so scenes keep working after the workers
@@ -524,8 +526,9 @@ export class AIStudio {
               finalUrl: url,
               finalTriangles: output.triangles,
               finalPipeline: output.pipeline ?? null,
-              // More textures for its shape follow (the next poll starts their job)
-              ...(this.textureOptions() ? TEXTURES_TO_START : NO_TEXTURES),
+              // More textures for its shape follow (the next poll starts their job), unless
+              // another model than TRELLIS.2 made it
+              ...(this.textureOptions() && retexturable(output) ? TEXTURES_TO_START : NO_TEXTURES),
             },
       );
     } catch (err) {
@@ -927,6 +930,15 @@ export class AIStudio {
 
 /** What a textures job is started with */
 type TexturesInput = Parameters<NonNullable<StudioWorkers['startTextures']>>[0];
+
+/**
+ * Whether texture options can be made for a final: TRELLIS.2 made it, or the host didn't say
+ * (RunPod and older workers only have TRELLIS.2). Retexturing is TRELLIS.2's, and the worker
+ * refuses it for a final with Pixal3D's shape.
+ */
+function retexturable(output: ModelOutput): boolean {
+  return output.model === undefined || output.model === 'trellis2';
+}
 
 /** The views as stored with the generation, and as sent to the 3D worker */
 interface DrawnViews {

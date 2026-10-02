@@ -1737,6 +1737,20 @@ describe('AIStudio texture options', () => {
     expect(without.started.map((s) => s.kind)).toEqual(['references', 'preview', 'final']);
   });
 
+  it('makes none for a final Pixal3D made, which the worker would refuse', async () => {
+    const t = setup();
+    // The job API on Modal says which model made a final: with the recipe on, Pixal3D
+    const pixal3d = await finished(t, 'u1', { model: 'pixal3d', pipeline: 'pixal3d-1024_cascade' });
+    expect(pixal3d).toMatchObject({ status: 'done', error: null, textures: null });
+    expect(t.store.rows.get(pixal3d.id)).toMatchObject({ texturesStatus: null });
+    expect(texturesStarts(t)).toEqual([]);
+    // TRELLIS.2's get them, and so do finals whose host doesn't say (RunPod, older workers)
+    expect((await finished(t, 'u2', { model: 'trellis2' })).textures?.status).toBe('running');
+    expect((await finished(t, 'u3')).textures?.status).toBe('running');
+    expect(texturesStarts(t)).toHaveLength(2);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('picks the textures up again after a restart', async () => {
     const t = setup();
     const gen = await finished(t);
