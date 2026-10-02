@@ -57,6 +57,30 @@ and the result's optional `projection` field says why (`applied`, `reason`, `iou
 `seconds`). Previews skip it: it adds a few seconds and the preview is only for choosing. With the
 recipe on, Pixal3D's finals go through the same export, after they are levelled (The recipe, step 4).
 
+**Floating pieces can be dropped** (`trellis2/forge3d_worker/cleanup.py`, `Preset.drop_floaters`, off by
+default). TRELLIS.2 sometimes leaves a bit of a model in the air beside it: one of Phase 5's dragons has
+the tip of its tail hanging loose. With the flag on, the export removes a connected piece right after
+`to_glb` (before the projection) only when it is both small, under 8 % of the surface, and apart, more
+than 3 % of the bounding-box diagonal from what stays. Pieces within that gap of each other count as one,
+so a part reaches the model through the parts it touches (a basket through its ropes), and the floaters
+together never take more than 8 % of the surface (more would be several separate things, not floaters).
+Distances are between surfaces, so a piece resting on one large flat triangle touches it.
+
+On Phase 5's 39 finals it drops the dragon's tail tip (two back-to-back sheets, 5.7 % of the surface,
+4.9 % of the diagonal away) and three specks hidden inside a balloon's envelope and a cabin, and nothing
+else. The real parts that come loose sit much closer: a fox's tail tip 0.9 % away, a chair's armrests
+0.75 %, a balloon's pilot and burner up to 1.4 %; sprinkles, pearls and chopsticks touch the model
+(within 0.35 %). It takes 0.1 to 1.3 s per final on one CPU core.
+
+**A generation's shape can be retextured** (for experiments: `Trellis2Runtime.retexture`). After
+`generate()`, `last_latent` holds the shape latent TRELLIS.2 sampled (a few MB, on the CPU), with the
+picture, its cutout and the seed. `retexture(sampler_params=…, seed=…, views=…)` samples only the
+texture flow again on that shape, so the geometry stays the one approved: `sampler_params` go over
+pipeline.json's (12 steps, guidance strength 1, guidance interval [0.6, 0.9]), and `views` (other sides
+of the object) steer the texture flow alone, as job views steer every flow. Without a seed it draws the
+noise the generation's own texture was drawn from, so `retexture()` alone gives that texture back and
+settings can be compared on one noise. The mesh goes through `export()` like any other.
+
 ## The recipe: Pixal3D finals, off by default
 
 Phase 5's finals, made by TRELLIS.2 alone, invented wrong backs: the arcade machine's back was a dark
@@ -224,7 +248,8 @@ sent when a view is left out: one with no object in it, or one whose object runs
 off, and the model comes out crumpled; `CLIPPED_EDGE` in `pipeline.py`).
 
 Finals also carry `projection`, whether the picture was painted onto the model (see above); its
-time is part of `export_s`.
+time is part of `export_s`. A preset with `drop_floaters` adds `floaters`: how many pieces the model had,
+how many were dropped, their faces and share of the surface, and the largest of them.
 
 A final made by the recipe has the same fields, with Pixal3D in its `credits`, and says what the recipe
 did. For example:
@@ -743,7 +768,9 @@ The tests cover input validation, job handling, the out-of-memory retry and fall
 normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API, the
 nvdiffrast stand-in (against a brute-force rasterizer and analytic results) and the picture
 projection (synthetic models pictured from known cameras: the camera found, the colours painted,
-the fall-backs). For the recipe they cover, on fakes, the default (TRELLIS.2's finals) and the choice
+the fall-backs), the floater cleanup (synthetic donuts, bowls, balloons, cabins and dragons: what floats
+apart goes, what touches or is big stays, UVs and texture kept) and retexturing (the texture flow alone
+on the generation's shape, its noise drawn again bit for bit, views, the low-VRAM retry). For the recipe they cover, on fakes, the default (TRELLIS.2's finals) and the choice
 of model, the container's model pool, the fallbacks to TRELLIS.2 and what they report, the weights a
 run fetches, the recipe's preview, levelling and its gate, the thin rule and the weight swap,
 Pixal3D's cameras and views, the NATTEN stand-in (against NATTEN's own definition) and the weights
