@@ -418,10 +418,36 @@ def test_colour_match_brings_each_view_to_the_old_texture():
     side = SIDES.index((0, +1))
     dark = np.asarray(darker(Image.new("RGB", (1, 1), COLOURS[(0, +1)]), 0.6)).reshape(3)
     assert np.abs(cell(texture_of(plain), side, inset=INSET) - dark).max() <= 3
+    # Matched view by view, the same
+    each = box(COLOURS)
+    summary = M.bake_views(each, frame, views, match_colour="each", device="cpu")
+    for view in summary["views"]:
+        np.testing.assert_allclose(view["gain"], [1 / 0.6] * 3, rtol=0.03)
     # Views whose colours agree nowhere with the old texture's (light grey here) aren't matched
     other = box(uniform((200, 200, 200)))
     summary = M.bake_views(other, frame, views, device="cpu")
     assert all(view["gain"] is None for view in summary["views"])
+    with pytest.raises(ValueError, match="match_colour"):
+        M.bake_views(box(), frame, views, match_colour="global", device="cpu")
+
+
+def test_a_wrong_old_side_doesnt_pull_the_view_that_replaces_it():
+    # The old back is a dark smear of its own colour; the views have it right
+    back = SIDES.index((2, -1))
+    smeared = dict(COLOURS)
+    smeared[(2, -1)] = tuple(np.asarray(darker(Image.new("RGB", (1, 1), COLOURS[(2, -1)]), 0.6)).reshape(3))
+    frame = M.frame_for(box())
+    views = M.render_views(box(COLOURS), frame, size=128, device="cpu")
+    # Together, the other five views outvote it: the gains stay 1 and the back comes out right
+    mesh = box(smeared)
+    summary = M.bake_views(mesh, frame, views, device="cpu")
+    np.testing.assert_allclose(summary["views"][0]["gain"], [1, 1, 1], atol=0.02)
+    assert np.abs(cell(texture_of(mesh), back, inset=INSET) - COLOURS[(2, -1)]).max() <= 3
+    # View by view, the back view is matched to the smear it replaces
+    mesh = box(smeared)
+    summary = M.bake_views(mesh, frame, views, match_colour="each", device="cpu")
+    np.testing.assert_allclose(summary["views"][M.NAMES.index("back")]["gain"], [0.6] * 3, rtol=0.03)
+    assert np.abs(cell(texture_of(mesh), back, inset=INSET) - smeared[(2, -1)]).max() <= 3
 
 
 def test_the_front_view_can_be_left_to_the_pictures_projection():

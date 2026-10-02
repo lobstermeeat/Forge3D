@@ -18,8 +18,9 @@ geometry side of that, on the final mesh as ``to_glb`` makes it:
    point and normal come from rasterising the mesh in UV space. A texel takes colour from a view
    where it is visible there (a depth test against the view's own depth map), weighted by how
    squarely the view sees it (a power of the cosine), fading out near the view's silhouette and depth
-   edges. Views are blended by weight in linear light. Where the views' weights add up to little the
-   old colour stays, fading in. A view's background never gets in: only pixels the mesh covers are
+   edges. Views are blended by weight in linear light, after an optional colour match to the old
+   texture (per-channel gains, from where both agree in hue). Where the views' weights add up to little
+   the old colour stays, fading in. A view's background never gets in: only pixels the mesh covers are
    used, less any of the background's colour that reaches in from outside. The change is carried on
    into the texture's gutters, so filtering doesn't bring old colours back at chart edges.
 
@@ -40,7 +41,7 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, Union
 
 import numpy as np
 import torch
@@ -86,12 +87,19 @@ FULL_WEIGHT = 0.25
 # mesh, reached from outside through such pixels at most BACKGROUND_BAND pixels into the mesh
 BACKGROUND_BAND = 8
 BACKGROUND_TOLERANCE = 0.06
-# Colour match: a view's colour is scaled per channel (linear light) to the old texture's, over the
-# texels where the two show about the same hue (within MATCH_HUE degrees), by at most MAX_GAIN either
-# way. Too few such texels (MATCH_AGREEMENT of the view's weight) and the view is left as drawn
+# Colour match: the views' colour is scaled per channel (linear light) by the median ratio of the old
+# texture's colour to theirs, over the texels where both are colourful (chroma at least 0.2 of the
+# brightness: greys and blacks agree with any grey) and show about the same hue (within MATCH_HUE
+# degrees), by at most MAX_GAIN either way. "together" (the default) pools all six views for one set of
+# gains; "each" matches every view on its own, which lets a view that replaces a wrong texture be pulled
+# towards it (a clean back towards the red ghost of the front on the arcade machine's old back). With
+# such texels under MATCH_AGREEMENT of the weight, or fewer than MATCH_TEXELS, the views stay as drawn
+MATCH_MODES = ("together", "each")
 MAX_GAIN = 2.0
 MATCH_HUE = 20.0
-MATCH_AGREEMENT = 0.1
+MATCH_AGREEMENT = 0.05
+MATCH_TEXELS = 200
+MATCH_SAMPLES = 400_000  # the median is taken over at most this many (evenly spaced) texels
 # The change runs on into the gutters: ring by ring from each chart's edge this many texels out (so a
 # chart's edge colour continues, for bilinear filtering and the first mip levels), coarse to fine beyond
 GUTTER_RINGS = 8
@@ -390,23 +398,38 @@ def _fade(zbuf: torch.Tensor, usable: torch.Tensor, feather: float, jump: float)
     return inside * away
 
 
-def _gains(old: torch.Tensor, new: torch.Tensor, weight: torch.Tensor, max_gain: float) -> Optional[torch.Tensor]:
+def _match_samples(old: torch.Tensor, new: torch.Tensor, weight: torch.Tensor):
     """
-    Per-channel gains (3,) that bring a view's colours (linear, (N, 3)) to the old texture's, from the
-    texels where both show about the same hue and the view counts (``weight``); None when too few do.
-    Texels whose colours disagree (a back painted with a ghost of the front) don't pull the match.
+    What a colour match may use of one view: the log ratios (M, 3) of the old texture's colours to the
+    view's (linear, (N, 3)) and the view's weights (M,), at the texels it sees where both colours are
+    colourful and about the same hue. Texels whose colours disagree (a back painted with a ghost of the
+    front) don't pull the match; nor do greys, whose hue agrees with any grey.
     """
-    total = float(weight.sum())
-    if total <= 0:
-        return None
+    luma_old, luma_new = projection._luma(old), projection._luma(new)
+    chroma_old = (old - luma_old[:, None]).norm(dim=-1)
+    chroma_new = (new - luma_new[:, None]).norm(dim=-1)
+    colourful = (chroma_old > 0.2 * luma_old.clamp_min(0.02)) & (chroma_new > 0.2 * luma_new.clamp_min(0.02))
     cos = (old * new).sum(-1) / (old.norm(dim=-1) * new.norm(dim=-1)).clamp_min(1e-9)
-    bright = (projection._luma(old) > 0.003) & (projection._luma(new) > 0.003)
-    agree = (cos >= math.cos(math.radians(MATCH_HUE))) & bright
-    w = weight * agree
-    if float(w.sum()) < MATCH_AGREEMENT * total or int((w > 0).sum()) < 50:
+    use = (weight > 0) & colourful & (cos >= math.cos(math.radians(MATCH_HUE))) & (luma_old > 0.003) & (luma_new > 0.003)
+    return torch.log((old[use] + 1e-4) / (new[use] + 1e-4)), weight[use]
+
+
+def _gains(ratios: list, weights: list, total: float, max_gain: float) -> Optional[torch.Tensor]:
+    """
+    Per-channel gains (3,) from match samples (``_match_samples``, one or more views): the weighted
+    median ratio, clamped to ``max_gain`` either way. None when they carry under MATCH_AGREEMENT of the
+    views' ``total`` weight or number under MATCH_TEXELS.
+    """
+    if not ratios:
         return None
-    gains = (w[:, None] * old).sum(0) / (w[:, None] * new).sum(0).clamp_min(1e-9)
-    return gains.clamp(1 / max_gain, max_gain)
+    ratio, weight = torch.cat(ratios), torch.cat(weights)
+    if ratio.shape[0] < MATCH_TEXELS or float(weight.sum()) < MATCH_AGREEMENT * total:
+        return None
+    if ratio.shape[0] > MATCH_SAMPLES:
+        keep = torch.linspace(0, ratio.shape[0] - 1, MATCH_SAMPLES, device=ratio.device).long()
+        ratio, weight = ratio[keep], weight[keep]
+    median = torch.stack([projection._wquantile(ratio[:, c], weight, 0.5) for c in range(3)])
+    return torch.exp(median).clamp(1 / max_gain, max_gain)
 
 
 def _into_gutters(change: torch.Tensor, covered: torch.Tensor, rings: int = GUTTER_RINGS) -> torch.Tensor:
@@ -453,7 +476,7 @@ def bake_views(
     full_weight: float = FULL_WEIGHT,
     front_weight: float = 1.0,
     view_weights: Optional[Sequence[float]] = None,
-    match_colour: bool = True,
+    match_colour: Union[bool, str] = True,
     max_gain: float = MAX_GAIN,
     background_band: int = BACKGROUND_BAND,
     background_tolerance: float = BACKGROUND_TOLERANCE,
@@ -470,9 +493,11 @@ def bake_views(
     ``depth_bias`` (pixels' worth of depth a visible texel may lie behind the nearest surface),
     ``full_weight`` (the sum of weights that replaces a texel's colour in full), ``front_weight`` (times
     the front view's weight; the picture's own projection covers the front after this),
-    ``view_weights`` (six more factors), ``match_colour`` (scale each view's colour to the old texture's
-    first, at most ``max_gain`` either way), ``background_band`` and ``background_tolerance`` (the
-    views' background inside the silhouette; a band of 0 turns that off). ``debug``, a dict, collects
+    ``view_weights`` (six more factors), ``match_colour`` (scale the views' colour to the old texture's
+    first, by at most ``max_gain`` either way: True or "together" for one set of gains for all six
+    views, "each" for a set per view, False for none), ``background_band`` and
+    ``background_tolerance`` (the views' background inside the silhouette; a band of 0 turns that off).
+    ``debug``, a dict, collects
     per texel (the covered ones, ``flat`` indices into the texture) its world point, each view's weight
     and the amount of the views' colour it took.
 
@@ -488,6 +513,9 @@ def bake_views(
         if len(view_weights) != len(NAMES):
             raise ValueError(f"expected {len(NAMES)} view weights, got {len(view_weights)}")
         factors = [a * float(b) for a, b in zip(factors, view_weights)]
+    match = MATCH_MODES[0] if match_colour is True else (match_colour or None)
+    if match is not None and match not in MATCH_MODES:
+        raise ValueError(f"match_colour is True, False or one of {MATCH_MODES}, not {match_colour!r}")
     device = _device(device)
     rgb, alpha, uv = _texture(mesh)
     with torch.no_grad():
@@ -517,6 +545,7 @@ def bake_views(
         total = torch.zeros(flat.numel(), device=device)
         mixed = torch.zeros((flat.numel(), 3), device=device)
         weights, reports = [], []
+        pooled_ratios, pooled_weights, pooled_total = [], [], 0.0  # the match samples of all views
         for number, axes in enumerate(_cameras(device)):
             image = _view_image(views[number], device)
             h, w = image.shape[:2]
@@ -555,9 +584,17 @@ def bake_views(
                 * sampled[:, 4]
                 * (sampled[:, 3] > 1e-3)
             )
-            gains = _gains(old, colour, weight, max_gain) if match_colour else None
-            if gains is not None:
-                colour = (colour * gains).clamp(0, 1)
+            gains = None
+            if match is not None:
+                ratio, sample_weight = _match_samples(old, colour, weight)
+                if match == "each":
+                    gains = _gains([ratio], [sample_weight], float(weight.sum()), max_gain)
+                    if gains is not None:
+                        colour = (colour * gains).clamp(0, 1)
+                else:
+                    pooled_ratios.append(ratio)
+                    pooled_weights.append(sample_weight)
+                    pooled_total += float(weight.sum())
             weight = weight * factors[number]
             total += weight
             mixed += weight[:, None] * colour
@@ -575,6 +612,13 @@ def bake_views(
         # Views blended by weight; the old colour where they add up to little
         amount = projection._smoothstep(0.0, full_weight, total) if full_weight > 0 else (total > 0).float()
         blend = mixed / total.clamp_min(1e-9)[:, None]
+        if match == "together":
+            gains = _gains(pooled_ratios, pooled_weights, pooled_total, max_gain)
+            if gains is not None:
+                blend = (blend * gains).clamp(0, 1)  # the same gains for every view: the same as scaling each
+            for report in reports:
+                report["gain"] = [round(float(g), 3) for g in gains] if gains is not None else None
+            del pooled_ratios, pooled_weights
         new = old + amount[:, None] * (blend - old)
         out = texture.clone().view(-1, 3)
         touched = amount > 0
