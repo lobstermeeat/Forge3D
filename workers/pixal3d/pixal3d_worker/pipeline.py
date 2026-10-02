@@ -278,6 +278,9 @@ class Pixal3DRuntime(Trellis2Runtime):
     ``posed`` (an experiment, multi-view weights only) the elevation goes into the picture's camera
     instead, as an absolute pose, and nothing is turned afterwards.
 
+    ``trellis2`` is a TRELLIS.2 runtime to make those previews with instead of loading one here (a
+    container that holds both; the caller keeps it off the GPU, asleep, between uses).
+
     ``thin_ratio`` (None: off) is the rule for thin, flat objects (``thin.py``): a multi-view runtime
     then loads the single-view flow models too (``single``; the decoders, the background remover,
     DINOv3 and NAF are shared), keeps them on the CPU, and swaps them onto the GPU for a picture whose
@@ -313,6 +316,7 @@ class Pixal3DRuntime(Trellis2Runtime):
         trellis2_model_dir: str = TRELLIS2_MODEL_DIR,
         posed: bool = False,
         thin_ratio: Optional[float] = THIN_RATIO,
+        trellis2: Optional[Trellis2Runtime] = None,
     ) -> None:
         if main not in (MAIN_VIEW, MAIN_PICTURE):
             raise ValueError(f"main must be {MAIN_VIEW!r} or {MAIN_PICTURE!r}")
@@ -366,16 +370,30 @@ class Pixal3DRuntime(Trellis2Runtime):
             f"in {time.perf_counter() - started:.1f} s (low VRAM: {low_vram})"
         )
 
-        self.trellis2: Optional[Trellis2Runtime] = None
-        if level == LEVEL_PREVIEW:
-            started = time.perf_counter()
-            self.trellis2 = Trellis2Runtime(trellis2_model_dir)
-            # Off the GPU between uses, and in upstream's low-VRAM mode while it runs (each model on the
-            # GPU only for its stage): Pixal3D's own models stay resident
-            self.trellis2._offload()
-            print(f"[pixal3d] loaded TRELLIS.2 for previews in {time.perf_counter() - started:.1f} s")
+        self.trellis2 = self._trellis2_for_previews(level, trellis2, trellis2_model_dir)
 
     # --- Loading ----------------------------------------------------------------------------------
+
+    @staticmethod
+    def _trellis2_for_previews(
+        level: str, trellis2: Optional[Trellis2Runtime], model_dir: str
+    ) -> Optional[Trellis2Runtime]:
+        """
+        The TRELLIS.2 that makes the recipe's '512' previews: none unless levelling against them; the
+        caller's when given (in whatever state the caller keeps it); otherwise one loaded here and put to
+        sleep: off the GPU between uses, and in upstream's low-VRAM mode while it runs (each model on the
+        GPU only for its stage), even after an out-of-memory retry, so that Pixal3D's own models stay
+        resident.
+        """
+        if level != LEVEL_PREVIEW:
+            return None
+        if trellis2 is not None:
+            return trellis2
+        started = time.perf_counter()
+        runtime = Trellis2Runtime(model_dir)
+        runtime.sleep()
+        print(f"[pixal3d] loaded TRELLIS.2 for previews in {time.perf_counter() - started:.1f} s")
+        return runtime
 
     @staticmethod
     def _load(

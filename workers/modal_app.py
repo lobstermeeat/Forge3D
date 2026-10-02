@@ -13,6 +13,12 @@ this computer sleeps or goes offline, and `--run NAME` continues a run from its 
 step. `make_set` does the same for every line of a test set, and workers/gallery/ turns the
 results into a review page.
 
+Previews are TRELLIS.2's '512' pipeline; finals go through the Pixal3D recipe (README.md, "The
+recipe"): TRELLIS.2's '512' preview at the job's seed, the picture's camera found against it, Pixal3D's
+multi-view weights with the picture as their one view (the single-view weights for a thin, flat
+object), levelled, then the usual export. Both run in the Trellis2 container, so the server's contract
+(worker "trellis2", mode "preview" | "final") is unchanged.
+
 The GPU code is the same as in the RunPod images (trellis2/, flux-schnell/); only the entry
 points differ. The job API (job_api.py) speaks RunPod's protocol, so the server's client works
 with both. One-time setup (Hugging Face access, Modal secrets) is in README.md.
@@ -25,8 +31,10 @@ import json
 import os
 import pathlib
 import re
+import threading
 import time
-from typing import Any, Callable, Optional
+import traceback
+from typing import Any, Callable, Collection, Optional
 
 import modal
 
@@ -46,6 +54,26 @@ TRELLIS2_COMMIT = "75fbf0183001ed9876c8dbb35de6b68552ee08bd"
 CUMESH_COMMIT = "12289e1062f0603f2f0d0771b02e1395d247f26f"
 FLEXGEMM_COMMIT = "6dd94a859c26ee8246888502eada3dd8ad85532e"
 GLTFPACK_VERSION = "1.3"
+# Pixal3D (TencentARC, MIT since 2026-05-21) makes the finals: pixel-aligned image features on TRELLIS.2's
+# models and decoders. Pinned as pixal3d/NOTICE.md records, with MoGe-2 (the picture's field of view),
+# the utils3d it pins, and NAF (DINOv3 feature upsampling); NATTEN is not installed (pixal3d_worker/
+# neighborhood.py computes its one call in PyTorch), nor nvdiffrast or RMBG-2.0.
+PIXAL3D_COMMIT = "f7cf38429b0bd264f1995f0f8743a88b1c728b94"
+NAF_COMMIT = "37f2dfc180f2de53d98bd601109c0da0dd6b0f43"
+MOGE_COMMIT = "07444410f1e33f402353b99d6ccd26bd31e469e8"  # MoGe-2, before MoGe-3 changed its dependencies
+UTILS3D_COMMIT = "3fab839f0be9931dac7c8488eb0e1600c236e183"  # what that MoGe pins
+# Pixal3D's weight sets download_models fetches: the recipe needs both (the multi-view set for most
+# pictures, the single-view set for thin, flat objects: pixal3d_worker/thin.py)
+PIXAL3D_WEIGHTS = "all"
+
+# Which model makes finals: Pixal3D (the recipe), or TRELLIS.2 alone as before Phase 6. Read when the
+# app is deployed and baked into the TRELLIS.2 image, so production goes back with one env change:
+#     ORAINGE_FINAL_MODEL=trellis2 modal deploy workers/modal_app.py
+# Previews are always TRELLIS.2's, and so are finals while Pixal3D's weights or models can't be loaded.
+FINAL_MODELS = ("pixal3d", "trellis2")
+FINAL_MODEL = os.environ.get("ORAINGE_FINAL_MODEL", FINAL_MODELS[0])
+if FINAL_MODEL not in FINAL_MODELS:
+    raise SystemExit(f"ORAINGE_FINAL_MODEL must be one of {', '.join(FINAL_MODELS)}, not {FINAL_MODEL!r}")
 
 # 48 GB cards keep every TRELLIS.2 model on the GPU. An A10 (24 GB) costs about half as much per
 # second but is slower and needs TRELLIS2_LOW_VRAM = "1"; 1024³ finals may run out of memory there.
@@ -69,6 +97,7 @@ R2_SECRET = os.environ.get("ORAINGE_R2_SECRET")
 storage_secrets = [modal.Secret.from_name(R2_SECRET)] if R2_SECRET else []
 if modal.is_local():
     print(f"[orainge] results: {f'R2 (secret {R2_SECRET})' if R2_SECRET else 'inline; set ORAINGE_R2_SECRET for R2'}")
+    print(f"[orainge] finals: {FINAL_MODEL} (ORAINGE_FINAL_MODEL={'trellis2' if FINAL_MODEL == 'pixal3d' else 'pixal3d'} for the other)")
 
 
 def _git(url: str, commit: str, target: str) -> str:
@@ -123,6 +152,21 @@ trellis2_image = (
         f"v{GLTFPACK_VERSION}/gltfpack-ubuntu.zip && unzip /tmp/gltfpack.zip -d /usr/local/bin"
         " && chmod +x /usr/local/bin/gltfpack && rm /tmp/gltfpack.zip"
     )
+    # Pixal3D (MIT) and NAF (Apache-2.0) at pinned commits, Pixal3D importable as `pixal3d`. The same
+    # steps as the Phase 6 experiments' image (ops/exp_pixal3d.py on ai-ops-pixal3d), so Modal reuses them
+    .run_commands(
+        _git("https://github.com/TencentARC/Pixal3D", PIXAL3D_COMMIT, "/opt/pixal3d"),
+        'echo /opt/pixal3d > "$(python -c "import site; print(site.getsitepackages()[0])")/pixal3d-repo.pth"',
+        _git("https://github.com/valeoai/NAF", NAF_COMMIT, "/opt/naf"),
+    )
+    # MoGe-2 and the utils3d it pins (both MIT). --no-deps: their requirements would replace pinned
+    # packages (MoGe lists opencv-python, gradio and more that inference never imports)
+    .run_commands(
+        "python -m pip install --no-deps"
+        f" 'utils3d @ git+https://github.com/EasternJournalist/utils3d.git@{UTILS3D_COMMIT}'"
+        f" 'moge @ git+https://github.com/microsoft/MoGe.git@{MOGE_COMMIT}'"
+    )
+    .pip_install_from_requirements(str(WORKERS / "pixal3d" / "requirements.txt"))
     .env(
         {
             "ATTN_BACKEND": "flash_attn",
@@ -130,9 +174,14 @@ trellis2_image = (
             "TRELLIS2_MODEL_DIR": f"{MODELS}/TRELLIS.2-4B",
             "TRELLIS2_LOW_VRAM": TRELLIS2_LOW_VRAM,
             "TRITON_CACHE_DIR": f"{CACHE}/triton",
+            "PIXAL3D_MODEL_DIR": f"{MODELS}/pixal3d",
+            "PIXAL3D_DINO_DIR": f"{MODELS}/dinov3-vitl16",
+            "PIXAL3D_NAF_DIR": "/opt/naf",
+            "ORAINGE_FINAL_MODEL": FINAL_MODEL,
         }
     )
     .add_local_dir(WORKERS / "trellis2" / "forge3d_worker", "/root/forge3d_worker")
+    .add_local_dir(WORKERS / "pixal3d" / "pixal3d_worker", "/root/pixal3d_worker")
 )
 
 flux_image = (
@@ -161,6 +210,7 @@ download_image = (
         WORKERS / "flux-schnell" / "scripts" / "download_weights.py", "/root/weights/reference.py"
     )
     .add_local_file(WORKERS / "multiview" / "scripts" / "download_weights.py", "/root/weights/multiview.py")
+    .add_local_file(WORKERS / "pixal3d" / "scripts" / "download_weights.py", "/root/weights/pixal3d.py")
 )
 
 api_image = (
@@ -242,20 +292,156 @@ def share_caches() -> None:
         print(f"[orainge] kernel caches not saved: {type(err).__name__}: {err}")
 
 
+# --- Two models in one container: TRELLIS.2 for previews, Pixal3D for finals --------------------------
+
+
+def choose_model(job: dict, final_model: str, loaded: Collection[str]) -> str:
+    """
+    Which model makes a job. Previews are TRELLIS.2's ('512', quick; the final keeps the preview's seed).
+    Finals are the final model's (FINAL_MODEL) when it is loaded or still loading, else TRELLIS.2's. A
+    final carrying ``views`` (the Studio's AI_MULTIVIEW step, off by default) is Pixal3D's too: its
+    multi-view weights build from the views (the Pixal3D worker's contract), while TRELLIS.2 steers its
+    flows with them for the preview.
+    """
+    payload = job.get("input")
+    payload = payload if isinstance(payload, dict) else {}
+    if payload.get("mode", "final") != "final":
+        return "trellis2"
+    return final_model if final_model in loaded else "trellis2"
+
+
+class ModelPool:
+    """
+    A container's runtimes. TRELLIS.2 is built first and resident on the GPU, so previews start as soon
+    as it is up; Pixal3D is built in a background thread (its models take about 90 s to load) and the
+    first final waits for it. Pixal3D's finals peaked at 28-31 GB on an L40S (48 GB) with its weights
+    resident, which leaves no room for TRELLIS.2's 1024 cascade beside them, so when Pixal3D takes the
+    first final TRELLIS.2 goes to sleep (its models to RAM, upstream's low-VRAM mode) and stays there:
+    previews then cost a few seconds more, and that is the state the Pixal3D recipe runs TRELLIS.2 in
+    anyway for its '512' preview. Nothing is swapped back and forth between jobs.
+    """
+
+    def __init__(self, trellis2: Any) -> None:
+        self.runtimes: dict[str, Any] = {"trellis2": trellis2}
+        self.resident = "trellis2"
+        self._loading: dict[str, threading.Thread] = {}
+        self._failed: dict[str, str] = {}
+
+    def load_later(self, name: str, build: Callable[[], Any]) -> None:
+        """Builds a runtime in a background thread. If that fails, the model is counted out."""
+
+        def work() -> None:
+            try:
+                self.runtimes[name] = build()
+            except Exception as err:  # noqa: BLE001 - the model is counted out, the container goes on
+                traceback.print_exc()
+                self._failed[name] = f"{type(err).__name__}: {err}"
+                print(f"[orainge] {name} could not be loaded, so finals are made with trellis2: {self._failed[name]}")
+
+        thread = threading.Thread(target=work, name=f"load-{name}", daemon=True)
+        self._loading[name] = thread
+        thread.start()
+
+    def count_out(self, name: str, reason: str) -> None:
+        """A model that isn't there (its weights were never downloaded): finals use TRELLIS.2."""
+        self._failed[name] = reason
+        print(f"[orainge] {name} is not available, so finals are made with trellis2: {reason}")
+
+    @property
+    def loaded(self) -> set[str]:
+        """The models a job can ask for: those built, and those still being built (use() waits for them)."""
+        return {name for name in (*self.runtimes, *self._loading) if name not in self._failed}
+
+    def use(self, name: str) -> Optional[Any]:
+        """The runtime for `name`, ready for a job, or None if it could not be loaded."""
+        thread = self._loading.pop(name, None)
+        if thread is not None:
+            thread.join()
+        runtime = self.runtimes.get(name)
+        if runtime is None:
+            return None
+        if name != "trellis2" and self.resident == "trellis2":
+            # From now on the GPU is this model's; TRELLIS.2 serves asleep (its weights in RAM), for good
+            self.runtimes["trellis2"].sleep()
+            self.resident = name
+        return runtime
+
+
+def build_pixal3d(trellis2: Any) -> Any:
+    """
+    The Pixal3D runtime for finals (pixal3d_worker.pipeline.Pixal3DRuntime): the multi-view weights with
+    the single-view set beside them for thin objects (PIXAL3D_THIN_RATIO), its models on the GPU, and
+    this container's TRELLIS.2 for the recipe's '512' preview instead of a copy of its own.
+    """
+    from pixal3d_worker import pipeline
+
+    return pipeline.Pixal3DRuntime(
+        multiview=True,
+        low_vram=False,
+        level=pipeline.LEVEL_PREVIEW,
+        trellis2=trellis2,
+        thin_ratio=pipeline.thin_ratio_from_env(os.environ.get("PIXAL3D_THIN_RATIO")),
+    )
+
+
+def _ran_out_of_memory(result: dict) -> bool:
+    return "out of memory" in str(result.get("error", "")).lower()
+
+
+def handle_with_models(
+    job: dict,
+    pool: ModelPool,
+    final_model: str,
+    handlers: dict[str, Callable[..., dict]],
+    storage: Any,
+    pack: Any,
+) -> dict:
+    """
+    One job through the model choose_model picks, with that model's name in the result (``"model"``).
+    ``handlers`` holds each model's handle_job (production's for TRELLIS.2; the Pixal3D worker's, which
+    binds a job's views and reports the recipe's camera, pose, level, weights and thin). A final that
+    Pixal3D can't make for want of GPU memory, even after its own low-VRAM retry, is made with TRELLIS.2
+    instead, which says so in ``"fallback"``: a model the user keeps is worth more than an error.
+    """
+    name = choose_model(job, final_model, pool.loaded)
+    runtime = pool.use(name)
+    if runtime is None:  # it failed to load since the choice was made
+        name, runtime = "trellis2", pool.use("trellis2")
+    result = handlers[name](job, runtime, storage, pack)
+    if name != "trellis2" and _ran_out_of_memory(result):
+        reason = str(result["error"])
+        print(f"[orainge] {name} ran out of GPU memory; making this final with trellis2 instead: {reason}")
+        name, runtime = "trellis2", pool.use("trellis2")
+        result = handlers[name](job, runtime, storage, pack)
+        if "error" not in result:
+            result["fallback"] = reason
+    if "error" not in result:
+        result["model"] = name
+    return result
+
+
 @app.cls(
     image=trellis2_image,
     gpu=TRELLIS2_GPU,
     cpu=4.0,
-    memory=16384,
+    # TRELLIS.2 asleep (about 10 GB) and Pixal3D's single-view flow models wait in RAM during a final,
+    # and Pixal3D's own low-VRAM retry moves its multi-view models there too; what the Phase 6 runs used
+    memory=49152,
     volumes={MODELS: models, CACHE: cache},
     secrets=storage_secrets,
-    timeout=600,
+    # A Pixal3D final takes 1-2 minutes, 3-5 with out-of-memory retries, and may then be made again with
+    # TRELLIS.2 (1-3 minutes); a stuck job is still cut off well inside a quarter of an hour
+    timeout=900,
     startup_timeout=600,
     scaledown_window=60,  # idle containers are billed; a cold start takes about a minute
     max_containers=2,  # caps spending; raise it for more parallel jobs
 )
 class Trellis2:
-    """Image to textured, web-packed GLB. Input and output as in README.md (Job contracts)."""
+    """
+    Image to textured, web-packed GLB. Input and output as in README.md (Job contracts). Previews are
+    TRELLIS.2's and finals go through the Pixal3D recipe (or TRELLIS.2: FINAL_MODEL), in one container,
+    so a preview's seed carries into its final the way it always has.
+    """
 
     @modal.enter()
     def load(self) -> None:
@@ -268,8 +454,23 @@ class Trellis2:
         # FlexGEMM reads its tuning results when it is imported, so bring in the shared ones first
         merge_tuning(LOCAL_TUNING, SHARED_TUNING)
         storage = storage_from_env()
-        runtime = Trellis2Runtime(f"{MODELS}/TRELLIS.2-4B")
-        self.handle = lambda job: handle_job(job, runtime, storage, pack_glb)
+        trellis2 = Trellis2Runtime(f"{MODELS}/TRELLIS.2-4B")
+        pool = ModelPool(trellis2)
+        handlers: dict[str, Callable[..., dict]] = {"trellis2": handle_job}
+        final_model = os.environ.get("ORAINGE_FINAL_MODEL", FINAL_MODEL)
+        if final_model == "pixal3d":
+            from pixal3d_worker.service import handle_job as pixal3d_handle_job
+
+            handlers["pixal3d"] = pixal3d_handle_job
+            if _weights_marker("pixal3d").exists():
+                # Built while this container's first previews run; use() waits for it at the first final
+                pool.load_later("pixal3d", lambda: build_pixal3d(trellis2))
+            else:
+                pool.count_out(
+                    "pixal3d",
+                    "its weights are missing: modal run workers/modal_app.py::download_models --which pixal3d",
+                )
+        self.handle = lambda job: handle_with_models(job, pool, final_model, handlers, storage, pack_glb)
 
     @modal.method()
     def generate(self, job: dict) -> dict:
@@ -355,10 +556,12 @@ class MultiView:
         return True
 
 
+# In download order: Pixal3D's script reuses the TRELLIS.2 worker's DINOv3, BiRefNet and decoders
 WEIGHT_SCRIPTS = {
     "trellis2": "/root/weights/trellis2.py",
     "reference": "/root/weights/reference.py",
     "multiview": "/root/weights/multiview.py",
+    "pixal3d": "/root/weights/pixal3d.py",
 }
 
 
@@ -371,7 +574,7 @@ WEIGHT_SCRIPTS = {
     timeout=3 * 3600,  # generous for slow Hugging Face transfers; an interrupted run resumes
 )
 def download_models(which: str = "all", force: bool = False) -> None:
-    """Downloads the pinned weights (about 60 GB) into the orainge-models volume. CPU only."""
+    """Downloads the pinned weights (about 80 GB) into the orainge-models volume. CPU only."""
     if which != "all" and which not in WEIGHT_SCRIPTS:
         raise SystemExit(f"--which must be all, {', '.join(WEIGHT_SCRIPTS)}")
     for name in WEIGHT_SCRIPTS if which == "all" else [which]:
@@ -397,6 +600,7 @@ def _download(name: str, force: bool) -> None:
         **os.environ,
         "MODELS_ROOT": MODELS,
         "FLUX_MODEL_DIR": f"{MODELS}/FLUX.1-schnell",
+        "WHICH": PIXAL3D_WEIGHTS,  # pixal3d.py: which of Pixal3D's weight sets (the other scripts ignore it)
         "HF_HUB_DISABLE_PROGRESS_BARS": "1",  # progress bars flood non-interactive logs
     }
     subprocess.run([sys.executable, script], env=env, check=True)
@@ -412,7 +616,11 @@ def _download(name: str, force: bool) -> None:
 @modal.concurrent(max_inputs=32)
 @modal.asgi_app()
 def api():
-    """https://<workspace>--orainge-ai-api.modal.run: set it as the server's AI_WORKERS_URL."""
+    """
+    https://<workspace>--orainge-ai-api.modal.run: set it as the server's AI_WORKERS_URL. Worker
+    "trellis2" takes previews and finals alike (the Trellis2 container routes finals to the Pixal3D
+    recipe); "multiview" is there for the Studio's AI_MULTIVIEW step, which is off by default.
+    """
     from job_api import ModalCalls, app_for_token
 
     trellis2, flux, multiview = Trellis2(), FluxSchnell(), MultiView()
@@ -532,7 +740,10 @@ def run_pipeline(
         return result
 
     def weights() -> dict:
-        for name in ["trellis2", "reference"] if prompt else ["trellis2"]:
+        names = ["trellis2", "reference"] if prompt else ["trellis2"]
+        if final:
+            names.append("pixal3d")  # finals go through the Pixal3D recipe (TRELLIS.2 alone without them)
+        for name in names:
             ensure_weights(name)
         return {}
 
@@ -575,9 +786,18 @@ def run_pipeline(
                 "timings": result["timings"],
                 "gpu_seconds": round(sum(result["timings"].values()), 1),
             }
-            # Which TRELLIS.2 pipeline made it: a final that ran out of GPU memory is made with "512"
+            # Which pipeline made it ("512", "1024_cascade", "pixal3d-1024_cascade"; a TRELLIS.2 final that
+            # ran out of GPU memory is made with "512")
             if "pipeline" in result:
                 step["pipeline"] = result["pipeline"]
+            # Which model made it ("pixal3d" | "trellis2"), why not the one asked for (fallback), and the
+            # recipe's notes: Pixal3D's weights ("multiview" | "single"), what the preview measured (thin),
+            # the picture's camera, the pose search that placed it, and what the export levelled
+            for key in ("model", "fallback", "weights", "thin", "camera", "pose", "level"):
+                if result.get(key):
+                    step[key] = result[key]
+            if result.get("views_used"):  # extra views of the object that helped (0 is left out)
+                step["views_used"] = result["views_used"]
             if result.get("projection"):  # finals: whether the picture was painted on, and why not
                 step["projection"] = result["projection"]
             return step
@@ -829,7 +1049,11 @@ def make_set(prompts: str, final: bool = True, name: str = "", pictures_only: bo
     print(f"[orainge] {name}: {len(runs)} runs, saved in the orainge-outputs volume as {names[0]} to {names[-1]}")
     print("  Progress, any time:  python workers/modal_app.py status")
     # Any missing weights are fetched once here, not by every run at the same time
-    download_models.remote(which="all" if any("prompt" in run for run in runs) else "trellis2")
+    if any("prompt" in run for run in runs):
+        download_models.remote(which="all")
+    else:
+        for which in ["trellis2", "pixal3d"] if final else ["trellis2"]:
+            download_models.remote(which=which)
     # All at once, so every run finishes before the copies start and the map closes cleanly
     arguments = set_arguments(names, runs, existing, final, chosen, pictures_only)
     outcomes = list(make_model.starmap(arguments, return_exceptions=True))

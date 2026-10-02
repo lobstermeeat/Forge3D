@@ -537,3 +537,30 @@ def test_the_thin_ratio_comes_from_the_environment():
     assert pipeline.thin_ratio_from_env("0.25") == 0.25
     with pytest.raises(ValueError):
         pipeline.thin_ratio_from_env("thin")
+
+
+# --- The TRELLIS.2 that makes the recipe's previews -----------------------------------------------------
+
+
+def test_the_recipe_uses_the_callers_trellis2_when_given(monkeypatch):
+    loaded = []
+
+    class OwnTrellis2:
+        def __init__(self, model_dir):
+            loaded.append(model_dir)
+            self.asleep = False
+
+        def sleep(self):
+            self.asleep = True
+
+    monkeypatch.setattr(pipeline, "Trellis2Runtime", OwnTrellis2)
+    shared = object()
+    choose = Pixal3DRuntime._trellis2_for_previews
+    # The container's own TRELLIS.2 (production holds both runtimes): used as it is, nothing loaded
+    assert choose(pipeline.LEVEL_PREVIEW, shared, "/models/TRELLIS.2-4B") is shared and loaded == []
+    # Without one, a copy of its own, asleep: off the GPU between uses, and kept off it after a retry
+    own = choose(pipeline.LEVEL_PREVIEW, None, "/models/TRELLIS.2-4B")
+    assert isinstance(own, OwnTrellis2) and own.asleep and loaded == ["/models/TRELLIS.2-4B"]
+    # No levelling against previews: no TRELLIS.2 at all, given or not
+    assert choose(pipeline.LEVEL_NONE, shared, "/x") is None and choose(pipeline.LEVEL_GIVEN, None, "/x") is None
+    assert loaded == ["/models/TRELLIS.2-4B"]

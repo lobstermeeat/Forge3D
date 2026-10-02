@@ -150,6 +150,12 @@ class Trellis2Runtime:
     views_used: int = 0
     # How extra views steer the flows; the same for previews and finals (experiments set their own)
     multiview: MultiView = MULTIVIEW
+    # Asleep: every model off the GPU and upstream's low-VRAM mode for good, because another runtime has
+    # the GPU (production's container runs Pixal3D's finals beside this; see sleep())
+    asleep: bool = False
+    # Deployed in low-VRAM mode (TRELLIS2_LOW_VRAM=1, an A10): the models live off the GPU from the start,
+    # and a retry's restore leaves them there
+    low_vram_configured: bool = False
 
     def __init__(self, model_dir: str = MODEL_DIR) -> None:
         _configure_environment()
@@ -163,6 +169,7 @@ class Trellis2Runtime:
         pipeline.low_vram = os.environ.get("TRELLIS2_LOW_VRAM", "1") == "1"
         pipeline.cuda()
         self.pipeline = pipeline
+        self.low_vram_configured = pipeline.low_vram
 
     def generate(self, image: Any, preset: Preset, seed: int, views: Sequence[View] = ()) -> Any:
         """
@@ -171,8 +178,9 @@ class Trellis2Runtime:
         views_used then says how many were used. The image alone is the cutout the projection paints.
 
         Running out of GPU memory gets one retry in low-VRAM mode, and a final that still runs out is
-        made once more, still in low-VRAM mode, with the preview's pipeline (see FALLBACK_PIPELINE).
-        pipeline_used then says which pipeline made the mesh.
+        made once more, still in low-VRAM mode, with the preview's pipeline (see FALLBACK_PIPELINE); a
+        final that runs out while the models are already off the GPU (an A10, or asleep beside Pixal3D)
+        goes to that pipeline at once. pipeline_used then says which pipeline made the mesh.
         """
         self.pipeline_used = preset.pipeline_type
         self.views_used = 0
@@ -186,29 +194,40 @@ class Trellis2Runtime:
         if extra:
             weights = ", ".join(f"{weight:g}" for weight in self._weights(extra))
             print(f"[forge3d] {len(extra)} views besides the picture ({self.multiview.mode}; weights {weights})")
+        fallback = FALLBACK_PIPELINE.get(preset.pipeline_type)
         try:
             return self._run(prepared, preset.pipeline_type, seed, cutout, extra)
         except Exception as err:
-            if self.pipeline.low_vram or not is_out_of_memory(err):
+            if not is_out_of_memory(err):
+                raise
+            retry = not self.pipeline.low_vram  # with the models off the GPU there may be room
+            if not retry and fallback is None:
                 raise
             reason = _one_line(err)
-            print(f"[forge3d] out of GPU memory in {preset.pipeline_type}, retrying in low-VRAM mode: {reason}")
+            if retry:
+                print(f"[forge3d] out of GPU memory in {preset.pipeline_type}, retrying in low-VRAM mode: {reason}")
+            else:
+                print(
+                    f"[forge3d] out of GPU memory in {preset.pipeline_type} with the models already off the GPU, "
+                    f"falling back to {fallback}: {reason}"
+                )
+                traceback.clear_frames(err.__traceback__)
         # Retried out here: inside the except block the traceback keeps the failed run's tensors,
         # and so their GPU memory, alive
         try:
-            self._offload()
-            try:
-                return self._run(prepared, preset.pipeline_type, seed, cutout, extra)
-            except Exception as err:
-                fallback = FALLBACK_PIPELINE.get(preset.pipeline_type)
-                if fallback is None or not is_out_of_memory(err):
-                    raise
-                print(
-                    f"[forge3d] out of GPU memory in {preset.pipeline_type} even in low-VRAM mode, "
-                    f"falling back to {fallback}: {_one_line(err)}"
-                )
-                # The retry's traceback holds its tensors the same way: drop them before the cheaper run
-                traceback.clear_frames(err.__traceback__)
+            if retry:
+                self._offload()
+                try:
+                    return self._run(prepared, preset.pipeline_type, seed, cutout, extra)
+                except Exception as err:
+                    if fallback is None or not is_out_of_memory(err):
+                        raise
+                    print(
+                        f"[forge3d] out of GPU memory in {preset.pipeline_type} even in low-VRAM mode, "
+                        f"falling back to {fallback}: {_one_line(err)}"
+                    )
+                    # The retry's traceback holds its tensors the same way: drop them before the cheaper run
+                    traceback.clear_frames(err.__traceback__)
             self._free_gpu_memory()
             mesh = self._run(prepared, fallback, seed, cutout, extra)
             self.pipeline_used = fallback
@@ -309,9 +328,29 @@ class Trellis2Runtime:
         torch.cuda.empty_cache()
 
     def _restore(self) -> None:
-        """Every model back on the GPU, the way __init__ put them there."""
+        """
+        Every model back where __init__ put them: on the GPU, unless the runtime is deployed in low-VRAM mode
+        (TRELLIS2_LOW_VRAM=1) or asleep, when nothing moves.
+        """
+        if self.asleep or self.low_vram_configured:
+            return
         self.pipeline.low_vram = False
         self.pipeline.cuda()
+
+    def sleep(self) -> None:
+        """
+        Every model off the GPU, for good, in upstream's low-VRAM mode (each model visits the GPU for its
+        stage): another runtime has the GPU from now on. Production's container does this to TRELLIS.2 when
+        Pixal3D takes its first final; previews then run this way, as the Pixal3D recipe's own '512'
+        preview does. wake() undoes it.
+        """
+        self.asleep = True
+        self._offload()
+
+    def wake(self) -> None:
+        """After sleep(), every model back where __init__ put them (on the GPU, unless deployed in low-VRAM mode)."""
+        self.asleep = False
+        self._restore()
 
     def export(self, mesh: Any, preset: Preset) -> tuple[bytes, int]:
         """
