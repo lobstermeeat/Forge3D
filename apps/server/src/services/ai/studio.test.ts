@@ -80,11 +80,18 @@ function memoryStore(): GenerationStore & { rows: Map<string, GenerationRecord> 
       if (rows.get(id)?.jobId !== jobId) return null;
       return this.update(id, patch);
     },
-    async finishTextures(id, jobId, patch) {
+    async finishTextures(id, { finalUrl, jobId }, patch) {
       const row = rows.get(id);
       if (row?.status !== 'done' || row.texturesStatus !== 'running') return null;
-      if (row.texturesJobId !== jobId) return null;
+      if (row.finalUrl !== finalUrl || row.texturesJobId !== jobId) return null;
       return this.update(id, patch);
+    },
+    async takeTexturesJob(id, patch) {
+      // Read and cleared with nothing in between, as Postgres does it in one statement
+      const texturesJobId = rows.get(id)?.texturesJobId ?? null;
+      const record = { ...rows.get(id)!, ...patch, texturesJobId: null } as GenerationRecord;
+      rows.set(id, record);
+      return { record: { ...record }, texturesJobId };
     },
     async recent(userId, limit) {
       return [...rows.values()]
@@ -344,7 +351,10 @@ describe('AIStudio', () => {
     });
 
     // AI_MULTIVIEW is off by default: no views step, and the models get the picture alone. The
-    // texture options follow the final (on by default; see 'AIStudio texture options')
+    // texture options follow the final, from the next poll on (on by default; see 'AIStudio
+    // texture options')
+    expect(started.map((s) => s.kind)).toEqual(['references', 'preview', 'final']);
+    expect((await studio.get('u1', gen.id)).textures?.status).toBe('running');
     expect(started.map((s) => s.kind)).toEqual(['references', 'preview', 'final', 'textures']);
     expect(started.some((s) => 'views' in s.input)).toBe(false);
     expect(gen).toMatchObject({ views: [], viewsError: null });
@@ -796,13 +806,8 @@ describe('AIStudio with AI_MULTIVIEW=1 (the views step)', () => {
       'finishing',
       'done',
     ]);
-    expect(started.map((s) => s.kind)).toEqual([
-      'references',
-      'views',
-      'preview',
-      'final',
-      'textures',
-    ]);
+    // The final's texture options start on the next poll
+    expect(started.map((s) => s.kind)).toEqual(['references', 'views', 'preview', 'final']);
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -1123,26 +1128,50 @@ describe('AIStudio texture options', () => {
   afterEach(() => warn.mockRestore());
 
   /**
+   * Picks picture 0 of a prompt's generation and takes it to a final (seed `seed`, made by the
+   * cascade unless `final` says otherwise) that is done on the workers but not yet polled.
+   */
+  async function makeFinal(
+    t: ReturnType<typeof setup>,
+    user: string,
+    id: string,
+    { seed = 4242, final = {} }: { seed?: number; final?: Partial<ModelOutput> } = {},
+  ): Promise<void> {
+    await t.studio.pick(user, id, 0);
+    t.models.set([...t.models.keys()].at(-1)!, {
+      status: 'done',
+      output: modelOutput(seed, 'preview'),
+    });
+    await t.studio.get(user, id);
+    await t.studio.keep(user, id);
+    t.models.set([...t.models.keys()].at(-1)!, {
+      status: 'done',
+      output: { ...modelOutput(seed, 'final'), pipeline: '1024_cascade', ...final },
+    });
+  }
+
+  /** A prompt's generation whose final is done on the workers, not yet polled */
+  async function finalReady(
+    t: ReturnType<typeof setup>,
+    user = 'u1',
+    options: { seed?: number; final?: Partial<ModelOutput> } = {},
+  ): Promise<GenerationView> {
+    const gen = await picking(t, user);
+    await makeFinal(t, user, gen.id, options);
+    return gen;
+  }
+
+  /**
    * A prompt's generation taken to its final (seed 4242, made by the cascade unless `final` says
-   * otherwise). Polling the done final starts its texture options.
+   * otherwise). The poll that finds the final done returns it; the next starts its textures job.
    */
   async function finished(
     t: ReturnType<typeof setup>,
     user = 'u1',
     final: Partial<ModelOutput> = {},
   ): Promise<GenerationView> {
-    const gen = await picking(t, user);
-    await t.studio.pick(user, gen.id, 0);
-    t.models.set([...t.models.keys()].at(-1)!, {
-      status: 'done',
-      output: modelOutput(4242, 'preview'),
-    });
+    const gen = await finalReady(t, user, { final });
     await t.studio.get(user, gen.id);
-    await t.studio.keep(user, gen.id);
-    t.models.set([...t.models.keys()].at(-1)!, {
-      status: 'done',
-      output: { ...modelOutput(4242, 'final'), pipeline: '1024_cascade', ...final },
-    });
     return t.studio.get(user, gen.id);
   }
 
@@ -1163,10 +1192,23 @@ describe('AIStudio texture options', () => {
   const texturesJob = (t: ReturnType<typeof setup>, gen: GenerationView) =>
     t.store.rows.get(gen.id)!.texturesJobId!;
 
+  /** The textures jobs the workers were asked for, in order */
+  const texturesStarts = (t: ReturnType<typeof setup>) =>
+    t.started.filter((s) => s.kind === 'textures');
+
+  /** What fetch throws when it can't connect: no byte of the request was sent */
+  const refused = () =>
+    new TypeError('fetch failed', {
+      cause: Object.assign(new Error('connect ECONNREFUSED 10.0.0.7:443'), {
+        code: 'ECONNREFUSED',
+      }),
+    });
+
   it('makes 3 more textures for a done final, from what the final was made from', async () => {
     const t = setup();
-    let gen = await finished(t);
-    // The final is done and in use at once; its textures follow
+    const ready = await finalReady(t);
+    // The poll that finds the final done returns it at once, in use; its textures follow
+    let gen = await t.studio.get('u1', ready.id);
     expect(gen).toMatchObject({
       status: 'done',
       error: null,
@@ -1174,7 +1216,10 @@ describe('AIStudio texture options', () => {
       textures: { status: 'running', count: 3, options: [], error: null },
     });
     expect(TEXTURE_COUNT).toBe(3);
-    // The final's picture and seed, and no views (it had none)
+    expect(texturesStarts(t)).toEqual([]);
+    // The next poll starts their job: the final's picture and seed, and no views (it had none)
+    gen = await t.studio.get('u1', gen.id);
+    expect(gen.textures).toEqual({ status: 'running', count: 3, options: [], error: null });
     expect(t.started.at(-1)).toEqual({
       kind: 'textures',
       input: {
@@ -1225,6 +1270,23 @@ describe('AIStudio texture options', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it("returns the final's poll without waiting for its textures job to start", async () => {
+    const t = setup();
+    // A start that never answers
+    t.control.texturesStart = new Promise<void>(() => {});
+    const gen = await finalReady(t);
+    const poll = t.studio.get('u1', gen.id);
+    const outcome = await Promise.race([
+      poll.then((g) => g.status),
+      new Promise((resolve) => setTimeout(() => resolve('still waiting'), 200)),
+    ]);
+    expect(t.store.rows.get(gen.id)!.status).toBe('done');
+    expect(outcome).toBe('done');
+    // The panel polls on while textures are to come, and its next poll starts them
+    expect(await poll).toMatchObject({ textures: { status: 'running', options: [] } });
+    expect(texturesStarts(t)).toEqual([]);
+  });
+
   it("sends the final's views with its textures (AI_MULTIVIEW=1)", async () => {
     const t = setup(false, { multiview: true });
     const gen = await t.studio.startFromPhoto('u1', await png('#ff000080'));
@@ -1240,6 +1302,7 @@ describe('AIStudio texture options', () => {
       status: 'done',
       output: { ...modelOutput(8, 'final'), viewsUsed: 6 },
     });
+    expect((await t.studio.get('u1', gen.id)).status).toBe('done');
     expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
 
     const [finalStart, texturesStart] = t.started.slice(-2);
@@ -1296,7 +1359,6 @@ describe('AIStudio texture options', () => {
 
   it('never fails the generation when its textures fail', async () => {
     const t = setup();
-    // As on a deployment whose finals are Pixal3D's
     let gen = await finished(t);
     t.textures.set(texturesJob(t, gen), {
       status: 'failed',
@@ -1369,6 +1431,118 @@ describe('AIStudio texture options', () => {
     });
     expect(t.started.filter((s) => s.kind === 'textures')).toHaveLength(1);
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('never records a textures job started for one final on the next', async () => {
+    const t = setup();
+    const stock = t.workers.startTextures!.bind(t.workers);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let calls = 0;
+    t.workers.startTextures = async (input) => {
+      const call = ++calls;
+      // The first final's start is slow
+      if (call === 1) await gate;
+      // The next final's first start can't connect: tried again on the next poll
+      if (call === 2) throw refused();
+      return stock(input);
+    };
+    const gen = await finalReady(t);
+    expect((await t.studio.get('u1', gen.id)).status).toBe('done');
+    // Poll A starts the first final's textures; the start hangs
+    const pollA = t.studio.get('u1', gen.id);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Meanwhile (API only: the panel hides the pictures once done) another picture becomes the
+    // final, whose textures job is still to start
+    await makeFinal(t, 'u1', gen.id, { seed: 777 });
+    expect(await t.studio.get('u1', gen.id)).toMatchObject({
+      status: 'done',
+      textures: { status: 'running' },
+    });
+    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+    expect(calls).toBe(2);
+    expect(t.store.rows.get(gen.id)).toMatchObject({ seed: 777, texturesJobId: null });
+
+    // Poll A's start comes back at last, with a job made for the first final's shape
+    release();
+    await pollA;
+    const [oldStart] = texturesStarts(t);
+    expect(oldStart!.input['seed']).toBe(4242);
+    // It isn't recorded for the next final, and is stopped
+    const [oldJob] = [...t.textures.keys()];
+    expect(t.store.rows.get(gen.id)).toMatchObject({
+      seed: 777,
+      texturesStatus: 'running',
+      texturesJobId: null,
+    });
+    expect(t.cancelled).toEqual([`model:${oldJob}`]);
+
+    // The next poll starts the next final's own, whose textures are offered
+    await t.studio.get('u1', gen.id);
+    expect(texturesStarts(t).at(-1)!.input['seed']).toBe(777);
+    t.textures.set(texturesJob(t, gen), { status: 'done', output: texturesOutput([1777]) });
+    expect((await t.studio.get('u1', gen.id)).textures).toMatchObject({
+      status: 'done',
+      options: [{ url: `https://files.test/ai/${gen.id}/final-777-texture-1777.glb` }],
+    });
+  });
+
+  it("never ends the next final's texture options with the last one's failed start", async () => {
+    const t = setup();
+    const stock = t.workers.startTextures!.bind(t.workers);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let calls = 0;
+    t.workers.startTextures = async (input) => {
+      // The first final's start is slow, and refused in the end
+      if (++calls === 1) {
+        await gate;
+        throw new Error('AI worker run failed: 400 {"detail":"bad input"}');
+      }
+      return stock(input);
+    };
+    const gen = await finalReady(t);
+    await t.studio.get('u1', gen.id);
+    const pollA = t.studio.get('u1', gen.id);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await makeFinal(t, 'u1', gen.id, { seed: 777 });
+    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+
+    release();
+    await pollA;
+    expect(t.store.rows.get(gen.id)).toMatchObject({
+      seed: 777,
+      texturesStatus: 'running',
+      texturesJobId: null,
+      texturesError: null,
+    });
+    // The next final's own job starts on the next poll
+    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+    expect(texturesStarts(t)).toMatchObject([{ input: { seed: 777 } }]);
+  });
+
+  it('stops a textures job a poll records while another picture is picked', async () => {
+    const t = setup();
+    const gen = await finalReady(t);
+    await t.studio.get('u1', gen.id);
+    const { finalUrl } = t.store.rows.get(gen.id)!;
+    // A poll records its textures job just after Pick has read the generation
+    const find = t.store.find.bind(t.store);
+    t.store.find = async (id, userId) => {
+      const row = await find(id, userId);
+      t.store.find = find;
+      await t.store.finishTextures(id, { finalUrl, jobId: null }, { texturesJobId: 'textures-9' });
+      return row;
+    };
+    expect(await t.studio.pick('u1', gen.id, 0)).toMatchObject({
+      status: 'previewing',
+      final: null,
+      textures: null,
+    });
+    // It bills while it runs, and its textures would never be offered
+    expect(t.cancelled).toEqual(['model:textures-9']);
+    expect(t.store.rows.get(gen.id)).toMatchObject({ texturesStatus: null, texturesJobId: null });
   });
 
   it('offers no textures made for another shape', async () => {
@@ -1471,17 +1645,13 @@ describe('AIStudio texture options', () => {
     });
   });
 
-  it('starts one textures job when two polls find the final done at once', async () => {
+  it('starts one textures job when two polls start one at once', async () => {
     const t = setup();
     let release: () => void = () => {};
     // Both polls wait here, then race to record their textures job
     t.control.texturesStart = new Promise<void>((resolve) => (release = resolve));
-    const gen = await picking(t);
-    await t.studio.pick('u1', gen.id, 0);
-    t.models.set('model-2', { status: 'done', output: modelOutput(4242, 'preview') });
-    await t.studio.get('u1', gen.id);
-    await t.studio.keep('u1', gen.id);
-    t.models.set('model-3', { status: 'done', output: modelOutput(4242, 'final') });
+    const gen = await finalReady(t);
+    expect((await t.studio.get('u1', gen.id)).status).toBe('done');
 
     const polls = [t.studio.get('u1', gen.id), t.studio.get('u1', gen.id)];
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -1489,7 +1659,7 @@ describe('AIStudio texture options', () => {
     for (const poll of await Promise.all(polls)) {
       expect(poll).toMatchObject({ status: 'done', textures: { status: 'running' } });
     }
-    expect(t.started.filter((s) => s.kind === 'textures')).toHaveLength(2);
+    expect(texturesStarts(t)).toHaveLength(2);
     // The generation keeps one; the other is stopped
     const kept = texturesJob(t, gen);
     const [first, second] = [...t.textures.keys()];
@@ -1554,6 +1724,8 @@ describe('AIStudio texture options', () => {
     await studio.keep('u1', gen.id);
     gen = await studio.get('u1', gen.id);
     expect(gen).toMatchObject({ status: 'done', textures: { status: 'running' } });
+    // This poll starts their job, and the next finds it done
+    expect((await studio.get('u1', gen.id)).textures?.status).toBe('running');
     gen = await studio.get('u1', gen.id);
     expect(gen.textures).toMatchObject({ status: 'done', error: null });
     const seed = store.rows.get(gen.id)!.seed!;
@@ -1574,6 +1746,7 @@ describe('AIStudio texture options', () => {
     let photo = await studio.startFromPhoto('u1', small);
     expect((await studio.get('u1', photo.id)).status).toBe('reviewing');
     await studio.keep('u1', photo.id);
+    expect((await studio.get('u1', photo.id)).textures?.status).toBe('running');
     expect((await studio.get('u1', photo.id)).textures?.status).toBe('running');
     photo = await studio.get('u1', photo.id);
     expect(photo).toMatchObject({

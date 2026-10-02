@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, isNull } from 'drizzle-orm';
 import type { Database } from '../../db';
 import { schema } from '../../db';
 import type { StorageProvider } from '../storage';
@@ -33,8 +33,9 @@ import type {
  * Texture options (AI_TEXTURE_OPTIONS, on by default): once the final is done, TRELLIS.2 makes
  * TEXTURE_COUNT more textures for its shape, and the user picks one of the four in the panel. On
  * the 20 test prompts the final's own texture was good enough to publish 10 times, and the best
- * of four 16 times. The final is done and usable at once: the textures job runs after it, with
- * its own state (texturesStatus), and never fails the generation.
+ * of four 16 times. The final is done and usable at once: the poll that finds it done returns it,
+ * and the next one starts the textures job, which has its own state (texturesStatus) and never
+ * fails the generation.
  *
  * Every job is started and then polled by `get`, so no request waits on a GPU. Pictures, views
  * and models are copied into the server's storage, so scenes keep working after the workers
@@ -87,15 +88,25 @@ export interface GenerationStore {
     patch: Partial<NewGeneration>,
   ): Promise<GenerationRecord | null>;
   /**
-   * Updates the texture options of a done generation only while `jobId` is still their job (null
-   * while it's still to start), so overlapping polls keep one textures job, and no textures land
-   * on a final that was replaced meanwhile. Returns null when that isn't so.
+   * Updates the texture options of a done final only while it is still the generation's final
+   * (`expected.finalUrl`) and `expected.jobId` is still their job (null while it's still to
+   * start). So overlapping polls keep one textures job, and a job or textures meant for one final
+   * never land on the next. Returns null when that isn't so.
    */
   finishTextures(
     id: string,
-    jobId: string | null,
+    expected: { finalUrl: string | null; jobId: string | null },
     patch: Partial<NewGeneration>,
   ): Promise<GenerationRecord | null>;
+  /**
+   * Updates the generation and clears its textures job in one step, returning the job it had
+   * (null for none). A poll may record a textures job at any moment: read and cleared together,
+   * none is missed.
+   */
+  takeTexturesJob(
+    id: string,
+    patch: Partial<NewGeneration>,
+  ): Promise<{ record: GenerationRecord; texturesJobId: string | null }>;
   recent(userId: string, limit: number): Promise<GenerationRecord[]>;
 }
 
@@ -275,13 +286,13 @@ export class AIStudio {
    * the texture options are made.
    */
   async get(userId: string, id: string): Promise<GenerationView> {
-    let record = await this.find(userId, id);
+    const record = await this.find(userId, id);
     if (record.jobId && RUNNING.has(record.status as GenerationStatus)) {
-      record = await this.advance(record);
+      // A final this finds done is returned at once; the next poll starts its texture options
+      return view(await this.advance(record));
     }
-    // The final is done and usable; its texture options follow
     if (record.status === 'done' && record.texturesStatus === 'running') {
-      record = await this.advanceTextures(record);
+      return view(await this.advanceTextures(record));
     }
     return view(record);
   }
@@ -297,9 +308,9 @@ export class AIStudio {
     if (RUNNING.has(record.status as GenerationStatus)) {
       throw new StudioError('BAD_REQUEST', 'Wait for the current step to finish');
     }
-    // The old final's textures won't be offered: stop their job (it bills while it runs)
-    if (record.texturesJobId) this.cancel('model', record.texturesJobId);
-    const picked = await this.deps.store.update(record.id, {
+    // The old final's textures won't be offered. Their job is read and cleared in one step, so one
+    // a poll records meanwhile isn't missed, and stopped (it bills while it runs)
+    const { record: picked, texturesJobId } = await this.deps.store.takeTexturesJob(record.id, {
       imageUrl: reference.url,
       views: null,
       viewsError: null,
@@ -311,6 +322,7 @@ export class AIStudio {
       ...NO_TEXTURES,
       seed: null,
     });
+    if (texturesJobId) this.cancel('model', texturesJobId);
     return view(await this.runJob(picked, this.firstModelStep()));
   }
 
@@ -501,7 +513,7 @@ export class AIStudio {
               finalUrl: url,
               finalTriangles: output.triangles,
               finalPipeline: output.pipeline ?? null,
-              // More textures for its shape follow (advanceTextures starts their job)
+              // More textures for its shape follow (the next poll starts their job)
               ...(this.textureOptions() ? TEXTURES_TO_START : NO_TEXTURES),
             },
       );
@@ -645,8 +657,8 @@ export class AIStudio {
 
   /**
    * Starts the textures job for a done final, from what the final was made from: the picture,
-   * its seed and its views. Overlapping polls can both start one: the first is kept, the other
-   * stopped.
+   * its seed and its views. Overlapping polls can both start one: the first is kept, and the other
+   * stopped, as is one started for a final that has been replaced since.
    */
   private async startTextures(record: GenerationRecord): Promise<GenerationRecord> {
     let jobId: string;
@@ -669,11 +681,13 @@ export class AIStudio {
       if (isTransient(err)) return record;
       return this.texturesFailed(record, err);
     }
-    const started = await this.deps.store.finishTextures(record.id, null, {
-      texturesJobId: jobId,
-      updatedAt: new Date(),
-    });
+    const started = await this.deps.store.finishTextures(
+      record.id,
+      { finalUrl: record.finalUrl, jobId: null },
+      { texturesJobId: jobId, updatedAt: new Date() },
+    );
     if (started) return started;
+    // Another poll's job was recorded first, or the final has been replaced since
     this.cancel('model', jobId);
     return this.find(record.userId, record.id);
   }
@@ -698,7 +712,11 @@ export class AIStudio {
     record: GenerationRecord,
     patch: Partial<NewGeneration>,
   ): Promise<GenerationRecord> {
-    const updated = await this.deps.store.finishTextures(record.id, record.texturesJobId, patch);
+    const updated = await this.deps.store.finishTextures(
+      record.id,
+      { finalUrl: record.finalUrl, jobId: record.texturesJobId },
+      patch,
+    );
     return updated ?? (await this.find(record.userId, record.id));
   }
 
@@ -1034,7 +1052,7 @@ export function drizzleGenerationStore(db: Database): GenerationStore {
         .returning();
       return row ?? null;
     },
-    async finishTextures(id, jobId, patch) {
+    async finishTextures(id, { finalUrl, jobId }, patch) {
       const [row] = await db
         .update(table)
         .set(patch)
@@ -1043,11 +1061,31 @@ export function drizzleGenerationStore(db: Database): GenerationStore {
             eq(table.id, id),
             eq(table.status, 'done'),
             eq(table.texturesStatus, 'running'),
+            finalUrl === null ? isNull(table.finalUrl) : eq(table.finalUrl, finalUrl),
             jobId === null ? isNull(table.texturesJobId) : eq(table.texturesJobId, jobId),
           ),
         )
         .returning();
       return row ?? null;
+    },
+    async takeTexturesJob(id, patch) {
+      // The row's textures job, locked until the update: a poll recording one meanwhile waits for
+      // this statement (and then finds it cleared), and one recorded just before is read here
+      const before = db
+        .select({ id: table.id, texturesJobId: table.texturesJobId })
+        .from(table)
+        .where(eq(table.id, id))
+        .for('update')
+        .as('before');
+      const [row] = await db
+        .update(table)
+        .set({ ...patch, texturesJobId: null })
+        .from(before)
+        .where(eq(table.id, before.id))
+        .returning({ ...getTableColumns(table), takenTexturesJobId: before.texturesJobId });
+      if (!row) throw new StudioError('NOT_FOUND', 'This generation was not found');
+      const { takenTexturesJobId, ...record } = row;
+      return { record, texturesJobId: takenTexturesJobId };
     },
     async recent(userId, limit) {
       return db
