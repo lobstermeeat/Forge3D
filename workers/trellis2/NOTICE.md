@@ -16,6 +16,7 @@ which the DINOv3 License requires.
 | [flash-attention](https://github.com/Dao-AILab/flash-attention)                                                                                                             | Attention kernels                                         | BSD-3-Clause                                                                        |
 | [PyTorch](https://github.com/pytorch/pytorch)                                                                                                                               | Runtime                                                   | BSD-3-Clause                                                                        |
 | [gltfpack / meshoptimizer](https://github.com/zeux/meshoptimizer) (embeds [Basis Universal](https://github.com/BinomialLLC/basis_universal))                                | meshopt + KTX2 packing                                    | MIT (Basis Universal: Apache-2.0)                                                   |
+| [MV-Adapter](https://github.com/huanngzh/MV-Adapter) camera conventions (no code copied)                                                                                    | Views baked into textures (`mvtexture.py`, experimental)  | Apache-2.0                                                                          |
 
 ## Deliberately excluded
 

@@ -348,6 +348,33 @@ them to its code.
   views that show its long axis (a stack of books at 45° and 315°; a car in all four side views, wheels
   cut). A view's cutout touching the frame edge means "unknown beyond here", not the object's edge.
 
+### Views baked into the texture (Phase 7, an experiment)
+
+`trellis2/forge3d_worker/mvtexture.py` is the geometry side of letting MV-Adapter's image+geometry
+model (ig2mv, `scripts/inference_ig2mv_sdxl.py`) draw the sides the picture doesn't show: it renders
+the final's own shape as the position and normal maps ig2mv draws six views from, and bakes those
+views into the base-colour texture. Nothing in production calls it: an experiment sets
+`Trellis2Runtime.before_projection`, which runs between unpremultiplying the texture and the picture's
+projection (to_glb, unpremultiply, bake, project, shade, export).
+
+- **Its cameras are not the image-only model's**: six orthographic views at the same scale (768 px
+  over [-0.55, 0.55]), of the front (glTF +Z), the side on its right (+X), the back, the left side, the
+  top (the front at the top of the image) and the bottom (the back at the top), in that order.
+- `frame_for(mesh, azimuth)` places to_glb's mesh as upstream's `load_mesh(rescale=True)` does (+Y up
+  becomes +Z, the largest coordinate 0.5, not re-centred), after turning it so that the picture's
+  azimuth (the projection's `pose`) faces the front camera.
+- `control_maps` and `as_control` give the control image upstream renders, (6, 6, 768, 768): world
+  positions + 0.5, then world normals / 2 + 0.5, both 0.5 off the mesh.
+- `bake_views` writes six drawn views into the texture: per texel a depth test in each view, a weight
+  cos³ (none under a cosine of 0.2), fades within 4 px of silhouettes and depth edges, a blend in
+  linear light, one colour match to the old texture for all six views; the old colour where the
+  weights add up to little, fading in; the views' grey background left out; the change carried into
+  the gutters. Each of these is a keyword argument.
+- On the Phase 5 arcade machine, its own texture rendered from the six cameras and baked back changes
+  by 0.64/255 on average where it is baked (99% of texels within 12.3; the rest sit at sharp edges and
+  UV seams), and by 0.24 (99% within 4) from renders twice the size: what is left is resampling. About
+  60% of its texels, mostly the inner faces of its panels, are seen by no camera and keep their colour.
+
 ### The Pixal3D worker
 
 `pixal3d/pixal3d_worker/service.py` is the `trellis2` contract with Pixal3D behind it, plus views. With
@@ -741,9 +768,11 @@ without diffusers installed, one multiview camera check is skipped.
 
 The tests cover input validation, job handling, the out-of-memory retry and fallback, shading
 normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API, the
-nvdiffrast stand-in (against a brute-force rasterizer and analytic results) and the picture
+nvdiffrast stand-in (against a brute-force rasterizer and analytic results), the picture
 projection (synthetic models pictured from known cameras: the camera found, the colours painted,
-the fall-backs). For the recipe they cover, on fakes, the default (TRELLIS.2's finals) and the choice
+the fall-backs) and the views' bake (MV-Adapter's ig2mv cameras held to its code, the control maps of
+a box, boxes baked from views painted per side: hidden sides, the background, the fades, the colour
+match, the gutters). For the recipe they cover, on fakes, the default (TRELLIS.2's finals) and the choice
 of model, the container's model pool, the fallbacks to TRELLIS.2 and what they report, the weights a
 run fetches, the recipe's preview, levelling and its gate, the thin rule and the weight swap,
 Pixal3D's cameras and views, the NATTEN stand-in (against NATTEN's own definition) and the weights
