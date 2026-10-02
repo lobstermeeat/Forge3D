@@ -147,10 +147,11 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
   const keep = trpc.ai.keep.useMutation({ onSuccess: show, onError });
   const retry = trpc.ai.retry.useMutation({ onSuccess: show, onError });
   const busy = start.isPending || pick.isPending || keep.isPending || retry.isPending;
-  // Tells the server which texture went in the scene, and by whom; the generation comes back
+  // Tells the server which texture went in the scene, and by whom; the generation comes back. It
+  // only keeps the record (the scene has the texture already), so a failure stays out of Output
   const { mutate: recordTexture } = trpc.ai.chooseTexture.useMutation({
     onSuccess: (next) => utils.ai.get.setData({ id: next.id }, next),
-    onError,
+    onError: (err) => console.warn("[orainge] couldn't record the texture choice:", errorText(err)),
   });
 
   // Start FLUX while the user types: after a quiet spell it takes about 45 s before it can draw

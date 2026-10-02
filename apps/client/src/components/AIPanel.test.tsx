@@ -5,6 +5,7 @@ import type { ModelData } from '@forge3d/shared';
 import type { EditorActions } from '@/hooks/useEditorActions';
 import { useAIStore } from '@/stores/aiStore';
 import { useEditorStore } from '@/stores/editorStore';
+import { useOutputStore } from '@/stores/outputStore';
 import type { GenerationView } from '../../../../apps/server/src/services/ai/studio';
 import { AIPanel } from './AIPanel';
 
@@ -14,8 +15,15 @@ const server = vi.hoisted(() => {
   return {
     generation: undefined as unknown,
     chooseTexture: { mutate: (() => {}) as (input: unknown) => void, isPending: false },
+    /** What the panel does when ai.chooseTexture answers */
+    chooseTextureOptions: {} as {
+      onSuccess?: (view: never) => void;
+      onError?: (err: unknown) => void;
+    },
     mutation,
-    utils: { ai: { get: { setData: () => {} }, recent: { invalidate: async () => {} } } },
+    utils: {
+      ai: { get: { setData: (..._args: unknown[]) => {} }, recent: { invalidate: async () => {} } },
+    },
   };
 });
 
@@ -35,7 +43,12 @@ vi.mock('@/api/trpc', () => ({
       keep: { useMutation: () => server.mutation },
       retry: { useMutation: () => server.mutation },
       warm: { useMutation: () => server.mutation },
-      chooseTexture: { useMutation: () => server.chooseTexture },
+      chooseTexture: {
+        useMutation: (options: typeof server.chooseTextureOptions) => {
+          server.chooseTextureOptions = options;
+          return server.chooseTexture;
+        },
+      },
     },
   },
 }));
@@ -225,6 +238,33 @@ describe("AIPanel and the judge's pick (AI_TEXTURE_JUDGE=1)", () => {
         screen.getByText('The same shape with other textures. Pick the one you like best.'),
       ).toBeTruthy();
       unmount();
+    }
+  });
+
+  it("keeps the server's answer, and leaves a record that failed out of Output", () => {
+    const { editor } = scene(final.url);
+    server.generation = generation(null);
+    render(<AIPanel actions={editor} />);
+    const setData = vi.spyOn(server.utils.ai.get, 'setData');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    useOutputStore.getState().clear();
+    try {
+      fireEvent.click(screen.getByRole('radio', { name: 'Texture 2' }));
+      expect(chooseTexture).toHaveBeenCalledWith({ id: 'g1', number: 2, by: 'creator' });
+      // The generation the server sends back replaces the panel's copy
+      const answer = generation(null);
+      server.chooseTextureOptions.onSuccess?.(answer as never);
+      expect(setData).toHaveBeenCalledWith({ id: 'g1' }, answer);
+      // The texture is in the scene either way: a record that fails is only logged
+      server.chooseTextureOptions.onError?.(new Error('fetch failed'));
+      expect(useOutputStore.getState().lines.filter((line) => line.level === 'error')).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(
+        "[orainge] couldn't record the texture choice:",
+        'fetch failed',
+      );
+    } finally {
+      warn.mockRestore();
+      setData.mockRestore();
     }
   });
 });
