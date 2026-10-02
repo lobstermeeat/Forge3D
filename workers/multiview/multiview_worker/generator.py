@@ -155,20 +155,68 @@ class BiRefNetRemover:
         return rgb
 
 
-def check_adapter_weights(weights: dict, unet_keys: set, encoder_keys: set) -> None:
+def check_adapter_weights(
+    weights: dict, unet_keys: set, encoder_keys: set, name: str = ADAPTER_FILE
+) -> None:
     """
     The pipeline loads the adapter with strict=False, which would leave a mismatched file's layers
     as copies of SDXL's own and draw six unrelated pictures. Every tensor in the file must land, and
-    every multi-view, reference and camera-encoder layer must get one.
+    every multi-view, reference and condition-encoder layer must get one.
     """
     unused = sorted(key for key in weights if key not in unet_keys and key not in encoder_keys)
     adapter_layers = {key for key in unet_keys if "_mv" in key or "_ref" in key} | set(encoder_keys)
     missing = sorted(adapter_layers - set(weights))
     if unused or missing:
         raise RuntimeError(
-            f"{ADAPTER_FILE} doesn't match the pipeline: {len(unused)} unused tensors "
+            f"{name} doesn't match the pipeline: {len(unused)} unused tensors "
             f"(e.g. {unused[:2]}), {len(missing)} adapter layers without weights (e.g. {missing[:2]})"
         )
+
+
+def load_pipeline(
+    models_root: str, adapter_file: str, num_views: int, device: str, self_attn_processor: Any
+) -> Any:
+    """
+    SDXL with one of MV-Adapter's multi-view adapters, every model from a local folder, set up as
+    upstream's inference scripts do: the fp16-fix VAE, the ShiftSNR noise schedule, the adapter's
+    layers made with `self_attn_processor` and filled from `adapter_file`, in fp16 on `device`.
+    """
+    import safetensors.torch
+    import torch
+    from diffusers import AutoencoderKL
+
+    from mvadapter.pipelines.pipeline_mvadapter_i2mv_sdxl import MVAdapterI2MVSDXLPipeline
+    from mvadapter.schedulers.scheduling_shift_snr import ShiftSNRScheduler
+
+    dtype = torch.float16
+    vae = AutoencoderKL.from_pretrained(os.path.join(models_root, VAE_DIR), torch_dtype=dtype)
+    pipe = MVAdapterI2MVSDXLPipeline.from_pretrained(
+        os.path.join(models_root, SDXL_DIR),
+        vae=vae,
+        torch_dtype=dtype,
+        variant="fp16",
+        add_watermarker=False,  # SDXL's invisible watermark would alter the views' pixels
+    )
+    pipe.scheduler = ShiftSNRScheduler.from_scheduler(
+        pipe.scheduler, shift_mode="interpolated", shift_scale=SHIFT_SCALE
+    )
+    # Upstream first copies SDXL's attention weights into the new layers (a training start) by
+    # cloning the whole UNet, 5 GB more RAM. The adapter file overwrites every one of those layers
+    # (check_adapter_weights), so skipping the copy gives the same weights.
+    pipe.init_custom_adapter(
+        num_views=num_views, self_attn_processor=self_attn_processor, copy_attn_weights=False
+    )
+    weights = safetensors.torch.load_file(os.path.join(models_root, ADAPTER_DIR, adapter_file))
+    check_adapter_weights(
+        weights, set(pipe.unet.state_dict()), set(pipe.cond_encoder.state_dict()), adapter_file
+    )
+    pipe.load_custom_adapter(weights, weight_name=adapter_file)
+    del weights
+    pipe.to(device=device, dtype=dtype)
+    pipe.cond_encoder.to(device=device, dtype=dtype)
+    pipe.enable_vae_slicing()
+    pipe.set_progress_bar_config(disable=True)  # 50 lines a job in the logs otherwise
+    return pipe
 
 
 class MultiViewGenerator:
@@ -182,39 +230,12 @@ class MultiViewGenerator:
         guidance: float = GUIDANCE,
         remover: Optional[Remover] = None,
     ) -> None:
-        import safetensors.torch
-        import torch
-        from diffusers import AutoencoderKL
+        from mvadapter.models.attention_processor import DecoupledMVRowSelfAttnProcessor2_0
 
-        from mvadapter.pipelines.pipeline_mvadapter_i2mv_sdxl import MVAdapterI2MVSDXLPipeline
-        from mvadapter.schedulers.scheduling_shift_snr import ShiftSNRScheduler
-
-        dtype = torch.float16
-        vae = AutoencoderKL.from_pretrained(os.path.join(models_root, VAE_DIR), torch_dtype=dtype)
-        pipe = MVAdapterI2MVSDXLPipeline.from_pretrained(
-            os.path.join(models_root, SDXL_DIR),
-            vae=vae,
-            torch_dtype=dtype,
-            variant="fp16",
-            add_watermarker=False,  # SDXL's invisible watermark would alter the views' pixels
+        # Upstream's default attention for this adapter: across the six views, row by row
+        self.pipe = load_pipeline(
+            models_root, ADAPTER_FILE, len(AZIMUTHS), device, DecoupledMVRowSelfAttnProcessor2_0
         )
-        pipe.scheduler = ShiftSNRScheduler.from_scheduler(
-            pipe.scheduler, shift_mode="interpolated", shift_scale=SHIFT_SCALE
-        )
-        # Upstream first copies SDXL's attention weights into the new layers (a training start) by
-        # cloning the whole UNet, 5 GB more RAM. The adapter file overwrites every one of those layers
-        # (check_adapter_weights), so skipping the copy gives the same weights.
-        pipe.init_custom_adapter(num_views=len(AZIMUTHS), copy_attn_weights=False)
-        weights = safetensors.torch.load_file(os.path.join(models_root, ADAPTER_DIR, ADAPTER_FILE))
-        check_adapter_weights(weights, set(pipe.unet.state_dict()), set(pipe.cond_encoder.state_dict()))
-        pipe.load_custom_adapter(weights, weight_name=ADAPTER_FILE)
-        del weights
-        pipe.to(device=device, dtype=dtype)
-        pipe.cond_encoder.to(device=device, dtype=dtype)
-        pipe.enable_vae_slicing()
-        pipe.set_progress_bar_config(disable=True)  # 50 lines a job in the logs otherwise
-
-        self.pipe = pipe
         self.device = device
         self.steps = steps
         self.guidance = guidance
