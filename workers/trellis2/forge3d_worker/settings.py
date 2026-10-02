@@ -20,6 +20,8 @@ class Preset:
     remesh: bool
     # Paint the input picture onto the side of the model it shows (forge3d_worker.projection)
     project_picture: bool = False
+    # Drop small pieces floating apart from the model, before the projection (forge3d_worker.cleanup)
+    drop_floaters: bool = False
 
 
 PRESETS: dict[str, Preset] = {

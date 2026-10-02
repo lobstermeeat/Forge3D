@@ -125,4 +125,8 @@ def handle_job(
         result["projection"] = projection
         if projection.get("gpu_fault"):
             result["refresh_worker"] = True  # the model went out unprojected; CUDA may not be usable
+    # Optional: the small pieces floating apart that the export dropped (presets with drop_floaters)
+    floaters = getattr(runtime, "last_cleanup", None)
+    if isinstance(floaters, dict) and floaters:
+        result["floaters"] = floaters
     return result

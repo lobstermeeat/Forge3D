@@ -1,5 +1,7 @@
 """Trellis2Runtime on a fake pipeline: the retry after running out of GPU memory."""
 
+import os
+import sys
 import types
 import weakref
 
@@ -38,6 +40,30 @@ class FakeModel:
 
 class Activations:
     """Stands in for the tensors a run holds: alive for as long as the run's frame is."""
+
+
+class ShapeLatent:
+    """
+    Upstream's SparseTensor as the runtime handles a shape latent: to() makes a moved copy that shares the
+    original's spatial cache (upstream's replace()), clear_spatial_cache() gives a tensor a new, empty one.
+    """
+
+    def __init__(self, cache=None, device="cuda") -> None:
+        self.cache = {"neighbours at 1024": "big"} if cache is None else cache
+        self.device = device
+
+    def to(self, device) -> "ShapeLatent":
+        return ShapeLatent(self.cache, torch.device(device).type)
+
+    def clear_spatial_cache(self) -> None:
+        self.cache = {}
+
+
+def returned(meshes, options):
+    """What upstream's run() returns: the meshes, and with return_latent=True the latents and resolution too."""
+    if not options.get("return_latent"):
+        return meshes
+    return meshes, (ShapeLatent(), "texture latent", 512 if options.get("pipeline_type") == "512" else 1024)
 
 
 class FakePipeline:
@@ -97,7 +123,7 @@ class FakePipeline:
             outcome = outcome[len("stranded-"):]
         if outcome != "mesh":
             raise failure(outcome, len(self.runs))
-        return [outcome]
+        return returned([outcome], options)
 
 
 def runtime_around(pipeline: FakePipeline) -> Trellis2Runtime:
@@ -369,7 +395,7 @@ class CroppingPipeline(FakePipeline):
 
     def run(self, image, **options):
         super().run(image, **options)
-        return [Mesh()]
+        return returned([Mesh()], options)
 
 
 def test_generate_keeps_the_full_frame_cutout_on_the_mesh():
@@ -394,7 +420,7 @@ def test_a_picture_with_its_own_alpha_is_its_own_cutout():
 def test_meshes_that_take_no_attributes_still_generate():
     pipeline = CroppingPipeline()
     pipeline.rembg_model = Remover()
-    pipeline.run = lambda image, **options: ["mesh"]
+    pipeline.run = lambda image, **options: returned(["mesh"], options)
     assert runtime_around(pipeline).generate(Image.new("RGB", (64, 64)), PRESETS["final"], seed=7) == "mesh"
 
 
@@ -455,9 +481,281 @@ def test_a_final_made_by_the_fallback_still_carries_the_picture_to_paint_on():
     class MeshPipeline(FakePipeline):
         def run(self, image, **options):
             super().run(image, **options)  # raises for the scripted failures
-            return [types.SimpleNamespace(pipeline_type=options["pipeline_type"])]
+            return returned([types.SimpleNamespace(pipeline_type=options["pipeline_type"])], options)
 
     pipeline = MeshPipeline(outcomes=["oom", "oom", "mesh"])
     picture = cutout()  # has its own alpha, so it is its own cutout
     mesh = runtime_around(pipeline).generate(picture, PRESETS["final"], seed=7)
     assert mesh.pipeline_type == "512" and mesh.forge3d_cutout is picture
+
+
+# --- retexture(): where the models are, running out of memory, what is kept -------------------------------
+
+
+class TexturePipeline(FakePipeline):
+    """
+    FakePipeline with upstream's texture stages reduced to their device handling: in low-VRAM mode each
+    moves its model onto the GPU and back without a ``finally`` (as upstream), and the texture stage
+    fails as scripted (``texture``: per attempt, "texture" or a failure()'s kind, "stranded-" first to
+    fail with its model left on the GPU).
+    """
+
+    tex_slat_sampler_params = {"steps": 12, "guidance_strength": 1.0}
+
+    def __init__(self, outcomes=("mesh",), low_vram: bool = False, texture=("texture",)) -> None:
+        super().__init__(outcomes, low_vram)
+        for name in ("tex_slat_flow_model_512", "tex_slat_flow_model_1024", "shape_slat_decoder"):
+            self.models[name] = FakeModel()
+        self.to(self._device)  # where __init__'s cuda() put the others
+        self.texture = list(texture)
+        self.attempts = []  # per texture attempt: the mode, where the weights were, the latent's device
+
+    def get_cond(self, image, resolution, include_neg_cond=True):
+        return {"cond": torch.ones(1, 2) * resolution, "neg_cond": torch.zeros(1, 2)}
+
+    def sample_tex_slat(self, cond, flow_model, shape_slat, sampler_params={}):  # noqa: B006 - upstream's
+        state = {"low_vram": self.low_vram, "weights": self.weights(), "latent": shape_slat.device}
+        self.attempts.append({**state, "flow": flow_model, "params": sampler_params, "live_runs": self.live_runs()})
+        activations = Activations()
+        self.activations.append(weakref.ref(activations))
+        outcome = self.texture[len(self.attempts) - 1]
+        if self.low_vram:
+            flow_model.to("cuda")
+        if outcome != "texture":
+            raise failure(outcome.replace("stranded-", ""), len(self.attempts))
+        if self.low_vram:
+            flow_model.cpu()
+        return "texture latent"
+
+    def decode_latent(self, shape_slat, tex_slat, resolution):
+        return [types.SimpleNamespace(shape=shape_slat, tex=tex_slat, resolution=resolution)]
+
+
+def retexturing(deployment: str, **options):
+    pipeline = TexturePipeline(low_vram=deployment == "deployed in low-VRAM mode", **options)
+    runtime = runtime_around(pipeline)
+    if deployment == "asleep":
+        runtime.sleep()
+    runtime.generate(cutout(), PRESETS["final"], seed=7)
+    return pipeline, runtime
+
+
+@pytest.mark.parametrize("deployment", ["on the GPU", "deployed in low-VRAM mode", "asleep"])
+def test_retexture_runs_wherever_the_models_live_and_leaves_them_there(deployment, capsys):
+    pipeline, runtime = retexturing(deployment)
+    mesh = runtime.retexture()
+
+    (attempt,) = pipeline.attempts
+    off = deployment != "on the GPU"
+    # Upstream's own mode: on the GPU all along, or each model visiting it for its stage
+    assert attempt["low_vram"] is off and attempt["weights"] == ({"cpu"} if off else {"cuda"})
+    # The 1024 texture flow, the defaults, and the shape latent on the pipeline's device for it
+    assert attempt["flow"] is pipeline.models["tex_slat_flow_model_1024"] and attempt["params"] == {"steps": 12, "guidance_strength": 1.0}
+    assert attempt["latent"] == "cuda" and mesh.shape.device == "cuda" and mesh.resolution == 1024
+    assert runtime.last_latent.shape_slat.device == "cpu"  # the kept one stays where it was
+    assert pipeline.low_vram is off and pipeline.weights() == ({"cpu"} if off else {"cuda"})
+    assert runtime.asleep is (deployment == "asleep")
+
+
+@pytest.mark.parametrize("kind", ["oom", "cumesh-oom"])
+def test_retexture_out_of_memory_is_retried_once_in_low_vram_mode_then_restored(kind, monkeypatch, capsys):
+    pipeline, runtime = retexturing("on the GPU", texture=[kind, "texture"])
+    emptied = []  # where the weights were each time torch's cache was emptied
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: emptied.append(pipeline.weights()))
+    capsys.readouterr()
+
+    assert runtime.retexture(sampler_params={"steps": 20}).tex == "texture latent"
+
+    first, retry = pipeline.attempts
+    assert first["low_vram"] is False and first["weights"] == {"cuda"}
+    assert retry["low_vram"] is True and retry["weights"] == {"cpu"} and retry["params"]["steps"] == 20
+    # The failed attempt's tensors were let go before the retry, and the cache went back to CUDA
+    assert retry["live_runs"] == 0 and emptied[0] == {"cpu"}
+    assert pipeline.low_vram is False and pipeline.weights() == {"cuda"}
+    log = capsys.readouterr().out.splitlines()
+    assert len(log) == 2 and log[0].startswith("[forge3d] retexturing the 1024_cascade shape: ")
+    assert log[1].startswith("[forge3d] out of GPU memory retexturing, retrying in low-VRAM mode: ")
+    assert log[1].endswith("(run 1)")
+
+
+@pytest.mark.parametrize(
+    "deployment, texture",
+    [
+        ("on the GPU", ["bug"]),  # not out of memory: not retried
+        ("on the GPU", ["oom", "oom"]),  # out of memory again in low-VRAM mode
+        ("deployed in low-VRAM mode", ["stranded-oom"]),  # nothing cheaper; its model left on the GPU
+        ("asleep", ["stranded-cumesh-oom"]),
+    ],
+)
+def test_a_failed_retexture_is_raised_with_the_models_put_back(deployment, texture, capsys):
+    pipeline, runtime = retexturing(deployment, texture=texture)
+    latent = runtime.last_latent
+    with pytest.raises((torch.cuda.OutOfMemoryError, RuntimeError, ValueError), match=rf"\(run {len(texture)}\)$"):
+        runtime.retexture()
+
+    assert len(pipeline.attempts) == len(texture)
+    off = deployment != "on the GPU"
+    assert pipeline.low_vram is off and pipeline.weights() == ({"cpu"} if off else {"cuda"})
+    # The failed attempts' tensors were let go before the weights went back
+    assert pipeline.live_runs() == 0
+    # The shape is still there to try again
+    assert runtime.last_latent is latent
+
+
+def test_retexture_needs_a_shape():
+    runtime = runtime_around(TexturePipeline(outcomes=["bug", "mesh"]))
+    with pytest.raises(RuntimeError, match="no shape to retexture"):
+        runtime.retexture()
+    # A failed generation leaves none either, even after a successful one
+    with pytest.raises(ValueError):
+        runtime.generate(cutout(), PRESETS["final"], seed=7)
+    with pytest.raises(RuntimeError, match="no shape to retexture"):
+        runtime.retexture()
+    runtime.generate(cutout(), PRESETS["final"], seed=8)
+    assert runtime.last_latent is not None and runtime.last_latent.seed == 8
+
+
+def test_generate_keeps_its_shape_latent_small():
+    """On the CPU, without the caches it shared with the run's tensors (upstream's flows fill them on the GPU)."""
+    pipeline = TexturePipeline()
+    runtime = runtime_around(pipeline)
+    returns = []
+    stock = pipeline.run
+
+    def run(image, **options):
+        result = stock(image, **options)
+        returns.append(result)
+        return result
+
+    pipeline.run = run
+    picture = cutout()
+    mesh = runtime.generate(picture, PRESETS["final"], seed=7)
+
+    assert pipeline.runs[0]["return_latent"] is True
+    meshes, (shape_slat, _, resolution) = returns[0]
+    assert mesh is meshes[0]  # what generate() returns is unchanged
+    latent = runtime.last_latent
+    assert latent.shape_slat.device == "cpu" and latent.shape_slat.cache == {}
+    assert shape_slat.cache == {"neighbours at 1024": "big"}  # the run's own cache is left alone
+    assert (latent.resolution, latent.pipeline_type, latent.seed) == (1024, "1024_cascade", 7)
+    assert latent.image is pipeline.runs[0]["image"] and latent.cutout is picture
+
+
+def test_a_fallback_keeps_the_fallbacks_shape_and_its_512_texture_flow():
+    pipeline = TexturePipeline(outcomes=["oom", "oom", "mesh"])
+    runtime = runtime_around(pipeline)
+    runtime.generate(cutout(), PRESETS["final"], seed=7)
+    assert (runtime.last_latent.pipeline_type, runtime.last_latent.resolution) == ("512", 512)
+    mesh = runtime.retexture()
+    assert pipeline.attempts[-1]["flow"] is pipeline.models["tex_slat_flow_model_512"] and mesh.resolution == 512
+
+
+def upstream_sparse_tensor():
+    source = os.environ.get("TRELLIS2_SRC")
+    if source and source not in sys.path:
+        sys.path.append(source)
+    try:
+        from trellis2.modules.sparse import SparseTensor
+    except ImportError:
+        return None
+    return SparseTensor
+
+
+@pytest.mark.skipif(upstream_sparse_tensor() is None, reason="TRELLIS2_SRC: TRELLIS.2's source")
+def test_the_kept_latent_drops_upstreams_shared_spatial_cache():
+    from forge3d_worker.pipeline import _detached
+
+    SparseTensor = upstream_sparse_tensor()
+    coords = torch.tensor([[0, 1, 2, 3], [0, 4, 5, 6], [0, 7, 8, 9]], dtype=torch.int32)
+    run = SparseTensor(feats=torch.randn(3, 8), coords=coords)
+    latent = run * 2.0 + 1.0  # derived, as upstream's de-normalised latent is: it shares the run's cache
+    latent.register_spatial_cache("neighbours", torch.zeros(1000))
+    assert latent._spatial_cache is run._spatial_cache
+
+    kept = _detached(latent, "cpu")
+    assert kept._spatial_cache == {} and "neighbours" in str(run._spatial_cache)
+    assert torch.equal(kept.feats, latent.feats) and torch.equal(kept.coords, latent.coords)
+    assert kept.shape == latent.shape and kept._scale == latent._scale
+    # Moved for a retexture, it gets its own cache again: what the texture flow keeps never lands on the kept one
+    moved = _detached(kept, "cpu")
+    moved.register_spatial_cache("texture flow", torch.zeros(10))
+    assert kept._spatial_cache == {}
+
+
+# --- The floater cleanup in export(), when the preset asks for it ------------------------------------------
+
+
+def floater_glb():
+    """A textured box with a small cube floating beside it, as to_glb would return it (premultiplied texture)."""
+    import trimesh
+
+    body = trimesh.creation.box()
+    speck = trimesh.creation.box(extents=(0.05, 0.05, 0.05)).apply_translation((1.0, 0, 0))
+    vertices = np.concatenate([body.vertices, speck.vertices])
+    faces = np.concatenate([body.faces, speck.faces + len(body.vertices)])
+    material = trimesh.visual.material.PBRMaterial(baseColorTexture=Image.new("RGBA", (8, 8), (100, 100, 100, 128)))
+    visual = trimesh.visual.TextureVisuals(uv=np.zeros((len(vertices), 2)), material=material)
+    return trimesh.Trimesh(vertices, faces, visual=visual, process=False)
+
+
+def exporting(glb):
+    runtime = runtime_around(FakePipeline())
+    runtime._o_voxel = types.SimpleNamespace(postprocess=types.SimpleNamespace(to_glb=lambda **kwargs: glb))
+    mesh = types.SimpleNamespace(vertices=None, faces=None, attrs=None, coords=None, layout=None, voxel_size=None)
+    mesh.forge3d_cutout = cutout()
+    return runtime, mesh
+
+
+def test_export_drops_floaters_after_unpremultiplying_and_before_the_projection(monkeypatch, capsys):
+    import dataclasses
+
+    from forge3d_worker import pipeline as pipeline_module
+
+    order = []
+    real = pipeline_module.cleanup.drop_floaters
+
+    def drop_floaters(glb):
+        order.append(("cleanup", len(glb.faces), glb.visual.material.baseColorTexture.mode))
+        return real(glb)
+
+    def project_picture(glb, picture):
+        order.append(("projection", len(glb.faces)))
+        return glb, {"applied": False, "reason": "test"}
+
+    monkeypatch.setattr(pipeline_module.cleanup, "drop_floaters", drop_floaters)
+    monkeypatch.setattr(pipeline_module.projection, "project_picture", project_picture)
+    runtime, mesh = exporting(floater_glb())
+    preset = dataclasses.replace(PRESETS["final"], drop_floaters=True)
+
+    _, triangles = runtime.export(mesh, preset)
+
+    assert order == [("cleanup", 24, "RGB"), ("projection", 12)] and triangles == 12
+    assert runtime.last_cleanup["pieces"] == 2 and runtime.last_cleanup["dropped"] == 1
+    assert runtime.last_cleanup["floaters"][0]["faces"] == 12
+    assert "[forge3d] floaters: {" in capsys.readouterr().out
+
+
+def test_production_presets_keep_every_piece(monkeypatch):
+    from forge3d_worker import pipeline as pipeline_module
+
+    monkeypatch.setattr(pipeline_module.projection, "project_picture", lambda glb, picture: (glb, {"applied": False}))
+    assert not PRESETS["final"].drop_floaters and not PRESETS["preview"].drop_floaters
+    runtime, mesh = exporting(floater_glb())
+    _, triangles = runtime.export(mesh, PRESETS["final"])
+    assert triangles == 24 and runtime.last_cleanup is None
+
+
+def test_a_failed_cleanup_leaves_the_model_whole(monkeypatch, capsys):
+    import dataclasses
+
+    from forge3d_worker import pipeline as pipeline_module
+
+    def broken(glb):
+        raise IndexError("index 7 is out of bounds\nfor axis 0")
+
+    monkeypatch.setattr(pipeline_module.cleanup, "drop_floaters", broken)
+    runtime, mesh = exporting(floater_glb())
+    preset = dataclasses.replace(PRESETS["preview"], drop_floaters=True)
+    _, triangles = runtime.export(mesh, preset)
+    assert triangles == 24 and runtime.last_cleanup == {"error": "IndexError: index 7 is out of bounds for axis 0"}
+    assert '[forge3d] floaters: {"error": ' in capsys.readouterr().out
