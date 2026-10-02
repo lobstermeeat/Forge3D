@@ -114,3 +114,13 @@ def test_generation_failures_are_reported_like_production():
     result = run(job(views=[{"image_base64": png(), "azimuth": 0}]), runtime)
     assert result["error"].startswith("generation failed: RuntimeError")
     assert result["refresh_worker"] is True
+
+
+@pytest.mark.parametrize("views", [None, [{"image_base64": png(), "azimuth": 0}]])
+def test_texture_options_are_refused_before_pixal3d_runs(views):
+    """Texture options remake a final's shape with TRELLIS.2 and retexture it; Pixal3D's finals are another shape."""
+    runtime = FakeRuntime()
+    extra = {"mode": "textures", "count": 3, **({"views": views} if views else {})}
+    result = run(job(**extra), runtime)
+    assert result == {"error": "texture options need TRELLIS.2 finals"}
+    assert runtime.calls == []

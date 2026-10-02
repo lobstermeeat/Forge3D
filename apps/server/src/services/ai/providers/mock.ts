@@ -5,6 +5,7 @@ import type {
   ModelView,
   ReferencesOutput,
   StudioWorkers,
+  TexturesOutput,
   ViewsOutput,
   WorkerJobState,
   WorkerKind,
@@ -20,7 +21,8 @@ type Job =
       seed: number;
       noObject: boolean;
       viewsUsed: number;
-    };
+    }
+  | { kind: 'textures'; readyAt: number; seed: number; count: number; noTextures: boolean };
 
 const MOCK_CREDITS = ['Mock model for development: no AI ran'];
 /** Ratings like the FLUX worker's, by position, so the second picture is always the best */
@@ -34,13 +36,14 @@ const MOCK_RATINGS: { score: number; issues: string[] }[] = [
 export const MOCK_VIEW_AZIMUTHS = [0, 45, 90, 180, 270, 315];
 
 /**
- * Stand-in GPU workers for development and browser tests (AI_WORKERS_MOCK=1): pictures, views
- * and models appear after a short delay, with no GPU, network or cost. The pictures are rated
- * like the real worker rates them, with the second always the best, and the views are 6 cutouts
- * of a box seen from around it. A prompt containing "fail" fails its pictures, a photo under
- * 128 px gets no views (the model is then made from the photo alone), and a photo under 64 px
- * fails its model too, so the error and fallback states can be tried. Never enable it in
- * production.
+ * Stand-in GPU workers for development and browser tests (AI_WORKERS_MOCK=1): pictures, views,
+ * models and texture options appear after a short delay, with no GPU, network or cost. The
+ * pictures are rated like the real worker rates them, with the second always the best, the views
+ * are 6 cutouts of a box seen from around it, and the texture options are the final's house in
+ * other colours. A prompt containing "fail" fails its pictures, a photo under 256 px gets no
+ * texture options, a photo under 128 px gets no views either (the model is then made from the
+ * photo alone), and a photo under 64 px fails its model too, so the error and fallback states can
+ * be tried. Never enable it in production.
  */
 export class MockWorkers implements StudioWorkers {
   readonly name = 'mock';
@@ -148,7 +151,43 @@ export class MockWorkers implements StudioWorkers {
         credits: MOCK_CREDITS,
         // Like a 3D worker that takes views
         viewsUsed: job.viewsUsed,
+        pipeline: job.mode === 'final' ? MOCK_FINAL_PIPELINE : '512',
       },
+    };
+  }
+
+  async startTextures(input: { image: Buffer; seed: number; count: number }): Promise<string> {
+    const { width = 0 } = await sharp(input.image).metadata();
+    return this.add({
+      kind: 'textures',
+      readyAt: Date.now() + this.delayMs * 2,
+      seed: input.seed,
+      count: input.count,
+      // A small photo stands in for a textures job that failed, so the panel's note can be seen
+      noTextures: width < 256,
+    });
+  }
+
+  /** The final's house in other colours: like texture options, the shape stays and the paint changes */
+  async textures(jobId: string): Promise<WorkerJobState<TexturesOutput>> {
+    const job = this.jobs.get(jobId);
+    if (job?.kind !== 'textures') return { status: 'failed', message: `Unknown job ${jobId}` };
+    if (Date.now() < job.readyAt) return { status: 'running' };
+    if (job.noTextures) {
+      return {
+        status: 'failed',
+        message: 'The mock workers make no texture options for a photo under 256 px',
+      };
+    }
+    const textures = Array.from({ length: job.count }, (_, i) => {
+      // The worker's seeds: the final's seed + 1000 for the first, + 2000 for the second, …
+      const textureSeed = job.seed + 1000 * (i + 1);
+      const glb = mockGlb(textureSeed, 'final');
+      return { file: { data: glb }, textureSeed, triangles: MOCK_TRIANGLES, bytes: glb.length };
+    });
+    return {
+      status: 'done',
+      output: { textures, errors: [], pipeline: MOCK_FINAL_PIPELINE, seconds: 1.5 * job.count },
     };
   }
 
@@ -204,6 +243,8 @@ async function mockView(azimuth: number): Promise<Buffer> {
 }
 
 const MOCK_TRIANGLES = 14;
+/** The pipeline TRELLIS.2's finals report */
+const MOCK_FINAL_PIPELINE = '1024_cascade';
 
 /**
  * A small house (box and pyramid roof) as a GLB, coloured by seed. Previews are grey-blue and

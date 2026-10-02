@@ -152,13 +152,18 @@ function createActions(d: ActionDeps) {
       return cmd.getEntityId();
     },
 
-    /** Points a model entity at another file, keeping where it stands (undoable). */
-    replaceModel(entityId: string, model: ModelData) {
+    /**
+     * Points a model entity at another file, keeping where it stands (undoable). `what` names
+     * the new file in the output and in Undo, such as "texture 2".
+     */
+    replaceModel(entityId: string, model: ModelData, what?: string) {
       const entity = sceneManager.getEntity(entityId);
       const before = entity?.getComponent<ModelData>('model');
       if (!entity || !before || before.url === model.url) return;
-      history.execute(new SetModelCommand(sceneManager, entityId, before, model));
-      logOutput('ok', `${entity.name} now uses its ${model.quality ?? 'new'} model`);
+      const cmd = new SetModelCommand(sceneManager, entityId, before, model);
+      if (what) cmd.description = `Use ${what}`;
+      history.execute(cmd);
+      logOutput('ok', `${entity.name} now uses ${what ?? `its ${model.quality ?? 'new'} model`}`);
     },
 
     /** The scene's entity showing a model from this AI generation, if any. */
@@ -167,6 +172,11 @@ function createActions(d: ActionDeps) {
         .getAllEntities()
         .find((e) => e.getComponent<ModelData>('model')?.generationId === generationId);
       return match?.id ?? null;
+    },
+
+    /** The model file an entity shows, if it shows one. */
+    modelOf(entityId: string): ModelData | null {
+      return sceneManager.getEntity(entityId)?.getComponent<ModelData>('model') ?? null;
     },
 
     async importModel(file: File, opts: { remember?: boolean } = {}) {

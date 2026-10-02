@@ -7,9 +7,13 @@ import time
 import traceback
 from typing import Any, Callable, Optional, Protocol, Sequence
 
-from .inputs import Fetch, InputError, View, parse_job
-from .settings import CREDITS, PRESETS, Preset
+from .inputs import Fetch, InputError, Job, View, parse_job
+from .settings import CREDITS, PRESETS, TEXTURE_SEED_STEP, Preset
 from .storage import Storage
+
+# A textures job's error where TRELLIS.2 doesn't make the finals: here, from a runtime that can't retexture
+# (the Pixal3D worker's); in modal_app.py, from a deployment with the recipe on
+TEXTURES_NEED_TRELLIS2 = "texture options need TRELLIS.2 finals"
 
 
 class Runtime(Protocol):
@@ -18,6 +22,8 @@ class Runtime(Protocol):
     made the mesh (a final that runs out of GPU memory falls back to the preview's); without it, the
     preset's pipeline is reported. It gets ``views`` only when the job has some and its generate() takes
     them (takes_views), and may then set ``views_used`` to how many it used (all of them, if it doesn't say).
+    A textures job also needs ``retexture(seed=…)``: a new texture for the last generation's shape
+    (Trellis2Runtime's).
     """
 
     def generate(self, image: Any, preset: Preset, seed: int, views: Sequence[View] = ()) -> Any: ...
@@ -60,12 +66,15 @@ def handle_job(
     Input: ``{"image_url" | "image_base64", "mode": "preview" | "final", "seed"?, "request_id"?, "views"?}``,
     where ``views`` are other pictures of the object: ``[{"image_url" | "image_base64", "azimuth",
     "elevation", "weight"?}]``. Reuse the preview's ``seed`` and ``views`` for the final pass so the final
-    refines the approved shape.
+    refines the approved shape. ``"mode": "textures"`` with the final's input (its ``seed`` required) and
+    ``"count"``? makes more textures for the final's shape instead: see make_textures.
     """
     try:
         spec = parse_job(job.get("input"), fallback_id=str(job.get("id", "job")), fetch=fetch)
     except InputError as err:
         return {"error": f"invalid input: {err}"}
+    if spec.mode == "textures":
+        return make_textures(spec, runtime, storage, pack)
 
     preset = PRESETS[spec.mode]
     timings: dict[str, float] = {}
@@ -78,14 +87,7 @@ def handle_job(
         clock = now
 
     try:
-        if spec.views and takes_views(runtime):
-            mesh = runtime.generate(spec.image, preset, spec.seed, views=spec.views)
-            views_used = getattr(runtime, "views_used", len(spec.views))
-        else:
-            # Exactly as before views existed. A runtime that doesn't take views gets the picture alone and
-            # reports the views it used itself, if it bound them some other way (else none)
-            mesh = runtime.generate(spec.image, preset, spec.seed)
-            views_used = int(getattr(runtime, "views_used", 0) or 0) if spec.views else 0
+        mesh, views_used = _generate(spec, runtime, preset)
         pipeline = getattr(runtime, "pipeline_used", None) or preset.pipeline_type
         lap("generate_s")
         raw, triangles = runtime.export(mesh, preset)
@@ -98,11 +100,7 @@ def handle_job(
         # e.g. no object found in the image
         return {"error": f"invalid input: {err}"}
     except Exception as err:  # noqa: BLE001 - report any failure to the caller
-        traceback.print_exc()
-        result = {"error": f"generation failed: {type(err).__name__}: {err}"}
-        if needs_restart(err):
-            result["refresh_worker"] = True
-        return result
+        return _failed(err)
 
     result = {
         "request_id": spec.request_id,
@@ -119,14 +117,142 @@ def handle_job(
         "timings": timings,
         "credits": list(CREDITS),
     }
-    # Optional: whether the picture was painted onto the model, and why not (Trellis2Runtime)
-    projection = getattr(runtime, "last_projection", None)
-    if isinstance(projection, dict) and projection:
-        result["projection"] = projection
-        if projection.get("gpu_fault"):
-            result["refresh_worker"] = True  # the model went out unprojected; CUDA may not be usable
-    # Optional: the small pieces floating apart that the export dropped (presets with drop_floaters)
-    floaters = getattr(runtime, "last_cleanup", None)
-    if isinstance(floaters, dict) and floaters:
-        result["floaters"] = floaters
+    notes = _export_notes(runtime)
+    result.update(notes)
+    if _gpu_fault(notes):
+        result["refresh_worker"] = True
     return result
+
+
+def texture_seed(seed: int, number: int) -> int:
+    """The noise seed of texture ``number`` (1 to count) in a textures job for the final made with ``seed``."""
+    return seed + TEXTURE_SEED_STEP * number
+
+
+def make_textures(spec: Job, runtime: Runtime, storage: Storage, pack: Pack) -> dict:
+    """
+    A textures job (texture options): the final's shape made again exactly as the final was (its preset,
+    seed and views), then ``spec.count`` new textures for it from TRELLIS.2's texture flow alone
+    (``runtime.retexture``). Texture k draws its noise from texture_seed(seed, k), and is exported, packed
+    and stored as a final is, at ``spec.texture_key(k)``. The final's own texture isn't exported again: the
+    creator has it. A texture that fails is listed in ``texture_errors`` and the others go on; when none is
+    made, the job fails. A runtime that can't retexture (the Pixal3D worker's) is refused before anything runs.
+    """
+    if not callable(getattr(runtime, "retexture", None)):
+        return {"error": TEXTURES_NEED_TRELLIS2}
+    preset = PRESETS["final"]
+    # Each step's seconds, summed over the textures. A failed step counts too: its GPU time was spent
+    timings = dict.fromkeys(("generate_s", "retexture_s", "export_s", "pack_s", "upload_s"), 0.0)
+
+    def timed(name: str, work: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        started = time.perf_counter()
+        try:
+            return work(*args, **kwargs)
+        finally:
+            timings[name] = round(timings[name] + time.perf_counter() - started, 3)
+
+    try:
+        mesh, views_used = timed("generate_s", _generate, spec, runtime, preset)
+        # Not exported: its texture is the final's own. Let go at once, so its GPU memory is free for the
+        # textures; the runtime keeps the shape latent that retexture() samples them on
+        del mesh
+        pipeline = getattr(runtime, "pipeline_used", None) or preset.pipeline_type
+    except InputError as err:
+        # e.g. no object found in the image
+        return {"error": f"invalid input: {err}"}
+    except Exception as err:  # noqa: BLE001 - report any failure to the caller
+        return _failed(err)
+
+    textures: list[dict] = []
+    errors: list[dict] = []
+    refresh = False
+    for number in range(1, spec.count + 1):
+        seed = texture_seed(spec.seed, number)
+        try:
+            mesh = timed("retexture_s", runtime.retexture, seed=seed)
+            try:
+                raw, triangles = timed("export_s", runtime.export, mesh, preset)
+            finally:
+                del mesh  # off the GPU before the next texture is sampled
+            notes = _export_notes(runtime)
+            refresh = refresh or _gpu_fault(notes)
+            packed = timed("pack_s", pack, raw, preset.texture_size)
+            stored = timed("upload_s", storage.put, spec.texture_key(number), packed, "model/gltf-binary")
+        except Exception as err:  # noqa: BLE001 - one texture failing must not lose the others
+            print(f"[forge3d] texture {number} of {spec.count} (seed {seed}) failed:")
+            traceback.print_exc()
+            errors.append({"texture_seed": seed, "error": f"{type(err).__name__}: {err}"})
+            refresh = refresh or needs_restart(err)
+            # Its traceback holds the failed texture's mesh, and so its GPU memory, for as long as the error
+            # lives: let go of it before the next texture
+            traceback.clear_frames(err.__traceback__)
+            continue
+        textures.append(
+            {
+                "texture_seed": seed,
+                "glb": stored,
+                "bytes": len(packed),
+                "raw_bytes": len(raw),
+                "triangles": triangles,
+                **notes,  # "projection" and "floaters", as a final has them
+            }
+        )
+
+    if textures:
+        result = {
+            "request_id": spec.request_id,
+            "mode": spec.mode,
+            "seed": spec.seed,
+            "textures": textures,
+            # The shape's pipeline: "512" when the cascade ran out of GPU memory (see handle_job)
+            "pipeline": pipeline,
+            "views_used": views_used,
+            "timings": timings,
+            "credits": list(CREDITS),
+        }
+        if errors:
+            result["texture_errors"] = errors
+    else:
+        result = {"error": f"generation failed: none of the {spec.count} textures was made: {errors[0]['error']}"}
+    if refresh:
+        result["refresh_worker"] = True
+    return result
+
+
+def _generate(spec: Job, runtime: Runtime, preset: Preset) -> tuple[Any, int]:
+    """The job's mesh, and how many of its views helped make it."""
+    if spec.views and takes_views(runtime):
+        mesh = runtime.generate(spec.image, preset, spec.seed, views=spec.views)
+        return mesh, getattr(runtime, "views_used", len(spec.views))
+    # Exactly as before views existed. A runtime that doesn't take views gets the picture alone and
+    # reports the views it used itself, if it bound them some other way (else none)
+    mesh = runtime.generate(spec.image, preset, spec.seed)
+    return mesh, int(getattr(runtime, "views_used", 0) or 0) if spec.views else 0
+
+
+def _failed(err: Exception) -> dict:
+    """A failed job's result. After a GPU fault the worker is replaced too: CUDA may be unusable in it."""
+    traceback.print_exc()
+    result = {"error": f"generation failed: {type(err).__name__}: {err}"}
+    if needs_restart(err):
+        result["refresh_worker"] = True
+    return result
+
+
+def _export_notes(runtime: Any) -> dict:
+    """
+    What the runtime's last export() reported besides the model (Trellis2Runtime keeps both): ``projection``,
+    whether the picture was painted onto the model and why not, and ``floaters``, the small pieces floating
+    apart it dropped (presets with drop_floaters). Each only when there is one.
+    """
+    notes = {}
+    for key, attribute in (("projection", "last_projection"), ("floaters", "last_cleanup")):
+        value = getattr(runtime, attribute, None)
+        if isinstance(value, dict) and value:
+            notes[key] = value
+    return notes
+
+
+def _gpu_fault(notes: dict) -> bool:
+    """A GPU fault while projecting: the model went out unprojected, and CUDA may not be usable."""
+    return bool(notes.get("projection", {}).get("gpu_fault"))

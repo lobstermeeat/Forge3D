@@ -772,3 +772,62 @@ def test_generate_leaves_upstreams_texture_sampling_as_it_was():
     with pytest.raises(ValueError):
         runtime.generate(Picture(0.3), PRESETS["final"], seed=11)
     assert "sample_tex_slat" not in vars(pipeline) and runtime.last_latent is None
+
+
+def test_a_textures_job_retextures_the_finals_shape_from_the_rolls_seeds():
+    """
+    handle_job end to end with mode "textures": TRELLIS.2's run() once, as the final's (its pipeline and
+    seed), then the texture flow alone per texture on that shape, its noise drawn from seed + 1000 * k.
+    """
+    import base64
+    import io
+
+    from forge3d_worker.service import handle_job
+
+    class PicturePipeline(RuntimePipeline):
+        """A picture's number is its red channel over 255."""
+
+        def preprocess_image(self, image):
+            value = image.convert("RGB").getpixel((32, 32))[0] / 255
+            self.prepared.append(value)
+            return value
+
+    buffer = io.BytesIO()
+    cutout().save(buffer, "PNG")
+    pipeline = PicturePipeline()
+    runtime = runtime_around(pipeline)
+    runs = []
+    stock_run = pipeline.run
+
+    def run(image, **options):
+        runs.append((options["pipeline_type"], options["seed"]))
+        return stock_run(image, **options)
+
+    pipeline.run = run
+    exported = []
+
+    def export(mesh, preset):
+        exported.append((mesh, preset))
+        return b"glb" * 10, 1234
+
+    runtime.export = export
+    stored = []
+    storage = types.SimpleNamespace(put=lambda key, data, kind: stored.append(key) or {"key": key})
+    picture = base64.b64encode(buffer.getvalue()).decode()
+    job = {"id": "j", "input": {"image_base64": picture, "mode": "textures", "seed": 11, "request_id": "gen_42"}}
+
+    out = handle_job(job, runtime, storage, lambda raw, size: raw)
+
+    assert "error" not in out and out["pipeline"] == "1024_cascade"
+    assert runs == [("1024_cascade", 11)]  # the shape, once, as the final made it
+    generated, *textures = pipeline.tex_calls
+    assert len(textures) == 3 and len(exported) == 3  # the generation's own texture isn't exported
+    for k, (call, (mesh, preset)) in enumerate(zip(textures, exported), 1):
+        torch.manual_seed(11 + 1000 * k)
+        assert torch.equal(call["noise"], torch.randn(1, 5, 3))
+        assert call["flow"] is pipeline.flows["tex"] and call["params"] == TEXTURE
+        # The generation's shape, a texture of its own, the final's export settings
+        assert torch.equal(mesh.shape, generated["shape"]) and preset is PRESETS["final"]
+        assert not torch.allclose(mesh.tex, exported[k % 3][0].tex)
+    assert [texture["texture_seed"] for texture in out["textures"]] == [1011, 2011, 3011]
+    assert stored == [f"ai/gen_42/final-11-texture-{k}.glb" for k in (1, 2, 3)]

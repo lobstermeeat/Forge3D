@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createAIOrchestrator, createStudioWorkers, multiviewEnabled } from '../index';
+import {
+  createAIOrchestrator,
+  createStudioWorkers,
+  multiviewEnabled,
+  textureOptionsEnabled,
+} from '../index';
 import { JobEndpoint, type FetchLike } from './jobEndpoint';
 import { SelfHostedProvider, createSelfHostedProvider } from './selfHosted';
 
@@ -606,6 +611,175 @@ describe('SelfHostedProvider', () => {
       'POST https://api.runpod.ai/v2/mv-ep/run',
       'POST https://api.runpod.ai/v2/mv-ep/cancel/mv-1',
     ]);
+  });
+
+  it('asks TRELLIS.2 for texture options and passes on what it made', async () => {
+    const texture = (k: number, more: object = {}) => ({
+      texture_seed: 77 + 1000 * k,
+      glb: {
+        key: `ai/gen-7/final-77-texture-${k}.glb`,
+        url: `https://r2.test/ai/gen-7/final-77-texture-${k}.glb`,
+      },
+      bytes: 1_550_172,
+      raw_bytes: 8_915_432,
+      triangles: 96_205,
+      projection: { applied: true, reason: 'applied', iou: 0.9755 },
+      ...more,
+    });
+    const api = fakeJobApi([
+      { id: 'fc-tex', status: 'IN_QUEUE' },
+      { id: 'fc-tex', status: 'IN_PROGRESS' },
+      {
+        id: 'fc-tex',
+        status: 'COMPLETED',
+        output: {
+          request_id: 'gen-7',
+          mode: 'textures',
+          seed: 77,
+          textures: [
+            texture(1),
+            texture(3, {
+              glb: { key: 'ai/gen-7/final-77-texture-3.glb', url: null, base64: 'Z2xURg==' },
+            }),
+            // Without its file or its seed, a texture can't be offered
+            texture(4, { glb: undefined }),
+            texture(5, { texture_seed: '5077' }),
+          ],
+          texture_errors: [{ texture_seed: 2077, error: 'ConnectionError: R2 unreachable' }],
+          pipeline: '1024_cascade',
+          model: 'trellis2',
+          views_used: 1,
+          timings: {
+            generate_s: 27.7,
+            retexture_s: 30.6,
+            export_s: 70.8,
+            pack_s: 4.5,
+            upload_s: 0.9,
+          },
+          credits: ['Built with DINOv3', '3D generation: TRELLIS.2 (Microsoft, MIT)'],
+        },
+      },
+      {
+        id: 'fc-512',
+        status: 'COMPLETED',
+        output: {
+          request_id: 'gen-7',
+          mode: 'textures',
+          seed: 77,
+          textures: [texture(1)],
+          pipeline: '512',
+          timings: { generate_s: 10, retexture_s: 9.5 },
+        },
+      },
+      // Where the finals are Pixal3D's (the recipe)
+      {
+        id: 'fc-pixal',
+        status: 'COMPLETED',
+        output: { error: 'texture options need TRELLIS.2 finals' },
+      },
+      // A final says which pipeline made it
+      { id: 'fc-final', status: 'COMPLETED', output: { ...trellisOutput, pipeline: '512' } },
+      { id: 'fc-tex-2', status: 'IN_QUEUE' },
+    ]);
+    const provider = createSelfHostedProvider(
+      { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
+      api.fetchImpl,
+    )!;
+    const picture = Buffer.from('picture');
+    const views = [{ image: Buffer.from('back'), azimuth: 180, elevation: 0 }];
+    expect(
+      await provider.startTextures({
+        image: picture,
+        views,
+        seed: 77,
+        count: 3,
+        requestId: 'gen-7',
+      }),
+    ).toBe('fc-tex');
+    expect(await provider.textures('fc-tex')).toEqual({ status: 'running' });
+    expect(await provider.textures('fc-tex')).toStrictEqual({
+      status: 'done',
+      output: {
+        textures: [
+          {
+            file: { url: 'https://r2.test/ai/gen-7/final-77-texture-1.glb' },
+            textureSeed: 1077,
+            triangles: 96_205,
+            bytes: 1_550_172,
+          },
+          {
+            file: { data: Buffer.from('Z2xURg==', 'base64') },
+            textureSeed: 3077,
+            triangles: 96_205,
+            bytes: 1_550_172,
+          },
+        ],
+        errors: [{ textureSeed: 2077, message: 'ConnectionError: R2 unreachable' }],
+        pipeline: '1024_cascade',
+        seconds: expect.closeTo(134.5, 5),
+      },
+    });
+    expect(await provider.textures('fc-512')).toMatchObject({
+      status: 'done',
+      output: { errors: [], pipeline: '512', seconds: expect.closeTo(19.5, 5) },
+    });
+    expect(await provider.textures('fc-pixal')).toEqual({
+      status: 'failed',
+      message: 'texture options need TRELLIS.2 finals',
+    });
+    expect(await provider.model('fc-final')).toMatchObject({
+      status: 'done',
+      output: { seed: 77, pipeline: '512' },
+    });
+    // Without views, none are sent
+    await provider.startTextures({ image: picture, seed: 77, count: 1, requestId: 'gen-7' });
+
+    expect(
+      api.calls.map((call) => `${call.method} ${call.url.replace('https://w.modal.run', '')}`),
+    ).toEqual([
+      'POST /trellis2/run',
+      'GET /trellis2/status/fc-tex',
+      'GET /trellis2/status/fc-tex',
+      'GET /trellis2/status/fc-512',
+      'GET /trellis2/status/fc-pixal',
+      'GET /trellis2/status/fc-final',
+      'POST /trellis2/run',
+    ]);
+    // The final's picture, seed and views, inline as for the final
+    expect(api.calls[0]!.body).toEqual({
+      input: {
+        image_base64: picture.toString('base64'),
+        views: [
+          { image_base64: Buffer.from('back').toString('base64'), azimuth: 180, elevation: 0 },
+        ],
+        mode: 'textures',
+        seed: 77,
+        count: 3,
+        request_id: 'gen-7',
+      },
+    });
+    expect(api.calls[6]!.body).toEqual({
+      input: {
+        image_base64: picture.toString('base64'),
+        mode: 'textures',
+        seed: 77,
+        count: 1,
+        request_id: 'gen-7',
+      },
+    });
+  });
+
+  it('makes texture options unless AI_TEXTURE_OPTIONS is 0 or false', () => {
+    expect(textureOptionsEnabled({})).toBe(true);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: '' })).toBe(true);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: '1' })).toBe(true);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'true' })).toBe(true);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: '0' })).toBe(false);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: ' 0\n' })).toBe(false);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'false' })).toBe(false);
+    expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: 'FALSE' })).toBe(false);
+    // The mock workers make them too, so development works end to end
+    expect(createStudioWorkers({ AI_WORKERS_MOCK: '1' })!.startTextures).toBeTypeOf('function');
   });
 
   it('turns the views step on only with AI_MULTIVIEW=1', () => {

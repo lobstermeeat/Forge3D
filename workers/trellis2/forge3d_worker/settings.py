@@ -1,11 +1,13 @@
-"""Generation presets for the two passes of the funnel: a cheap preview and the final asset."""
+"""Generation presets for the funnel's two passes (a cheap preview, the final asset), and texture options."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, get_args
 
-Mode = Literal["preview", "final"]
+# "textures" makes more textures for a final's shape (texture options; see TEXTURE_SEED_STEP below)
+Mode = Literal["preview", "final", "textures"]
+MODES: tuple[str, ...] = get_args(Mode)
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,15 @@ PRESETS: dict[str, Preset] = {
         pipeline_type="1024_cascade", max_faces=100_000, texture_size=2048, remesh=True, project_picture=True
     ),
 }
+
+# Texture options (mode "textures"): the final's shape is made again (the final's preset, seed and views),
+# then TRELLIS.2 samples new textures for it, each exported as a final is. Texture k of count (1 to
+# MAX_TEXTURES, TEXTURE_COUNT if the job doesn't say) draws its noise from seed + TEXTURE_SEED_STEP * k:
+# the seeds of Phase 7's rolls, where a reviewer picking the best of four textures of one shape took the
+# test set from 10 publishable finals of 20 to 16.
+TEXTURE_SEED_STEP = 1000
+TEXTURE_COUNT = 3
+MAX_TEXTURES = 4
 
 ViewMode = Literal["stochastic", "multidiffusion"]
 

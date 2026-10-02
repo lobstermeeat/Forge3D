@@ -20,6 +20,8 @@ multi-view weights with the picture as their one view (the single-view weights f
 object), levelled, then the usual export. Both run in the Trellis2 container, so the server's contract
 (worker "trellis2", mode "preview" | "final") is the same either way. Phase 6's re-test kept TRELLIS.2
 as the default: the recipe fixed made-up backs but lost more on textures (README.md, "The recipe").
+Texture options (mode "textures": more textures for a final's shape) are TRELLIS.2's alone, so with the
+recipe on they are refused.
 
 The GPU code is the same as in the RunPod images (trellis2/, flux-schnell/); only the entry
 points differ. The job API (job_api.py) speaks RunPod's protocol, so the server's client works
@@ -311,7 +313,8 @@ def choose_model(job: dict, final_model: str, loaded: Collection[str]) -> str:
     Finals are the final model's (FINAL_MODEL) when it is loaded or still loading, else TRELLIS.2's. A
     final carrying ``views`` (the Studio's AI_MULTIVIEW step, off by default) is Pixal3D's too: its
     multi-view weights build from the views (the Pixal3D worker's contract), while TRELLIS.2 steers its
-    flows with them for the preview.
+    flows with them for the preview. Texture options ("textures") are TRELLIS.2's (handle_with_models
+    refuses them when the finals are another model's).
     """
     payload = job.get("input")
     payload = payload if isinstance(payload, dict) else {}
@@ -402,6 +405,13 @@ def _ran_out_of_memory(result: dict) -> bool:
     return "out of memory" in str(result.get("error", "")).lower()
 
 
+# What a textures job gets with the recipe on (forge3d_worker/service.py gives the same to a runtime that
+# can't retexture): texture options remake the final's shape with TRELLIS.2 and retexture it, and a
+# Pixal3D final has another shape. Even a container whose Pixal3D isn't loaded refuses them: the final
+# may have come from one whose Pixal3D was
+TEXTURES_NEED_TRELLIS2 = "texture options need TRELLIS.2 finals"
+
+
 def handle_with_models(
     job: dict,
     pool: ModelPool,
@@ -418,7 +428,11 @@ def handle_with_models(
     instead, with Pixal3D's models off the GPU meanwhile (which also clears the stale CUDA error a
     CuMesh failure leaves), and says so in ``"fallback"``: a model the user keeps is worth more than an
     error. A final made with TRELLIS.2 because the final model isn't there says why in ``"fallback"`` too.
+    A textures job is refused unless the finals are TRELLIS.2's (TEXTURES_NEED_TRELLIS2); nothing runs.
     """
+    if _is_textures(job) and final_model != "trellis2":
+        print(f"[orainge] a textures job refused: the finals are {final_model}'s")
+        return {"error": TEXTURES_NEED_TRELLIS2}
     name = choose_model(job, final_model, pool.loaded)
     runtime = pool.use(name)
     if runtime is None:  # it failed to load since the choice was made
@@ -446,6 +460,11 @@ def handle_with_models(
 def _is_final(job: dict) -> bool:
     payload = job.get("input")
     return not isinstance(payload, dict) or payload.get("mode", "final") == "final"
+
+
+def _is_textures(job: dict) -> bool:
+    payload = job.get("input")
+    return isinstance(payload, dict) and payload.get("mode") == "textures"
 
 
 def _call_quietly(runtime: Any, method: str) -> None:
@@ -479,7 +498,8 @@ class Trellis2:
     """
     Image to textured, web-packed GLB. Input and output as in README.md (Job contracts). Previews are
     TRELLIS.2's, and so are finals unless FINAL_MODEL is "pixal3d" (the recipe), in one container, so a
-    preview's seed carries into its final the way it always has.
+    preview's seed carries into its final the way it always has. Texture options for a TRELLIS.2 final
+    (mode "textures") are made here too.
     """
 
     @modal.enter()
@@ -700,8 +720,8 @@ def _download(name: str, force: bool) -> None:
 def api():
     """
     https://<workspace>--orainge-ai-api.modal.run: set it as the server's AI_WORKERS_URL. Worker
-    "trellis2" takes previews and finals alike (the Trellis2 container routes finals to the Pixal3D
-    recipe); "multiview" is there for the Studio's AI_MULTIVIEW step, which is off by default.
+    "trellis2" takes previews, finals and texture options alike (the Trellis2 container routes finals to
+    the Pixal3D recipe); "multiview" is there for the Studio's AI_MULTIVIEW step, which is off by default.
     """
     from job_api import ModalCalls, app_for_token
 

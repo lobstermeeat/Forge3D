@@ -151,6 +151,24 @@ def test_run_queues_only_the_input(client, calls):
     assert calls.spawned == [("trellis2", {"input": body["input"]})]
 
 
+def test_texture_options_pass_through_untouched(client, calls):
+    """The API checks no modes: a textures job reaches the worker as sent, and its result comes back."""
+    body = {"input": {"image_url": "https://assets.example.com/cat.png", "mode": "textures", "seed": 7, "count": 4}}
+    assert client.post("/trellis2/run", json=body, headers=AUTH).json() == {"id": "fc-1", "status": "IN_QUEUE"}
+    assert calls.spawned == [("trellis2", body)]
+    # Some textures made and one failed is a completed job; only an "error" fails it
+    output = {
+        "mode": "textures",
+        "textures": [{"texture_seed": 1007, "glb": {"key": "ai/gen_1/final-7-texture-1.glb", "url": None}}],
+        "texture_errors": [{"texture_seed": 2007, "error": "ConnectionError: R2 unreachable"}],
+    }
+    calls.outcomes = {"fc-1": output, "fc-2": {"error": "texture options need TRELLIS.2 finals"}}
+    response = client.get("/trellis2/status/fc-1", headers=AUTH).json()
+    assert response == {"id": "fc-1", "status": "COMPLETED", "output": output}
+    response = client.get("/trellis2/status/fc-2", headers=AUTH).json()
+    assert response == {"id": "fc-2", "status": "FAILED", "error": "texture options need TRELLIS.2 finals"}
+
+
 @pytest.mark.parametrize("body", [None, [], {"input": "cat.png"}, {"prompt": "a teapot"}])
 def test_rejects_bodies_without_an_input_object(client, calls, body):
     response = client.post("/reference/run", json=body, headers=AUTH)
