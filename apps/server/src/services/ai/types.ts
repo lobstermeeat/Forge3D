@@ -117,6 +117,13 @@ export interface TexturesOutput {
   pipeline?: string;
   /** GPU seconds the job took */
   seconds: number;
+  /**
+   * The judge's pick, when it was asked (AI_TEXTURE_JUDGE=1): the texture a creator would rather
+   * use, by its seed (null for the final's own texture), and why in one sentence.
+   */
+  judge?: { textureSeed: number | null; why: string };
+  /** Why the judge gave no pick, when it was asked. The textures are offered all the same. */
+  judgeError?: string;
 }
 
 /** Where a view of the object was drawn from, in degrees (see workers/README.md, multiview). */
@@ -189,6 +196,11 @@ export interface StudioWorkers {
     seed: number;
     count: number;
     requestId: string;
+    /**
+     * Also ask the judge which texture a creator would rather use, the final's own among them
+     * (AI_TEXTURE_JUDGE=1). `prompt` is what the user typed; empty for a photo.
+     */
+    judge?: { prompt: string };
   }): Promise<string>;
   textures?(jobId: string): Promise<WorkerJobState<TexturesOutput>>;
 }

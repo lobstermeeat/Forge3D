@@ -6,19 +6,23 @@ import contextlib
 import gc
 import json
 import os
+import time
 import traceback
 from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Optional, Sequence
 
 from PIL import Image
 
-from . import cleanup, multiview, normals, projection, uv_raster
+from . import cleanup, multiview, normals, projection, rebake, uv_raster
 from .inputs import InputError, View
 from .settings import MULTIVIEW, MultiView, Preset
 
 MODEL_DIR = os.environ.get("TRELLIS2_MODEL_DIR", "/models/TRELLIS.2-4B")
 # The background-removed picture (RGBA, full frame) travels from generate() to export() on the mesh
 CUTOUT = "forge3d_cutout"
+# A retexture()'s mesh carries the Latent it was decoded from, so export() can keep that shape's texture
+# layout for its next texture (rebake.py); keep_layout() puts it on a generated mesh
+SHAPE = "forge3d_shape"
 
 
 class WeightMismatchError(RuntimeError):
@@ -82,6 +86,11 @@ def unpremultiply(texture: Image.Image, floor: float = ALPHA_FLOOR) -> Image.Ima
 def _one_line(err: BaseException) -> str:
     """An error's message on one line, whatever its own line breaks (CuMesh's span several)."""
     return " ".join(str(err).split())
+
+
+def _since(started: float) -> float:
+    """Seconds since ``started`` (time.perf_counter()), to the millisecond."""
+    return round(time.perf_counter() - started, 3)
 
 
 class _KeepCutout:
@@ -254,6 +263,17 @@ class Trellis2Runtime:
     last_retexture: Optional[dict] = None
     # What the last export() dropped as floating pieces (None when the preset has the cleanup off)
     last_cleanup: Optional[dict] = None
+    # Texture options: the second and later exports of a retextured shape sample only their texture, on the
+    # layout to_glb worked out for the first (rebake.py). Experiments turn this off to compare: then every
+    # export runs to_glb in full, and no layout is used or kept
+    rebake_textures: bool = True
+    # The texture layout of the last retextured shape exported in full (or of a generation's own texture that
+    # keep_layout() marked); generate() drops it (a new job)
+    texture_layout: Optional[rebake.TextureLayout] = None
+    # How the last export() made its mesh: {"path": "to_glb" | "rebake", "seconds": ...}, with "captured"
+    # when to_glb's layout was kept, "capture_error" when it couldn't be, and "fallback" saying why a kept
+    # layout wasn't used
+    last_export: Optional[dict] = None
 
     def __init__(self, model_dir: str = MODEL_DIR) -> None:
         _configure_environment()
@@ -281,8 +301,10 @@ class Trellis2Runtime:
         goes to that pipeline at once. pipeline_used then says which pipeline made the mesh.
 
         last_latent then holds the mesh's shape latent for retexture(); a failed generation leaves none.
+        Either way the texture layout kept for the last shape goes: layouts never outlive their job.
         """
         self.last_latent = None
+        self.texture_layout = None
         try:
             return self._generate(image, preset, seed, views)
         except BaseException:
@@ -435,7 +457,8 @@ class Trellis2Runtime:
         A new texture for the last generation's shape (or ``latent``'s, a past ``last_latent``): only the
         texture flow samples again, on the picture's condition at its resolution (as run() does: 1024, or
         512 for a '512' shape), and decode_latent decodes the same shape with it. Returns a mesh for
-        export(), with the picture's cutout on it so the projection still paints the picture on.
+        export(), with the picture's cutout on it so the projection still paints the picture on, and the
+        latent (SHAPE), so export() can reuse the shape's texture layout from one texture to the next.
 
         ``sampler_params`` go over the texture sampler's defaults (TRELLIS.2-4B: 12 steps, guidance_strength
         1, guidance_rescale 0, guidance_interval [0.6, 0.9], rescale_t 3). The noise is fixed, so variants
@@ -525,7 +548,29 @@ class Trellis2Runtime:
                 setattr(mesh, CUTOUT, latent.cutout)
             except (AttributeError, TypeError):  # a mesh that takes no attributes is exported unprojected
                 pass
+        try:
+            setattr(mesh, SHAPE, latent)
+        except (AttributeError, TypeError):  # nor does it get a texture layout: to_glb runs in full each time
+            pass
         return mesh
+
+    def keep_layout(self, mesh: Any) -> bool:
+        """
+        Marks ``mesh``, the one the last generate() returned, with the shape it was made from (SHAPE), as
+        retexture() marks its meshes: export() then keeps its texture layout, and that shape's retextures
+        rebake on it. A textures job that asks the judge does this to the generation's own texture, which
+        it exports first. Nothing else does, so a final's export runs to_glb unwatched, as it always has.
+        Returns whether the mesh was marked: not when the last generation's latent wasn't kept, nor when
+        the mesh takes no attributes (its export then runs to_glb in full and keeps nothing).
+        """
+        latent = self.last_latent
+        if latent is None:
+            return False
+        try:
+            setattr(mesh, SHAPE, latent)
+        except (AttributeError, TypeError):
+            return False
+        return True
 
     def _offload(self) -> None:
         """Switches to upstream's low-VRAM mode, which puts each model on the GPU only while it runs."""
@@ -585,11 +630,14 @@ class Trellis2Runtime:
         """
         Mesh to GLB. Running out of GPU memory (remeshing a complex final) gets one retry the same way.
         ``last_projection`` then summarises the picture's projection, and ``last_cleanup`` what was
-        dropped as floating pieces (each None when the preset has it off).
+        dropped as floating pieces (each None when the preset has it off). ``last_export`` says how
+        to_glb's mesh was made: by to_glb in full, or for a retextured shape's later textures by sampling
+        only the texture on the layout its first texture kept (see _textured).
         """
         self.last_projection: Optional[dict] = None
         self.last_before_projection: Any = None
         self.last_cleanup = None
+        self.last_export = None
         try:
             return self._export(mesh, preset)
         except Exception as err:
@@ -610,20 +658,7 @@ class Trellis2Runtime:
         # CuMesh (to_glb's remesh) allocates outside torch's cache, so hand that cache back to CUDA first:
         # what the generation, or the last job's projection, left reserved would otherwise not be free
         self._free_gpu_memory()
-        glb = self._o_voxel.postprocess.to_glb(
-            vertices=mesh.vertices,
-            faces=mesh.faces,
-            attr_volume=mesh.attrs,
-            coords=mesh.coords,
-            attr_layout=mesh.layout,
-            voxel_size=mesh.voxel_size,
-            aabb=[[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
-            decimation_target=preset.max_faces,
-            texture_size=preset.texture_size,
-            remesh=preset.remesh,
-            remesh_band=1,
-            remesh_project=0,
-        )
+        glb = self._textured(mesh, preset)
         material = glb.visual.material
         textured = getattr(material, "baseColorTexture", None) is not None
         if textured:
@@ -638,6 +673,77 @@ class Trellis2Runtime:
             self.last_projection = self._project(glb, getattr(mesh, CUTOUT, None))
         glb = shade(glb, mesh.voxel_size)
         return glb.export(file_type="glb"), int(len(glb.faces))
+
+    def _textured(self, mesh: Any, preset: Preset) -> Any:
+        """
+        to_glb's textured mesh for ``mesh``, noted in last_export. A mesh retexture() made carries its shape
+        (SHAPE), and so does a generated one that keep_layout() marked. When the texture layout kept for that
+        shape fits it, only its texture is sampled again (rebake.py). Otherwise to_glb runs in full, watched,
+        and its layout is kept for the shape's next texture. Any other mesh (a preview's, a final's) goes
+        through to_glb exactly as before, unwatched.
+        The layout only saves time: a rebake that fails falls back to to_glb in full, and a layout that
+        can't be kept fails nothing.
+        """
+        postprocess = self._o_voxel.postprocess
+        options = {
+            "attr_layout": mesh.layout,
+            "voxel_size": mesh.voxel_size,
+            "aabb": [[-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]],
+            "decimation_target": preset.max_faces,
+            "texture_size": preset.texture_size,
+            "remesh": preset.remesh,
+            "remesh_band": 1,
+            "remesh_project": 0,
+        }
+
+        def to_glb() -> Any:
+            return postprocess.to_glb(
+                vertices=mesh.vertices, faces=mesh.faces, attr_volume=mesh.attrs, coords=mesh.coords, **options
+            )
+
+        shape = getattr(mesh, SHAPE, None) if self.rebake_textures else None
+        if shape is None:
+            started = time.perf_counter()
+            glb = to_glb()
+            self.last_export = {"path": "to_glb", "seconds": _since(started)}
+            return glb
+        notes: dict = {}
+        if self.texture_layout is not None:
+            started = time.perf_counter()
+            glb, reason = self._rebaked(mesh, shape, options, postprocess)
+            if glb is not None:
+                return self._noted(glb, {"path": "rebake", "seconds": _since(started)})
+            notes["fallback"] = reason
+        started = time.perf_counter()
+        with rebake.capturing(postprocess) as watch:
+            glb = to_glb()
+        try:
+            self.texture_layout = rebake.keep(watch, glb, mesh, shape, options)
+            notes["captured"] = True
+        except Exception as err:  # noqa: BLE001 - the mesh is made; only the shape's next textures lose the saving
+            self.texture_layout = None
+            notes["capture_error"] = f"{type(err).__name__}: {_one_line(err)}"
+        return self._noted(glb, {"path": "to_glb", "seconds": _since(started), **notes})
+
+    def _rebaked(self, mesh: Any, shape: Any, options: dict, postprocess: Any) -> tuple[Optional[Any], str]:
+        """to_glb's mesh made on the kept layout, or None and why not. A layout that fails is dropped."""
+        try:
+            reason = rebake.unfit(self.texture_layout, mesh, shape, options)
+            if reason is not None:
+                return None, reason
+            return rebake.rebake(self.texture_layout, mesh, postprocess), ""
+        except Exception as err:  # noqa: BLE001 - the layout only saves time: to_glb makes the mesh instead
+            reason = f"the rebake failed: {type(err).__name__}: {_one_line(err)}"
+            # Its traceback holds what it allocated on the GPU: let go of that before CuMesh runs
+            traceback.clear_frames(err.__traceback__)
+        self.texture_layout = None
+        self._free_gpu_memory()
+        return None, reason
+
+    def _noted(self, glb: Any, export: dict) -> Any:
+        self.last_export = export
+        print(f"[forge3d] export: {json.dumps(export)}")
+        return glb
 
     @staticmethod
     def _drop_floaters(glb: Any) -> dict:

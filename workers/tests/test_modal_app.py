@@ -5,8 +5,10 @@ import base64
 import io
 import json
 import pathlib
+import random
 import re
 import subprocess
+import types
 
 import pytest
 
@@ -50,7 +52,10 @@ def test_defines_the_workers_the_api_and_the_helpers():
     assert isinstance(modal_app.FluxSchnell, modal.Cls)
     assert isinstance(modal_app.MultiView, modal.Cls)
     assert isinstance(modal_app.GeometryViews, modal.Cls)
-    assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d"]  # download order
+    assert isinstance(modal_app.Judge8B, modal.Cls) and isinstance(modal_app.Judge30B, modal.Cls)
+    # Download order; the judge's last, and only when asked for: the 8B alone, or both sizes
+    assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d", "judge8b", "judge"]
+    assert modal_app.ON_REQUEST_WEIGHTS == ("judge8b", "judge")
     assert isinstance(modal_app.download_models, modal.Function)
     assert isinstance(modal_app.api, modal.Function)
     assert isinstance(modal_app.make_model, modal.Function)
@@ -187,6 +192,354 @@ def test_geometry_views_loads_the_model_once_and_handles_jobs(tmp_path, monkeypa
     out = handle({"id": "fc-01K6", "image_base64": base64.b64encode(picture.getvalue()).decode(), "control_pngs": control})
     assert len(out["views"]) == 6 and out["timings"] == {"views_s": 1.0} and built == [str(models)]
     assert handle({"id": "fc-01K7", "control_pngs": control}) == {"error": "invalid input: image_base64 must be a base64 string"}
+
+
+# The judge: Qwen3-VL in two sizes; production asks the 8B when a textures job says "judge": true
+
+
+def class_options(name):
+    """A Modal class's decorator keywords, as written in modal_app.py (None: what ** spreads in)."""
+    tree = ast.parse((WORKERS / "modal_app.py").read_text())
+    cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == name)
+    return cls, {keyword.arg: keyword.value for keyword in cls.decorator_list[0].keywords}
+
+
+def test_judge8b_is_set_up_for_production_and_judge30b_for_experiments():
+    for name, size in (("Judge8B", "8b"), ("Judge30B", "30b")):
+        cls, options = class_options(name)
+        assert ast.unparse(options["gpu"]) == f"JUDGE_GPUS['{size}']" and ast.unparse(options[None]) == "JUDGE_OPTIONS"
+        assert [node.name for node in cls.body if isinstance(node, ast.FunctionDef)] == ["load", "judge", "warm"]
+        assert f"judge_handler('{size}')" in ast.unparse(cls)
+    # 17.5 GB of weights fit an L40S, where Phase 7 measured it; 62 GB need an H100's 80
+    assert modal_app.JUDGE_GPUS == {"8b": "L40S", "30b": "H100"}
+    _, options = class_options("Judge8B")
+    settings = {name: ast.literal_eval(options[name]) for name in ("timeout", "startup_timeout", "scaledown_window")}
+    # A judgement takes about 9 s; the 17.5 GB load took 16 s. It stays up past a textures job's wait between
+    # its warm-up and its question (a minute or so), and not much longer: idle time is billed
+    assert settings == {"timeout": 300, "startup_timeout": 600, "scaledown_window": 120}
+    _, options = class_options("Judge30B")
+    settings = {name: ast.literal_eval(options[name]) for name in ("timeout", "startup_timeout", "scaledown_window")}
+    assert settings == {"timeout": 900, "startup_timeout": 1200, "scaledown_window": 300}
+    shared = modal_app.JUDGE_OPTIONS
+    assert shared["image"] is modal_app.judge_image and shared["max_containers"] == 1
+    assert shared["volumes"] == {modal_app.MODELS: modal_app.models}
+    assert not {"secrets", "timeout", "startup_timeout", "scaledown_window", "gpu"} & set(shared)  # inline results; set per size
+    # The job API routes nothing to it: the Trellis2 container asks it
+    tree = ast.parse((WORKERS / "modal_app.py").read_text())
+    api = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "api")
+    assert "Judge" not in ast.unparse(api)
+    builds = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "build_images")
+    assert "('judge', judge_image)" in ast.unparse(builds)
+
+
+def test_judge_class_picks_the_class_for_a_size():
+    assert modal_app.judge_class("8b") is modal_app.Judge8B and modal_app.judge_class("30b") is modal_app.Judge30B
+    with pytest.raises(ValueError, match="8b, 30b, not '70b'"):
+        modal_app.judge_class("70b")
+
+
+def test_the_judge_image_installs_its_pinned_requirements():
+    requirements = (WORKERS / "judge" / "requirements.txt").read_text()
+    assert "transformers==4.57.6" in requirements and "accelerate==" in requirements  # Qwen3-VL: 4.57 on
+    assert re.search(r"pip_install_from_requirements\(str\(WORKERS / \"judge\" / \"requirements.txt\"\)\)", (WORKERS / "modal_app.py").read_text())
+    # The revisions the notice records are the ones the download script pins
+    notice = (WORKERS / "judge" / "NOTICE.md").read_text()
+    script = (WORKERS / "judge" / "scripts" / "download_weights.py").read_text()
+    for revision in re.findall(r'"Qwen/Qwen3-VL-[\w-]+", "([0-9a-f]{40})"', script):
+        assert f"`{revision}`" in notice
+    assert len(re.findall(r'"Qwen/Qwen3-VL-[\w-]+", "([0-9a-f]{40})"', script)) == 2
+
+
+@pytest.fixture
+def judge_models(tmp_path, monkeypatch):
+    """An empty models volume for the judge's weights markers."""
+    models = tmp_path / "models"
+    models.mkdir()
+    monkeypatch.setattr(modal_app, "MODELS", str(models))
+    return models
+
+
+def test_the_judge_loads_its_model_once_and_handles_jobs(judge_models, monkeypatch):
+    monkeypatch.syspath_prepend(str(WORKERS / "judge"))
+    from PIL import Image
+
+    from judge_worker import model as judge_model
+
+    built = []
+
+    class Model:
+        path = "/models/Qwen3-VL-30B-A3B-Instruct"
+        load_seconds = 42.0
+
+        def __init__(self, which, models_root, **options):
+            built.append((which, models_root))
+
+        def __call__(self, messages, max_new_tokens=1024):
+            return '{"K": "edits", "L": "publish", "best": "L", "why": "cleaner back"}'
+
+    monkeypatch.setattr(judge_model, "QwenVL", Model)
+    with pytest.raises(RuntimeError, match="download_models --which judge$"):
+        modal_app.judge_handler("30b")
+
+    (judge_models / ".judge-weights").write_text("digest")
+    handle = modal_app.judge_handler("30b")
+    assert built == [("30b", str(judge_models))]
+
+    def png(colour):
+        buffer = io.BytesIO()
+        Image.new("RGB", (48, 32), colour).save(buffer, format="PNG")
+        return base64.b64encode(buffer.getvalue()).decode()
+
+    # run_job adds the call's id to the job
+    job = {"id": "fc-01K6", "picture_png": png("white"), "candidates_png": [png("red"), png("blue")], "prompt": "a lamp"}
+    out = handle(job)
+    assert out["best"] == 1 and out["verdicts"] == ["edits", "publish"] and out["model"] == "30b"
+    assert out["why"] == "cleaner back" and built == [("30b", str(judge_models))]
+    assert handle({"id": "fc-01K7", "candidates_png": []}) == {"error": "invalid input: picture_png must be a base64 string"}
+
+
+def test_the_8b_loads_from_its_own_download_or_from_both_sizes(judge_models, monkeypatch):
+    monkeypatch.syspath_prepend(str(WORKERS / "judge"))
+    from judge_worker import model as judge_model
+
+    monkeypatch.setattr(judge_model, "QwenVL", lambda which, root, **options: types.SimpleNamespace(path=which, load_seconds=1.0))
+    assert modal_app.JUDGE_WEIGHTS == {"8b": ("judge8b", "judge"), "30b": ("judge",)}
+    missing = (
+        "the judge's 8b weights are missing or incomplete in the orainge-models volume: "
+        "modal run workers/modal_app.py::download_models --which judge8b"
+    )
+    assert modal_app.judge_weights_missing("8b") == missing
+    with pytest.raises(RuntimeError, match=re.escape(missing)):
+        modal_app.judge_handler("8b")
+    (judge_models / ".judge8b-weights").write_text("digest")
+    assert modal_app.judge_weights_missing("8b") is None and callable(modal_app.judge_handler("8b"))
+    assert "--which judge" in modal_app.judge_weights_missing("30b")  # the 8B's download hasn't the 30B
+    (judge_models / ".judge8b-weights").unlink()
+    (judge_models / ".judge-weights").write_text("digest")
+    assert modal_app.judge_weights_missing("8b") is None and modal_app.judge_weights_missing("30b") is None
+
+
+@pytest.mark.filterwarnings("ignore:The download_models function is executing locally")
+def test_downloading_all_leaves_the_judge_out(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(modal_app, "_download", lambda name, force: fetched.append(name))
+
+    class Volume:
+        def commit(self):
+            fetched.append("commit")
+
+    monkeypatch.setattr(modal_app, "models", Volume())
+    modal_app.download_models.local(which="all")
+    assert [name for name in fetched if name != "commit"] == ["trellis2", "reference", "multiview", "pixal3d"]
+    for which in ("judge8b", "judge"):
+        fetched.clear()
+        modal_app.download_models.local(which=which)
+        assert fetched == [which, "commit"]
+    with pytest.raises(SystemExit, match="--which must be all, trellis2, reference, multiview, pixal3d, judge8b, judge"):
+        modal_app.download_models.local(which="qwen")
+
+
+def test_judge8b_fetches_the_8b_alone_and_judge_both_sizes(tmp_path, monkeypatch):
+    """The judge's script runs for both, told which sizes by WHICH, and each download keeps its own marker."""
+    told = tmp_path / "which.txt"
+    script = tmp_path / "judge_weights.py"
+    script.write_text(f"import os\nwith open({str(told)!r}, 'a') as f: f.write(os.environ['WHICH'] + '\\n')\n")
+    models = tmp_path / "models"
+    models.mkdir()
+    monkeypatch.setattr(modal_app, "MODELS", str(models))
+    monkeypatch.setattr(modal_app, "WEIGHT_SCRIPTS", {**modal_app.WEIGHT_SCRIPTS, "judge8b": str(script), "judge": str(script), "pixal3d": str(script)})
+    modal_app._download("judge8b", force=False)
+    assert told.read_text().split() == ["8b"] and (models / ".judge8b-weights").exists()
+    assert not (models / ".judge-weights").exists()
+    modal_app._download("judge", force=False)
+    modal_app._download("pixal3d", force=False)
+    assert told.read_text().split() == ["8b", "all", modal_app.PIXAL3D_WEIGHTS]
+    modal_app._download("judge8b", force=False)  # already there
+    assert len(told.read_text().split()) == 3
+
+
+class FakeCall:
+    """A Modal FunctionCall: get() gives ``result`` or raises ``error``; cancel() is noted."""
+
+    def __init__(self, result=None, error=None, cancel_error=None):
+        self.result, self.error, self.cancel_error = result, error, cancel_error
+        self.waited = []
+        self.cancelled = False
+
+    def get(self, timeout=None):
+        self.waited.append(timeout)
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+    def cancel(self):
+        self.cancelled = True
+        if self.cancel_error is not None:
+            raise self.cancel_error
+
+
+class FakeMethod:
+    def __init__(self, call):
+        self.call = call
+        self.spawned = []
+
+    def spawn(self, *args):
+        self.spawned.append(args)
+        return self.call
+
+
+class FakeJudgeClass:
+    """Judge8B as TextureJudge calls it: Judge8B().judge.spawn(request), Judge8B().warm.spawn()."""
+
+    def __init__(self, call):
+        self.judge = FakeMethod(call)
+        self.warm = FakeMethod(FakeCall(True))
+        self.made = 0
+
+    def __call__(self):
+        self.made += 1
+        return self
+
+
+ANSWER = {"verdicts": ["edits", "publish", "edits"], "best": 1, "why": "L has the cleanest back", "seconds": 8.6, "model": "8b"}
+
+
+def test_the_texture_judge_is_judge8b_and_checks_its_weights_before_calling(judge_models, monkeypatch):
+    with pytest.raises(ValueError, match="not '70b'"):
+        modal_app.TextureJudge("70b")  # a wrong size fails where the container starts, not in a job
+    sizes = []
+    fake = FakeJudgeClass(FakeCall(ANSWER))
+    monkeypatch.setattr(modal_app, "judge_class", lambda size: sizes.append(size) or fake)
+    judge = modal_app.TextureJudge()
+    assert (judge.size, judge.model, judge.wait) == ("8b", "8b", 180.0) == (modal_app.JUDGE_SIZE, "8b", modal_app.JUDGE_WAIT)
+    missing = modal_app.judge_weights_missing("8b")
+    assert judge.unavailable() == missing and missing.endswith("--which judge8b")
+    with pytest.raises(RuntimeError, match=re.escape(missing)):
+        judge({"order": [0, 1, 2]})
+    # Nothing was called: no container started for a judge that can't load
+    assert fake.made == 0 and fake.judge.spawned == []
+    for marker in (".judge8b-weights", ".judge-weights"):
+        (judge_models / marker).write_text("digest")
+        assert judge.unavailable() is None
+        (judge_models / marker).unlink()
+    assert set(sizes) == {"8b"}
+
+
+def test_the_texture_judge_waits_for_judge8b_at_most_its_wait(judge_models, monkeypatch, capsys):
+    (judge_models / ".judge8b-weights").write_text("digest")
+    call = FakeCall(ANSWER)
+    fake = FakeJudgeClass(call)
+    monkeypatch.setattr(modal_app, "judge_class", lambda size: fake)
+    judge = modal_app.TextureJudge()
+
+    assert judge({"order": [2, 0, 1]}) == ANSWER
+    assert fake.judge.spawned == [({"order": [2, 0, 1]},)] and call.waited == [180.0] and not call.cancelled
+    judge.warm()  # starts a container and doesn't wait
+    assert fake.warm.spawned == [()] and fake.warm.call.waited == []
+
+    # Too slow: the call is cancelled, so its GPU time stops, and the job hears why
+    for slow in (TimeoutError(), modal.exception.OutputExpiredError()):
+        call = FakeCall(error=slow)
+        fake.judge = FakeMethod(call)
+        with pytest.raises(TimeoutError, match="^the judge didn't answer within 180 s$"):
+            judge({"order": [0, 1, 2]})
+        assert call.cancelled
+    call = FakeCall(error=TimeoutError(), cancel_error=ConnectionError("Modal is unreachable"))
+    fake.judge = FakeMethod(call)
+    with pytest.raises(TimeoutError, match="within 180 s"):
+        judge({"order": [0, 1, 2]})
+    assert "[orainge] the judge's call was not cancelled: ConnectionError: Modal is unreachable" in capsys.readouterr().out
+    # Other failures go through as they are: the job reports them in its judge_error
+    call = FakeCall(error=ConnectionError("Modal is unreachable"))
+    fake.judge = FakeMethod(call)
+    with pytest.raises(ConnectionError):
+        judge({"order": [0, 1, 2]})
+    assert not call.cancelled
+
+
+class Trellis2Like:
+    """TRELLIS.2's runtime as a textures job drives it, with nothing on a GPU."""
+
+    def __init__(self):
+        self.calls = []
+
+    def generate(self, image, preset, seed, views=()):
+        self.calls.append("generate")
+        return types.SimpleNamespace(texture="final")
+
+    def keep_layout(self, mesh):
+        self.calls.append("keep_layout")
+        return True
+
+    def retexture(self, *, seed):
+        self.calls.append("retexture")
+        return types.SimpleNamespace(texture=seed)
+
+    def export(self, mesh, preset):
+        self.calls.append("export")
+        return f"glb {mesh.texture}".encode(), 99_000
+
+
+class Saved:
+    def __init__(self):
+        self.saved = {}
+
+    def put(self, key, data, content_type):
+        self.saved[key] = data
+        return {"key": key, "url": None, "base64": base64.b64encode(data).decode()}
+
+
+def test_the_trellis2_container_asks_judge8b_when_a_textures_job_says_so(judge_models, monkeypatch):
+    monkeypatch.syspath_prepend(str(WORKERS / "trellis2"))
+    from PIL import Image
+
+    from forge3d_worker import service
+
+    (judge_models / ".judge8b-weights").write_text("digest")
+    fake = FakeJudgeClass(FakeCall(ANSWER))
+    monkeypatch.setattr(modal_app, "judge_class", lambda size: fake)
+    # judgeviews would need real GLBs: each candidate is a small grey grid here
+    monkeypatch.setattr(service, "draw_candidate", lambda raw: Image.new("RGB", (8, 8), (100, 100, 100)))
+    runtime = Trellis2Like()
+    handle = modal_app.trellis2_handler(runtime, Saved(), lambda raw, limit: raw, "trellis2")
+
+    picture = io.BytesIO()
+    Image.new("RGB", (32, 32), (200, 80, 40)).save(picture, format="PNG")
+    textures = {"image_base64": base64.b64encode(picture.getvalue()).decode(), "mode": "textures", "seed": 7, "count": 2}
+    out = handle({"id": "fc-1", "input": {**textures, "judge": True, "prompt": "a lamp"}})
+
+    assert out["model"] == "trellis2" and len(out["textures"]) == 2
+    order = [0, 1, 2]
+    random.Random(7).shuffle(order)  # the job's seed
+    assert out["judge"] == {**{k: ANSWER[k] for k in ("verdicts", "why", "seconds", "model")}, "pick": 1, "order": order}
+    assert fake.warm.spawned == [()] and len(fake.judge.spawned) == 1
+    (request,) = fake.judge.spawned[0]
+    assert set(request) == {"picture_png", "candidates_png", "prompt", "order"} and len(request["candidates_png"]) == 3
+    assert request["prompt"] == "a lamp" and request["order"] == order
+    assert runtime.calls[:3] == ["generate", "keep_layout", "export"]
+
+    # Nothing else calls it: a textures job that doesn't ask, a preview, a final
+    for job in (textures, {**textures, "judge": False}, {**textures, "mode": "preview"}, {**textures, "mode": "final"}):
+        result = handle({"id": "fc-2", "input": job})
+        assert "error" not in result and not {"judge", "judge_error"} & set(result)
+    assert fake.warm.spawned == [()] and len(fake.judge.spawned) == 1
+
+    # Without the 8B's weights the judge's part is skipped at once, and the textures are made
+    (judge_models / ".judge8b-weights").unlink()
+    runtime.calls.clear()
+    out = handle({"id": "fc-3", "input": {**textures, "judge": True}})
+    assert out["judge_error"] == modal_app.judge_weights_missing("8b") and len(out["textures"]) == 2
+    assert "keep_layout" not in runtime.calls and fake.warm.spawned == [()] and len(fake.judge.spawned) == 1
+
+
+def test_the_trellis2_container_builds_its_handler_with_the_judge():
+    tree = ast.parse((WORKERS / "modal_app.py").read_text())
+    cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "Trellis2")
+    load = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == "load")
+    assert "self.handle = trellis2_handler(trellis2, storage, pack_glb, final_model)" in ast.unparse(load)
+    handler = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "trellis2_handler")
+    assert "functools.partial(handle_job, judge=judge)" in ast.unparse(handler)
+    assert "TextureJudge() if judge is None else judge" in ast.unparse(handler)
 
 
 # Two models in one container: TRELLIS.2 for previews, Pixal3D for finals

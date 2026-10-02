@@ -85,7 +85,8 @@ settings can be compared on one noise. The mesh goes through `export()` like any
 doesn't show, TRELLIS.2's texture is a lottery. In Phase 7's rolls, the final's own texture made 10 of the 20
 test prompts publishable, and the best of four textures on the same shape made 16. So when a creator doesn't
 like a final's texture, the worker makes up to four more for the same shape with `retexture`, and the creator
-picks one.
+picks one. With `"judge": true` a self-hosted judge (Qwen3-VL-8B) says which of them it would pick, so the
+Studio can preselect it; on Phase 7's next seeds its pick was publishable for 15 of 20.
 
 ## The recipe: Pixal3D finals, off by default
 
@@ -355,8 +356,9 @@ at 90% of the frame; 46 s per picture on an A10G, 19 GiB of GPU memory at the pe
 
 Phase 7's rolls made three more textures for each of the twenty finals of `test-sets/phase2.txt`, on the
 final's own shape. Reviewers found the final's own texture publishable for 10 of 20, and the best of the
-four for 16 (the bar). No automatic pick agreed with them much better than chance, so the creator picks. A
-`"textures"` job makes those textures for a final the creator already has:
+four for 16 (the bar). No automatic pick from image statistics agreed with them much better than chance,
+so the creator picks; a self-hosted judge can preselect one (`"judge": true`, below). A `"textures"` job
+makes those textures for a final the creator already has:
 
 ```json
 { "image_url": "https://…", "mode": "textures", "seed": 1234, "request_id": "gen_42", "count": 3 }
@@ -385,9 +387,15 @@ again (give or take the GPU's own nondeterminism) and stores them under the same
       "bytes": 1550172,
       "raw_bytes": 8915432,
       "triangles": 96205,
-      "projection": { "applied": true, "reason": "applied", "iou": 0.9755, "…": "…" }
+      "projection": { "applied": true, "reason": "applied", "iou": 0.9755, "…": "…" },
+      "export": { "path": "to_glb", "seconds": "…", "captured": true }
     },
-    { "texture_seed": 4234, "glb": { "key": "ai/gen_42/final-1234-texture-3.glb", "…": "…" }, "…": "…" }
+    {
+      "texture_seed": 4234,
+      "glb": { "key": "ai/gen_42/final-1234-texture-3.glb", "…": "…" },
+      "export": { "path": "rebake", "seconds": "…" },
+      "…": "…"
+    }
   ],
   "texture_errors": [{ "texture_seed": 3234, "error": "ConnectionError: R2 unreachable" }],
   "pipeline": "1024_cascade",
@@ -400,6 +408,14 @@ again (give or take the GPU's own nondeterminism) and stores them under the same
 
 - Each texture has a final's fields: `glb`, `bytes`, `raw_bytes`, `triangles` and `projection` (and
   `floaters`, with a preset that drops them). `texture_seed` is the seed its noise came from.
+- `export` says how the texture's model was made. TRELLIS.2's `to_glb` does the same geometry work for
+  every texture of one shape (filling holes, remeshing, unwrapping UVs, finding where each texel lies on the
+  surface); only the texture changes. So the first texture runs it in full and keeps that work, the
+  texture layout (`"path": "to_glb"`, `"captured": true`), and the others only sample their texture at the
+  kept texels and build the material as `to_glb` does (`"path": "rebake"`;
+  `trellis2/forge3d_worker/rebake.py`). `seconds` is that step's time. A layout serves one shape in one job:
+  when it doesn't fit (other voxels, say) or the rebake fails, `to_glb` runs in full and `fallback` says why.
+  Finals and previews always run `to_glb` in full, as before, and keep nothing.
 - A texture that fails doesn't lose the others: it is listed in `texture_errors` (present only then), and
   the job completes with the rest, in order. When none is made, the job fails as other jobs do (`{"error":
   "generation failed: none of the 3 textures was made: …"}`), and so it does when the shape can't be made.
@@ -417,7 +433,97 @@ again (give or take the GPU's own nondeterminism) and stores them under the same
 
 **Cost:** one shape generation (Phase 5's finals: a median of 28 s on an L40S) plus about 30 s of GPU per
 texture. In the rolls, sampling a texture took a median of 10 s and exporting it 24 s; packing adds about
-1.5 s. Three textures come to about 2 minutes of the TRELLIS.2 container, about $0.09 (Cost, below).
+1.5 s. Three textures come to about 2 minutes of the TRELLIS.2 container, about $0.09 (Cost, below). The
+cached texture layout takes most of `to_glb`'s share of the export off the second and later textures: in
+`ops/exp_rebake.py`'s GPU check (two objects) a rebaked export took 6–9 s against 15–23 s in full, and a
+whole job of three textures 56–87 s.
+
+**The judge (`"judge": true`).** A textures job can also ask the self-hosted judge (The judge, below)
+which texture a creator would rather use, so the Studio can preselect it:
+
+```json
+{ "image_url": "https://…", "mode": "textures", "seed": 1234, "request_id": "gen_42", "count": 3, "judge": true, "prompt": "a red table lamp" }
+```
+
+`judge` is optional (false when left out). `prompt` is what the user typed, at most 500 characters; leave
+it out, or send `""`, for a photo. It is only read with `"judge": true`. The job then:
+
+1. makes the final's shape, as without the judge, and starts the judge's container (Judge8B) without
+   waiting for it, so its cold start overlaps the textures;
+2. exports the final's own texture exactly as the final job did, but keeping the shape's texture layout
+   (`Trellis2Runtime.keep_layout`), so every new texture rebakes, the first one too. The own texture is
+   not packed, stored or returned: the final has it;
+3. makes the `count` new textures as without the judge;
+4. draws every candidate, the own texture first, from its exported GLB (before gltfpack) as the judge's
+   six-view grid (`judgeviews.from_glb`);
+5. sends the judge the picture (as the judge fits it: at most 768 pixels a side, any transparency on
+   white), the grids as PNGs, the prompt, and the order to show them in, shuffled with the job's seed (the
+   judge favours some places over others; the same final always gets the same order), and waits for its
+   answer for at most 3 minutes (`JUDGE_WAIT` in `modal_app.py`).
+
+The result then also has:
+
+```json
+{
+  "textures": [{ "texture_seed": 2234, "…": "…", "export": { "path": "rebake", "seconds": 2.9 } }, "…"],
+  "own_texture": {
+    "raw_bytes": 9017744,
+    "triangles": 96205,
+    "projection": { "applied": true, "reason": "applied", "…": "…" },
+    "export": { "path": "to_glb", "seconds": 18.6, "captured": true }
+  },
+  "judge": {
+    "pick": 2,
+    "verdicts": ["edits", "edits", "publish", "edits"],
+    "why": "L keeps the shade one colour all round; K has a grey smear on the back.",
+    "model": "8b",
+    "seconds": 8.6,
+    "order": [1, 2, 0, 3]
+  },
+  "timings": { "generate_s": 27.7, "retexture_s": 18.0, "export_s": 23.4, "pack_s": 4.5, "upload_s": 0.9, "own_export_s": 24.1, "render_s": 1.6, "judge_s": 9.7 }
+}
+```
+
+- `judge.pick` is 0 for the final's own texture, or k for the k-th entry of `textures` as returned
+  (counted from 1; a texture that failed was no candidate). `verdicts` has one per candidate, the own
+  texture first: `"publish"`, `"edits"`, `"reject"`, or null where the reply gave none. `why` is the
+  judge's sentence; its letters (K, L, M, …) name the candidates in the order shown, so `order[0]` is K.
+  `model` is the judge's size, `"8b"`. `seconds` is the judge's own time. `order` lists the candidates (0
+  the own texture) in the order the judge saw them.
+- `judge_error` replaces `judge` whenever there is no pick; the textures come back as ever. It says why:
+  the judge's weights were never downloaded (`"the judge's 8b weights are missing or incomplete in the
+  orainge-models volume: modal run workers/modal_app.py::download_models --which judge8b"`), the worker
+  has no judge (RunPod's: `"no judge in this worker"`), the own texture's export failed, a candidate
+  couldn't be drawn, the judge failed or didn't answer in time, or its reply named no valid pick. When
+  the judge can't run at all (no weights, no judge), none of its part runs: no own export, no warm-up,
+  and the first new texture runs `to_glb` in full, as without the judge.
+- `own_texture`, when the own texture was exported, says how: `raw_bytes`, `triangles`, `projection` and
+  `floaters` as a texture has them, and `export` (`"path": "to_glb"`, `"captured": true`), which is why
+  every new texture's `export` says `"rebake"`. It has no `glb`: nothing is stored.
+- `timings` gains `own_export_s` (the own texture's export), `render_s` (the grids) and `judge_s` (how
+  long the job waited for the judge, a cold start included); each is 0 when that part didn't run.
+- Without `"judge": true` none of this appears, and the job is exactly as before. Previews and finals
+  ignore `judge` and `prompt`.
+
+**The judge's weights:** Judge8B needs Qwen3-VL-8B (17.5 GB), which `--which all` leaves out:
+`modal run --detach workers/modal_app.py::download_models --which judge8b` (`--which judge` fetches both
+sizes, about 80 GB, for the experiments; it serves the 8B too). Without them, a job that asks for the
+judge gets `judge_error` at once, and its textures as ever.
+
+**What it was validated on:** Phase 7's next-seed set, 20 objects, each with the final's own texture and
+three more of the same shape, four reviewers per texture. The final's own texture was publishable for 11
+of 20; Qwen3-VL-8B's pick for 15 of 20, in each of two orders; the reviewers' own best, cross-validated,
+for 15.7. Qwen3-VL-30B-A3B did worse (13 and 14), so production uses the 8B only. The two orders' picks
+differed for 15 of the 20 objects, yet each order's picks were publishable as often: the judge finds one
+good texture among several, not always the same one, which is why each final's order is fixed by its seed.
+
+**Cost of the judge:** one Judge8B call takes about 9 s on an L40S when warm (in the validation, a median
+of 8.6 s and at most 10.9 s for four candidates), plus a cold start when its container isn't up: loading
+its 17.5 GB took 16 s, on top of the container's own start. The job warms it as soon as the shape is
+made, so the cold start mostly overlaps the textures. Judge8B stays up 2 minutes after its last call, so
+jobs a minute or two apart share it; that idle time is billed. In the TRELLIS.2 container the judge adds
+about 20–30 s a job: the own texture's export in full (15–30 s) less what the first new texture saves by
+rebaking (about 10 s), the grids (about 2 s) and the wait for the answer (about 10 s). See Cost, below.
 
 ### The views' cameras
 
@@ -546,6 +652,51 @@ projection (to_glb, unpremultiply, bake, project, shade, export).
   UV seams), and by 0.24 (99% within 4) from renders twice the size: what is left is resampling. About
   60% of its texels, mostly the inner faces of its panels, are seen by no camera and keep their colour.
 
+### The judge (Phase 7)
+
+Phase 7's rolls showed that the texture is a lottery: the reviewers' best of four textures of one shape
+was publishable for 16 of 20 objects, production's own texture for 10, and pickers built on image
+statistics agreed with the reviewers barely better than chance. The judge is a self-hosted
+vision-language model asked what the reviewers were asked. Production asks its 8B size, Judge8B, from the
+Trellis2 container when a textures job says `"judge": true` (Texture options, above), and only then; the
+30B is for experiments.
+
+- **Renders**: `trellis2/forge3d_worker/judgeviews.py`'s `turntable(mesh, size=384, views=6,
+  elevation=20.0, background=0.12)` draws to_glb's mesh (glTF axes, the front +Z) from six azimuths (0,
+  60, ..., 300 degrees from the front, 20 degrees above) in a 3 x 2 grid, 1152 x 768: base colour times
+  ambient plus a key light from the camera's upper left, a faint rim light, a dark background, a 30
+  degree lens at one distance for every view. It uses the projection's torch rasteriser (GPU or CPU).
+- **The judge**: `judge/judge_worker/judge.py`'s `judge(picture, candidates, prompt_text)` makes one chat
+  call with the picture and every candidate's grid, each under a letter (K, L, M, ...; `order` shows
+  them in another order), and returns `{"verdicts": [...], "best": index, "why", "raw", "seconds",
+  "letters", "problems"}`. The verdicts are the reviewers' ("publish", "edits", "reject"); the rubric is
+  theirs, adapted to one shape with several textures (`prompt.py`, the only place the wording lives).
+  Decoding is greedy. A reply is read however it strays from the JSON asked for (`parse.py`); one with
+  no valid pick gives `best` 0, the generation's own texture, and says why in `parse_error`.
+- **The models**: Qwen3-VL through transformers 4.57.6, in two sizes: Qwen3-VL-8B-Instruct (17.5 GB in
+  bf16) and Qwen3-VL-30B-A3B-Instruct (a mixture of experts, 62 GB). Both are Apache-2.0, pinned by
+  revision with every weight file's sha256 (`judge/scripts/download_weights.py`: `download_models --which
+  judge8b` for the 8B alone, 17.5 GB, or `--which judge` for both, about 80 GB; "all" leaves them out).
+  The picture goes in at most 768 pixels a side (576
+  tokens) and each grid at 1152 x 768 (864 tokens): about 5,000 tokens for four candidates. At
+  inference transformers 4.57 runs all 128 of the 30B's experts on every token (about 10 GB more than
+  the weights for such a prompt); the judge switches it to the experts each token uses, the same sum.
+- **On Modal**: `Judge8B` (L40S) and `Judge30B` (H100), one class per size because a class parameter
+  can't choose the GPU; `judge_class("8b" | "30b")` gives the class. One container each. Judge8B, which
+  production calls, cuts a call off after 5 minutes (a judgement takes about 9 s), gives a container 10
+  minutes to start (its 17.5 GB load in about 16 s) and scales down after 2 minutes idle: a textures job
+  warms it (its `warm` method) once the shape is made and asks it about a minute later. Judge30B keeps
+  the experiments' settings: 15 minutes a call, 20 to start, 5 minutes idle. `TextureJudge` in
+  `modal_app.py` is what a textures job calls: it reads the weights' markers before anything, warms
+  Judge8B without waiting, and waits for an answer at most 3 minutes (`JUDGE_WAIT`), then cancels the
+  call. A `modal run` script calls
+  `modal_app.judge_class("30b")().judge.remote({"picture_png": …, "candidates_png": […], "prompt": "…",
+  "order": [2, 0, 3, 1]})` (base64 PNG or JPEG; `seed` shuffles instead of `order`) and gets the result
+  above with `"model"`, or `{"error": "invalid input: …" | "judge failed: …"}`.
+- **The experiment**: `ops/exp_judge.py` (in a staging app) makes each picture's final and three more
+  textures as the rolls did, draws their grids, and asks both judges in two mirrored orders; its
+  `summary.json` names each judge's verdicts and pick by candidate.
+
 ### The Pixal3D worker
 
 `pixal3d/pixal3d_worker/service.py` is the `trellis2` contract with Pixal3D behind it, plus views. With
@@ -648,9 +799,11 @@ texture options).
    sets (about 44 GB: the multi-view set for most pictures, the single-view set for thin, flat
    objects), MoGe-2 and NAF, and reuses the TRELLIS.2 weights' decoders, DINOv3 and BiRefNet, so it
    comes after `--which trellis2`. Add `--which multiview` only if the server will run with
-   `AI_MULTIVIEW=1` (it also fetches the image+geometry adapter the experiments use, 3.6 GB). Without
-   `--which`, `download_models` fetches all four sets, about 119 GB (Pixal3D's two flow-model sets are
-   44 GB of it).
+   `AI_MULTIVIEW=1` (it also fetches the image+geometry adapter the experiments use, 3.6 GB). Add
+   `--which judge8b` (Qwen3-VL-8B, 17.5 GB) if the server will ask texture options for the judge's pick
+   (`"judge": true`; Texture options, under Job contracts); without it those jobs get `judge_error` and
+   their textures as ever. Without `--which`, `download_models` fetches all four sets, about 119 GB
+   (Pixal3D's two flow-model sets are 44 GB of it), and leaves the judge out.
 
 5. Update the server's database. From Phase 6 on, the server reads the `views` and `views_error`
    columns of `ai_generations` (`apps/server/src/db/schema.ts`) even with `AI_MULTIVIEW` off, so
@@ -823,7 +976,8 @@ without it the step is skipped.
 **Texture options (`AI_TEXTURE_OPTIONS`, on by default).** On the sides the picture doesn't show,
 TRELLIS.2's texture is a lottery. On the 20 test prompts, the final's own texture was good enough to
 publish 10 times, and the best of four textures of the same shape 16 times (Phase 7's rolls). No
-automatic pick was trustworthy, so the creator picks:
+pick from image statistics was trustworthy, so the creator picks, starting from the judge's pick when
+it is on (below):
 
 1. Once a final is done, the server starts a `"textures"` job on the `trellis2` worker (Texture
    options, under Job contracts) with what the final was made from: the picture, the final's seed and
@@ -844,9 +998,36 @@ stops their job if it still runs. Each final's options take about 2 minutes of t
 (about $0.09). `AI_TEXTURE_OPTIONS=0` (or `false`) on the server turns them off. Workers with the recipe
 on (`ORAINGE_FINAL_MODEL=pixal3d`) refuse them, so turn them off there too.
 
+**The judge's pick (`AI_TEXTURE_JUDGE=1`, off by default).** With it on (`1` or `true`), each
+textures job also asks a self-hosted judge (Qwen3-VL-8B) which of the four textures a creator would
+rather use, the final's own among them. The server sends `"judge": true` and `"prompt"`, what the user
+typed (empty for a photo). On a 20-object validation set the judge's pick was publishable for 15, the
+final's own texture for 11 (the reviewers' own best: about 16). So the Studio makes the judge's pick
+the default:
+
+1. The server keeps the pick with the generation, numbered as the panel numbers the textures (1 is
+   the final's own), with the judge's one sentence (the `textures_pick` and `textures_pick_why`
+   columns). The worker's `pick` counts in its own list of textures, so when some failed, the server
+   finds the picked one by its seed among the ones it kept.
+2. When the options arrive, a dot marks the recommended texture (its tooltip says why), and the panel
+   switches the model in the scene to it, in place, as picking it would: Undo says "Use texture 3".
+   Under the picker it says "Switched to texture 3, the cleanest of the four. Pick another any time."
+3. It switches once, and only over the final's own texture. Never after the creator chose a texture,
+   and never again after Undo or a reload: the panel tells the server (`ai.chooseTexture`, kept in the
+   `textures_pick_applied` and `textures_chosen` columns). Not while the scene plays: it switches when
+   the scene stops. Not while the model is out of the scene: it switches once the final is back.
+
+A pick of 1, a judge that failed (`judge_error`) or a pick the server couldn't keep changes nothing:
+the panel is as without the judge. The server logs why and keeps it (`textures_judge_error`), as it
+does when a worker from before the judge sends no answer. With the judge off, a pick from a job started
+while it was on is left out. The judge needs its weights on the workers (`modal run
+workers/modal_app.py::download_models --which judge8b`), and the server the new `ai_generations`
+columns (`drizzle-kit push`).
+
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
 labelled pictures (rated, with the second always the best) and return a small house model after
-a second or two, then the final's house in 3 other colours as its texture options. A prompt with
+a second or two, then the final's house in 3 other colours as its texture options. With
+`AI_TEXTURE_JUDGE=1`, their judge always recommends texture 3. A prompt with
 the word "fail", or a photo under 64 px, shows the error states, and a photo under 256 px gets no
 texture options. With `AI_MULTIVIEW=1` too, they draw 6 views of a box (the front orange, the sides
 green and the back blue), except for a photo under 128 px, whose model is then made from the photo
@@ -907,6 +1088,9 @@ GiB-hour of memory, so about $2.30/h for a FLUX container and $2.50/h for a TREL
 | Preview                                                                            | 20–40 s         | ~$0.01–0.03 |
 | Final                                                                              | 1–2 min         | ~$0.04–0.08 |
 | Texture options: the final's shape again, then 3 textures (~30 s each)             | 1.5–3 min       | ~$0.07–0.11 |
+| The judge's pick for them (`"judge": true`): the TRELLIS.2 container's share       | +20–30 s        | ~$0.01–0.02 |
+| One Judge8B call when warm (L40S, 4 cores, 32 GiB: ~$2.40/h)                       | ~9 s            | ~$0.006     |
+| Judge8B's cold start and 2 minutes idle, when no other judged job comes            | ~3 min          | ~$0.10–0.15 |
 | Cold start and 60 s idle, per container scaled up                                  | ~2 min          | ~$0.08      |
 | Six views (multiview, A10G at ~$1.30/h all-in)                                     | 46 s            | ~$0.02      |
 | Final by the recipe, when `ORAINGE_FINAL_MODEL=pixal3d`                            | 45–103 s        | ~$0.03–0.07 |
@@ -951,6 +1135,10 @@ tools) on Stable Diffusion XL 1.0, whose CreativeML Open RAIL++-M license has us
 that Orainge's terms of service must pass on to users before the worker serves them. The same applies
 to MV-Adapter's image+geometry adapter (Apache-2.0), which only the experiments' `GeometryViews` runs.
 
+The judge ([`judge/NOTICE.md`](judge/NOTICE.md)) runs Qwen3-VL-8B-Instruct for texture options when a job
+asks for its pick, and Qwen3-VL-30B-A3B-Instruct in experiments only (both Apache-2.0, pinned by revision),
+through transformers (Apache-2.0).
+
 ## Tests
 
 ```sh
@@ -960,12 +1148,14 @@ python -m pytest workers/trellis2/tests        # CPU only; set GLTFPACK_BIN to i
 python -m pytest workers/flux-schnell/tests
 python -m pytest workers/pixal3d/tests         # CPU only (torch, trimesh): the recipe on a fake pipeline
 python -m pytest workers/multiview/tests       # torch for the camera checks; no GPU or weights
+python -m pytest workers/judge/tests           # the judge on a fake model; with transformers 4.57+, a tiny random Qwen3-VL too
 ```
 
 Run the folders separately: they share test file names. Each suite also runs from inside its folder
 (`cd workers/pixal3d && python -m pytest`). With `TRELLIS2_SRC` pointing at a TRELLIS.2 checkout, the
-trellis2 tests also run the views through TRELLIS.2's own samplers, not only a reduction of them;
-without diffusers installed, one multiview camera check is skipped.
+trellis2 tests also run the views through TRELLIS.2's own samplers, not only a reduction of them, and
+the cached texture layout through TRELLIS.2's own `to_glb` (skipped without it); without diffusers
+installed, one multiview camera check is skipped.
 
 The tests cover input validation, job handling, the out-of-memory retry and fallback, shading
 normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API, the
@@ -975,7 +1165,13 @@ the fall-backs), the floater cleanup (synthetic donuts, bowls, balloons, cabins 
 apart goes, what touches or is big stays, UVs and texture kept), retexturing (the texture flow alone
 on the generation's shape, its noise drawn again bit for bit, views, the low-VRAM retry), texture options
 (the final's shape once, the rolls' seeds, the count, the keys, one texture or all of them failing, the
-refusal where the finals aren't TRELLIS.2's, the timings) and the views' bake (MV-Adapter's ig2mv cameras held to its code, the control maps of
+refusal where the finals aren't TRELLIS.2's, the timings), the judge's pick for them on stand-ins for the
+renderer and the judge (the own texture exported first and keeping the layout, what the judge is sent and
+in which order, its pick mapped back to `textures`, every failure keeping the textures, a judge that
+can't run costing nothing, the inputs, and the judge worker's own job handling end to end), the cached
+texture layout (TRELLIS.2's own `to_glb` on CPU stand-ins for CuMesh and FlexGEMM, with `TRELLIS2_SRC`:
+what the capture sees, a rebake equal to `to_glb` bit for bit, the fallbacks, finals untouched, and a
+judged job's own texture equal to the final's export with every new texture rebaked) and the views' bake (MV-Adapter's ig2mv cameras held to its code, the control maps of
 a box, boxes baked from views painted per side: hidden sides, the background, the fades, the colour
 match, the gutters). For the recipe they cover, on fakes, the default (TRELLIS.2's finals) and the choice
 of model, the container's model pool, the fallbacks to TRELLIS.2 and what they report, the weights a
@@ -984,7 +1180,14 @@ Pixal3D's cameras and views, the NATTEN stand-in (against NATTEN's own definitio
 scripts' pins. The multiview tests hold its cameras to MV-Adapter's code and cover the reference
 picture's preparation and job handling, and for the image+geometry model the control maps' encoding
 and transport, the mesh's placement (against upstream's `load_mesh`), the call into the pipeline and
-its jobs, all with stand-ins for diffusers and the weights. Before the first
+its jobs, all with stand-ins for diffusers and the weights. For the judge they cover the turntable grid
+on synthetic boxes (which side each view sees, the texture where the UVs put it, the background, the
+framing, the light), the chat it sends, its reading of stray replies, its jobs, the weights script's
+pins, the calls into transformers (through a stand-in; with transformers 4.57 or later installed, also
+a tiny random Qwen3-VL, dense and mixture-of-experts, end to end on the CPU), the Modal classes, the
+8B's own weights, `TextureJudge` (the weights check before anything, the warm-up, the wait and the
+cancel), the Trellis2 container asking it only when a job says so, and the experiment script's own
+steps. Before the first
 production deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine
 that has nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real
 hardware.

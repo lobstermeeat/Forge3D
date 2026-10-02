@@ -1616,9 +1616,22 @@
   gap: 4px;
 }
 .f3-ai-texpicks .f3-chip {
+  position: relative;
   min-width: 28px;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+/* The texture the judge recommends (AI_TEXTURE_JUDGE=1): a dot, as on a suggested picture. Its
+   tooltip says why */
+.f3-ai-texpicks .f3-chip[data-recommended]::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--acc);
 }
 .f3-ai-recent {
   display: flex;

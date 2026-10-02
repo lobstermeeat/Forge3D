@@ -21,7 +21,11 @@ object), levelled, then the usual export. Both run in the Trellis2 container, so
 (worker "trellis2", mode "preview" | "final") is the same either way. Phase 6's re-test kept TRELLIS.2
 as the default: the recipe fixed made-up backs but lost more on textures (README.md, "The recipe").
 Texture options (mode "textures": more textures for a final's shape) are TRELLIS.2's alone, so with the
-recipe on they are refused.
+recipe on they are refused. A textures job that says "judge": true also asks the judge, Judge8B (Qwen3-VL
+picking the texture a creator would rather use; judge/judge_worker/), which the Trellis2 container calls.
+
+Experiments call more workers that production never does: GeometryViews (MV-Adapter's views of a given
+mesh) and Judge30B (the judge's larger size).
 
 The GPU code is the same as in the RunPod images (trellis2/, flux-schnell/); only the entry
 points differ. The job API (job_api.py) speaks RunPod's protocol, so the server's client works
@@ -31,6 +35,7 @@ with both. One-time setup (Hugging Face access, Modal secrets) is in README.md.
 from __future__ import annotations
 
 import base64
+import functools
 import json
 import os
 import pathlib
@@ -91,6 +96,9 @@ TRELLIS2_GPU = "L40S"
 TRELLIS2_LOW_VRAM = "0"
 FLUX_GPU = "L40S"  # FLUX.1 [schnell] needs about 34 GB
 MULTIVIEW_GPU = "A10G"  # MV-Adapter on SDXL needs about 14 GB: a 24 GB A10G, about half an L40S's price
+# The judge: Qwen3-VL-8B is 17.5 GB in bf16 (an A10G might do, untested; an L40S leaves room, and is where
+# Phase 7 measured it); Qwen3-VL-30B-A3B, the experiments' larger size, is 62 GB, so an H100 (80 GB)
+JUDGE_GPUS = {"8b": "L40S", "30b": "H100"}
 
 app = modal.App(APP_NAME)
 models = modal.Volume.from_name("orainge-models", create_if_missing=True)
@@ -213,6 +221,16 @@ multiview_image = (
     .add_local_dir(WORKERS / "multiview" / "mvadapter", "/root/mvadapter")
 )
 
+# The judge: Qwen3-VL through transformers, on MultiView's base (the same Python and torch, so Modal reuses
+# those layers)
+judge_image = (
+    modal.Image.debian_slim(python_version="3.10")
+    .pip_install(*TORCH, index_url=TORCH_INDEX)
+    .pip_install_from_requirements(str(WORKERS / "judge" / "requirements.txt"))
+    .env({"HF_HUB_OFFLINE": "1", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"})
+    .add_local_dir(WORKERS / "judge" / "judge_worker", "/root/judge_worker")
+)
+
 download_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("huggingface_hub[hf_xet]>=0.34,<2")
@@ -222,6 +240,7 @@ download_image = (
     )
     .add_local_file(WORKERS / "multiview" / "scripts" / "download_weights.py", "/root/weights/multiview.py")
     .add_local_file(WORKERS / "pixal3d" / "scripts" / "download_weights.py", "/root/weights/pixal3d.py")
+    .add_local_file(WORKERS / "judge" / "scripts" / "download_weights.py", "/root/weights/judge.py")
 )
 
 api_image = (
@@ -478,6 +497,35 @@ def _call_quietly(runtime: Any, method: str) -> None:
         print(f"[orainge] {method} failed: {type(err).__name__}: {err}")
 
 
+def trellis2_handler(
+    trellis2: Any, storage: Any, pack: Any, final_model: str, judge: Any = None
+) -> Callable[[dict], dict]:
+    """
+    The Trellis2 container's job handler around its loaded TRELLIS.2 runtime: every job goes through
+    handle_with_models. TRELLIS.2's handle_job gets the judge a textures job asks for with "judge": true
+    (``judge``, by default TextureJudge: Judge8B, called through Modal); no other job calls it. With the
+    recipe on (``final_model`` "pixal3d"), Pixal3D is built in the background when its weights are there.
+    """
+    from forge3d_worker.service import handle_job
+
+    pool = ModelPool(trellis2)
+    judge = TextureJudge() if judge is None else judge
+    handlers: dict[str, Callable[..., dict]] = {"trellis2": functools.partial(handle_job, judge=judge)}
+    if final_model == "pixal3d":
+        from pixal3d_worker.service import handle_job as pixal3d_handle_job
+
+        handlers["pixal3d"] = pixal3d_handle_job
+        if _weights_marker("pixal3d").exists():
+            # Built while this container's first previews run; use() waits for it at the first final
+            pool.load_later("pixal3d", lambda: build_pixal3d(trellis2))
+        else:
+            pool.count_out(
+                "pixal3d",
+                "its weights are missing: modal run workers/modal_app.py::download_models --which pixal3d",
+            )
+    return lambda job: handle_with_models(job, pool, final_model, handlers, storage, pack)
+
+
 @app.cls(
     image=trellis2_image,
     gpu=TRELLIS2_GPU,
@@ -506,7 +554,6 @@ class Trellis2:
     def load(self) -> None:
         from forge3d_worker.compress import pack_glb
         from forge3d_worker.pipeline import Trellis2Runtime
-        from forge3d_worker.service import handle_job
         from forge3d_worker.storage import storage_from_env
 
         _require_weights("trellis2")
@@ -514,22 +561,8 @@ class Trellis2:
         merge_tuning(LOCAL_TUNING, SHARED_TUNING)
         storage = storage_from_env()
         trellis2 = Trellis2Runtime(f"{MODELS}/TRELLIS.2-4B")
-        pool = ModelPool(trellis2)
-        handlers: dict[str, Callable[..., dict]] = {"trellis2": handle_job}
         final_model = os.environ.get("ORAINGE_FINAL_MODEL", FINAL_MODEL)
-        if final_model == "pixal3d":
-            from pixal3d_worker.service import handle_job as pixal3d_handle_job
-
-            handlers["pixal3d"] = pixal3d_handle_job
-            if _weights_marker("pixal3d").exists():
-                # Built while this container's first previews run; use() waits for it at the first final
-                pool.load_later("pixal3d", lambda: build_pixal3d(trellis2))
-            else:
-                pool.count_out(
-                    "pixal3d",
-                    "its weights are missing: modal run workers/modal_app.py::download_models --which pixal3d",
-                )
-        self.handle = lambda job: handle_with_models(job, pool, final_model, handlers, storage, pack_glb)
+        self.handle = trellis2_handler(trellis2, storage, pack_glb, final_model)
 
     @modal.method()
     def generate(self, job: dict) -> dict:
@@ -655,13 +688,185 @@ class GeometryViews:
         return run_job(self.handle, job)
 
 
-# In download order: Pixal3D's script reuses the TRELLIS.2 worker's DINOv3, BiRefNet and decoders
+# --- The judge: which texture of a shape a creator would rather use --------------------------------------
+# Production asks Judge8B when a textures job says "judge": true (TextureJudge, below); experiments ask
+# either size (ops/exp_judge.py). One class per size, because a class parameter can't choose the GPU (Modal
+# sets it per class; with_options would leave Judge(model="30b") on a card it doesn't fit).
+# judge_class("8b" | "30b") gives the class.
+
+# The downloads a size's weights come from: the 8B's own, or the one with both sizes
+JUDGE_WEIGHTS = {"8b": ("judge8b", "judge"), "30b": ("judge",)}
+
+
+def judge_weights_missing(size: str) -> Optional[str]:
+    """Why ``size``'s judge can't load here (no complete download of its weights), or None. Reads markers only."""
+    names = JUDGE_WEIGHTS[size]
+    if any(_weights_marker(name).exists() for name in names):
+        return None
+    return (
+        f"the judge's {size} weights are missing or incomplete in the orainge-models volume: "
+        f"modal run workers/modal_app.py::download_models --which {names[0]}"
+    )
+
+
+def judge_handler(which: str) -> Callable[[dict], dict]:
+    """A judge job handler (judge/judge_worker/service.py) with that size of Qwen3-VL loaded on the GPU."""
+    from judge_worker.model import load
+    from judge_worker.service import handle_job
+
+    missing = judge_weights_missing(which)
+    if missing is not None:
+        raise RuntimeError(missing)
+    model = load(which, MODELS)
+    print(f"[orainge] judge {which}: {model.path} loaded in {model.load_seconds} s")
+    return lambda job: handle_job(job, model, name=which)
+
+
+JUDGE_OPTIONS = dict(
+    image=judge_image,
+    cpu=4.0,
+    memory=32768,  # the weights go straight to the GPU; RAM holds a file's worth at a time
+    volumes={MODELS: models},
+    max_containers=1,
+)
+
+
+@app.cls(
+    gpu=JUDGE_GPUS["8b"],
+    # A judgement takes about 9 s; one still running after 5 minutes is stuck
+    timeout=300,
+    # Its 17.5 GB loaded in 16 s in Phase 7; the rest is room for a slow volume or a slow image pull
+    startup_timeout=600,
+    # A textures job warms it once the shape is made and asks it about a minute later: it must outlast
+    # that wait. Idle time is billed (about $0.04 a minute), so not much longer
+    scaledown_window=120,
+    **JUDGE_OPTIONS,
+)
+class Judge8B:
+    """
+    Qwen3-VL-8B looks at the picture a model was made from and turntable grids of several textures of its
+    shape (trellis2/forge3d_worker/judgeviews.py) and says which a creator would rather use. Production's
+    judge: the Trellis2 container asks it when a textures job says "judge": true (TextureJudge), and only
+    then; experiments ask it too. The job and its result are judge/judge_worker/service.py's:
+
+        modal_app.Judge8B().judge.remote({"picture_png": …, "candidates_png": […], "prompt": "…"})
+    """
+
+    @modal.enter()
+    def load(self) -> None:
+        self.handle = judge_handler("8b")
+
+    @modal.method()
+    def judge(self, job: dict) -> dict:
+        return run_job(self.handle, job)
+
+    @modal.method()
+    def warm(self) -> bool:
+        """Does nothing: calling it starts a container (load() runs first) before a judgement needs one."""
+        return True
+
+
+@app.cls(
+    gpu=JUDGE_GPUS["30b"],
+    timeout=900,
+    startup_timeout=1200,  # its 62 GB come off the volume before the first job
+    # Experiments call it as each object is made, a minute or so apart: idle time is billed, but a cold
+    # start (62 GB off the volume) costs more
+    scaledown_window=300,
+    **JUDGE_OPTIONS,
+)
+class Judge30B:
+    """Judge8B with Qwen3-VL-30B-A3B (a mixture of experts, 62 GB in bf16) on an H100. Experiments only."""
+
+    @modal.enter()
+    def load(self) -> None:
+        self.handle = judge_handler("30b")
+
+    @modal.method()
+    def judge(self, job: dict) -> dict:
+        return run_job(self.handle, job)
+
+    @modal.method()
+    def warm(self) -> bool:
+        """Does nothing: calling it starts a container (load() runs first) before a judgement needs one."""
+        return True
+
+
+JUDGES = {"8b": Judge8B, "30b": Judge30B}
+
+
+def judge_class(model: str) -> Any:
+    """The judge class for a size, "8b" or "30b": ``judge_class("30b")().judge.spawn(job)``."""
+    if model not in JUDGES:
+        raise ValueError(f"the judge model is one of {', '.join(JUDGES)}, not {model!r}")
+    return JUDGES[model]
+
+
+# Production's judge for texture options. In Phase 7's validation (20 objects, four textures each) its pick
+# was publishable for 15 of 20 in each of two orders, the 30B's for 13 to 14, the final's own texture for 11
+JUDGE_SIZE = "8b"
+# How long a textures job waits for the judge's answer: about 9 s when it is warm, plus up to a minute or
+# so when its container has to start (TextureJudge warms it early, so it rarely has to). After that the
+# textures go back without a pick
+JUDGE_WAIT = 180.0
+
+
+class TextureJudge:
+    """
+    The judge a textures job asks (trellis2/forge3d_worker/service.py's Judge), from the Trellis2 container:
+    Judge8B (JUDGE_SIZE), through Modal. ``unavailable()`` says, without calling anything, why it can't
+    judge (its weights were never downloaded), so such a job skips the judge's part at once instead of
+    starting a container that can't load. ``warm()`` starts its container and doesn't wait. Called with the
+    judge worker's job, it returns that worker's result; after ``wait`` seconds it cancels the call and
+    raises TimeoutError.
+    """
+
+    def __init__(self, size: str = JUDGE_SIZE, wait: float = JUDGE_WAIT) -> None:
+        judge_class(size)  # a wrong size fails here, not in a job
+        self.size = size
+        self.model = size  # what the job's "judge" says made the pick when the answer doesn't
+        self.wait = wait
+
+    def unavailable(self) -> Optional[str]:
+        return judge_weights_missing(self.size)
+
+    def warm(self) -> None:
+        judge_class(self.size)().warm.spawn()
+
+    def __call__(self, request: dict) -> dict:
+        missing = self.unavailable()
+        if missing is not None:
+            raise RuntimeError(missing)
+        call = judge_class(self.size)().judge.spawn(request)
+        try:
+            return call.get(timeout=self.wait)
+        except (TimeoutError, modal.exception.TimeoutError) as err:
+            _cancel_quietly(call)
+            raise TimeoutError(f"the judge didn't answer within {self.wait:g} s") from err
+
+
+def _cancel_quietly(call: Any) -> None:
+    """Cancels a call nobody waits for any more, so its GPU time stops; failing to only costs that time."""
+    try:
+        call.cancel()
+    except Exception as err:  # noqa: BLE001 - the job's own result matters more
+        print(f"[orainge] the judge's call was not cancelled: {type(err).__name__}: {err}")
+
+
+# In download order: Pixal3D's script reuses the TRELLIS.2 worker's DINOv3, BiRefNet and decoders. The
+# judge's only when asked for: the 8B alone (17.5 GB) for production's texture options, or both sizes
+# (about 80 GB) for the experiments
 WEIGHT_SCRIPTS = {
     "trellis2": "/root/weights/trellis2.py",
     "reference": "/root/weights/reference.py",
     "multiview": "/root/weights/multiview.py",
     "pixal3d": "/root/weights/pixal3d.py",
+    "judge8b": "/root/weights/judge.py",
+    "judge": "/root/weights/judge.py",
 }
+ON_REQUEST_WEIGHTS = ("judge8b", "judge")  # left out of --which all
+# What WHICH tells a script: which of Pixal3D's weight sets, which of the judge's sizes (the others ignore it)
+WEIGHT_SETS = {"pixal3d": PIXAL3D_WEIGHTS, "judge8b": "8b", "judge": "all"}
 
 
 @app.function(
@@ -675,11 +880,14 @@ WEIGHT_SCRIPTS = {
 def download_models(which: str = "all", force: bool = False) -> None:
     """
     Downloads the pinned weights (about 119 GB, 44 GB of it Pixal3D's two sets) into the orainge-models
-    volume. CPU only.
+    volume. CPU only. "all" leaves the judge out: ``--which judge8b`` fetches production's (Qwen3-VL-8B,
+    17.5 GB), which texture options ask when a job says "judge": true, and ``--which judge`` both sizes
+    (about 80 GB) for the experiments.
     """
     if which != "all" and which not in WEIGHT_SCRIPTS:
         raise SystemExit(f"--which must be all, {', '.join(WEIGHT_SCRIPTS)}")
-    for name in WEIGHT_SCRIPTS if which == "all" else [which]:
+    names = [name for name in WEIGHT_SCRIPTS if name not in ON_REQUEST_WEIGHTS] if which == "all" else [which]
+    for name in names:
         _download(name, force)
         models.commit()
 
@@ -702,7 +910,7 @@ def _download(name: str, force: bool) -> None:
         **os.environ,
         "MODELS_ROOT": MODELS,
         "FLUX_MODEL_DIR": f"{MODELS}/FLUX.1-schnell",
-        "WHICH": PIXAL3D_WEIGHTS,  # pixal3d.py: which of Pixal3D's weight sets (the other scripts ignore it)
+        "WHICH": WEIGHT_SETS.get(name, "all"),
         "HF_HUB_DISABLE_PROGRESS_BARS": "1",  # progress bars flood non-interactive logs
     }
     subprocess.run([sys.executable, script], env=env, check=True)
@@ -1244,6 +1452,7 @@ def build_images() -> None:
         ("reference", flux_image),
         ("multiview", multiview_image),
         ("trellis2", trellis2_image),
+        ("judge", judge_image),
     ]
     with modal.enable_output():
         for name, image in images:

@@ -15,6 +15,7 @@ export type {
   GenerationView,
   GenerationStatus,
   RunningStatus,
+  TextureChooser,
   TextureOption,
   TexturesStatus,
 } from './studio';
@@ -72,6 +73,18 @@ export function textureOptionsEnabled(
   return value !== '0' && value !== 'false';
 }
 
+/**
+ * AI_TEXTURE_JUDGE=1 (or true): the textures job also asks the judge (Qwen3-VL-8B on the workers)
+ * which of the four textures a creator would rather use, and the panel makes that one the default.
+ * Off by default: the workers need the judge's weights (`download_models --which judge8b`).
+ */
+export function textureJudgeEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const value = env['AI_TEXTURE_JUDGE']?.trim().toLowerCase();
+  return value === '1' || value === 'true';
+}
+
 let studio: AIStudio | null = null;
 
 export function getStudio(): AIStudio {
@@ -83,12 +96,20 @@ export function getStudio(): AIStudio {
         '[AI] AI_MULTIVIEW=1, but there is no multiview worker (on RunPod, set RUNPOD_MULTIVIEW_ENDPOINT_ID): models are made from the picture alone',
       );
     }
+    const textureOptions = textureOptionsEnabled();
+    const textureJudge = textureJudgeEnabled();
+    if (textureJudge && !textureOptions) {
+      console.warn(
+        '[AI] AI_TEXTURE_JUDGE=1, but texture options are off (AI_TEXTURE_OPTIONS): there are no textures to judge',
+      );
+    }
     studio = new AIStudio({
       workers,
       store: drizzleGenerationStore(db),
       storage: getStorage(),
       multiview,
-      textureOptions: textureOptionsEnabled(),
+      textureOptions,
+      textureJudge,
     });
   }
   return studio;

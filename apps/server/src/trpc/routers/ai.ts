@@ -4,7 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import { schema } from '../../db';
 import { getStudio, StudioError } from '../../services/ai';
-import { MAX_PROMPT_LENGTH } from '../../services/ai/studio';
+import { MAX_PROMPT_LENGTH, TEXTURE_COUNT } from '../../services/ai/studio';
 
 /** Photos arrive as data URLs; the client scales them to 2048 px first, so this is generous. */
 const MAX_PHOTO_DATA_URL = 12 * 1024 * 1024;
@@ -14,7 +14,7 @@ const id = z.object({ id: z.string().uuid() });
 
 /**
  * The Studio's AI panel: prompt or photo -> pick a picture -> preview -> keep -> final, then
- * texture options for the final.
+ * texture options for the final (with AI_TEXTURE_JUDGE=1, the judge's pick among them).
  */
 export const aiRouter = router({
   capabilities: publicProcedure.query(() => getStudio().capabilities()),
@@ -77,6 +77,25 @@ export const aiRouter = router({
   retry: protectedProcedure
     .input(id)
     .mutation(({ ctx, input }) => studioCall(() => getStudio().retry(ctx.user.id, input.id))),
+
+  /**
+   * Records a texture option the panel put in the scene (1 is the final's own): one the creator
+   * chose, or the judge's pick, which the panel applies once. Returns the generation.
+   */
+  chooseTexture: protectedProcedure
+    .input(
+      id.extend({
+        number: z
+          .number()
+          .int()
+          .min(1)
+          .max(TEXTURE_COUNT + 1),
+        by: z.enum(['creator', 'judge']),
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      studioCall(() => getStudio().chooseTexture(ctx.user.id, input.id, input.number, input.by)),
+    ),
 
   recent: protectedProcedure.query(({ ctx }) => studioCall(() => getStudio().recent(ctx.user.id))),
 
