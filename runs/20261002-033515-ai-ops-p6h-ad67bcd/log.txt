@@ -1,0 +1,38 @@
+== Smoke test: 04 on its next seed
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: pixal3d (ORAINGE_FINAL_MODEL=trellis2 for the other)
+[retest] app orainge-p6-retest-h; finals made by pixal3d
+1 runs in phase2
+Starting 1 runs
+Done: 1 of 1 runs finished
+phase2h-04-retro-arcade-machine: done model=pixal3d weights=multiview thin=0.3658 level=2.5 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=67.6
+
+== Phase 2 again from the same pictures, on the next seeds (phase2h)
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: pixal3d (ORAINGE_FINAL_MODEL=trellis2 for the other)
+[retest] app orainge-p6-retest-h; finals made by pixal3d
+20 runs in phase2
+Starting 20 runs
+Done: 20 of 20 runs finished
+phase2h-01-cute-low-poly-fox-sitting-down: done model=pixal3d weights=multiview thin=0.7402 level=no pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=49.7
+phase2h-02-red-high-top-sneaker: done model=pixal3d weights=multiview thin=0.3801 level=10.0 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=50.2
+phase2h-03-gaming-chair-black-and-purple: done model=pixal3d weights=multiview thin=0.6041 level=no pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=48.1
+phase2h-04-retro-arcade-machine: done model=pixal3d weights=multiview thin=0.3658 level=2.5 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=67.6
+phase2h-05-sci-fi-laser-pistol-white: done model=pixal3d weights=single thin=0.124 level=14.4 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=61.7
+phase2h-06-wooden-shield-with-a-lion: done model=pixal3d weights=single thin=0.0942 level=5.0 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=76.4
+phase2h-07-chibi-knight-with-a-big-helmet: done model=pixal3d weights=multiview thin=0.5902 level=10.0 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=76.7
+phase2h-08-vintage-film-camera: done model=pixal3d weights=multiview thin=0.6136 level=no pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=81.7
+phase2h-09-donut-with-pink-frosting: done model=pixal3d weights=multiview thin=0.4427 level=31.4 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=62.2
+phase2h-10-astronaut-helmet: done model=pixal3d weights=multiview thin=0.9605 level=19.4 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=67.5
+phase2h-11-stack-of-old-books-with-a-candle: done model=pixal3d weights=multiview thin=0.7349 level=10.0 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=86.1
+phase2h-12-skateboard-with-graffiti-art: done model=pixal3d weights=single thin=0.1469 level=45.6 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=52.0
+phase2h-13-cute-cartoon-car-bright-blue: done model=pixal3d weights=multiview thin=0.4768 level=11.2 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=80.3
+phase2h-14-bubble-tea-with-tapioca-pearls: done model=pixal3d weights=multiview thin=0.5617 level=18.8 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=56.8
+phase2h-15-health-potion-in-a-round-glass: done model=pixal3d weights=multiview thin=0.678 level=no pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=73.8
+phase2h-16-green-dragon-sitting-cartoon: done model=pixal3d weights=multiview thin=0.6713 level=8.1 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=55.7
+phase2h-17-bowl-of-ramen-with-an-egg: done model=pixal3d weights=multiview thin=0.8578 level=43.8 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=76.5
+phase2h-18-electric-guitar: done model=pixal3d weights=single thin=0.0865 level=19.4 pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=58.4
+phase2h-19-small-cabin-in-a-snowy-forest: done model=pixal3d weights=multiview thin=0.6259 level=no pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=66.7
+phase2h-20-hot-air-balloon: done model=pixal3d weights=multiview thin=0.7514 level=no pipeline=pixal3d-1024_cascade painted=True (applied) gpu_s=55.1
+46M	ops-out/private/all
+exit status: 0
