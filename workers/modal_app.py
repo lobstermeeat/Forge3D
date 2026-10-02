@@ -23,6 +23,10 @@ as the default: the recipe fixed made-up backs but lost more on textures (README
 Texture options (mode "textures": more textures for a final's shape) are TRELLIS.2's alone, so with the
 recipe on they are refused.
 
+Experiments call two more workers that production never does: GeometryViews (MV-Adapter's views of a
+given mesh) and the judge, Judge8B and Judge30B (Qwen3-VL picking the texture a creator would rather use;
+judge/judge_worker/).
+
 The GPU code is the same as in the RunPod images (trellis2/, flux-schnell/); only the entry
 points differ. The job API (job_api.py) speaks RunPod's protocol, so the server's client works
 with both. One-time setup (Hugging Face access, Modal secrets) is in README.md.
@@ -91,6 +95,9 @@ TRELLIS2_GPU = "L40S"
 TRELLIS2_LOW_VRAM = "0"
 FLUX_GPU = "L40S"  # FLUX.1 [schnell] needs about 34 GB
 MULTIVIEW_GPU = "A10G"  # MV-Adapter on SDXL needs about 14 GB: a 24 GB A10G, about half an L40S's price
+# The judge (experiments only): Qwen3-VL-8B is 17.5 GB in bf16 (an A10G would do, an L40S leaves room);
+# Qwen3-VL-30B-A3B is 62 GB, so an H100 (80 GB)
+JUDGE_GPUS = {"8b": "L40S", "30b": "H100"}
 
 app = modal.App(APP_NAME)
 models = modal.Volume.from_name("orainge-models", create_if_missing=True)
@@ -213,6 +220,16 @@ multiview_image = (
     .add_local_dir(WORKERS / "multiview" / "mvadapter", "/root/mvadapter")
 )
 
+# The judge (experiments only): Qwen3-VL through transformers, on MultiView's base (the same Python and
+# torch, so Modal reuses those layers)
+judge_image = (
+    modal.Image.debian_slim(python_version="3.10")
+    .pip_install(*TORCH, index_url=TORCH_INDEX)
+    .pip_install_from_requirements(str(WORKERS / "judge" / "requirements.txt"))
+    .env({"HF_HUB_OFFLINE": "1", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"})
+    .add_local_dir(WORKERS / "judge" / "judge_worker", "/root/judge_worker")
+)
+
 download_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("huggingface_hub[hf_xet]>=0.34,<2")
@@ -222,6 +239,7 @@ download_image = (
     )
     .add_local_file(WORKERS / "multiview" / "scripts" / "download_weights.py", "/root/weights/multiview.py")
     .add_local_file(WORKERS / "pixal3d" / "scripts" / "download_weights.py", "/root/weights/pixal3d.py")
+    .add_local_file(WORKERS / "judge" / "scripts" / "download_weights.py", "/root/weights/judge.py")
 )
 
 api_image = (
@@ -655,13 +673,88 @@ class GeometryViews:
         return run_job(self.handle, job)
 
 
-# In download order: Pixal3D's script reuses the TRELLIS.2 worker's DINOv3, BiRefNet and decoders
+# --- The judge (Phase 7, experiments only): which texture of a shape a creator would rather use ---------
+# One class per size, because a class parameter can't choose the GPU (Modal sets it per class; with_options
+# would leave Judge(model="30b") on a card it doesn't fit). judge_class("8b" | "30b") gives the class.
+
+
+def judge_handler(which: str) -> Callable[[dict], dict]:
+    """A judge job handler (judge/judge_worker/service.py) with that size of Qwen3-VL loaded on the GPU."""
+    from judge_worker.model import load
+    from judge_worker.service import handle_job
+
+    _require_weights("judge")
+    model = load(which, MODELS)
+    print(f"[orainge] judge {which}: {model.path} loaded in {model.load_seconds} s")
+    return lambda job: handle_job(job, model, name=which)
+
+
+JUDGE_OPTIONS = dict(
+    image=judge_image,
+    cpu=4.0,
+    memory=32768,  # the weights go straight to the GPU; RAM holds a file's worth at a time
+    volumes={MODELS: models},
+    timeout=900,
+    startup_timeout=1200,  # the 30B's 62 GB come off the volume before the first job
+    # Experiments call it as each object is made, a minute or so apart: idle time is billed, but a 30B
+    # cold start (62 GB off the volume) costs more
+    scaledown_window=300,
+    max_containers=1,
+)
+
+
+@app.cls(gpu=JUDGE_GPUS["8b"], **JUDGE_OPTIONS)
+class Judge8B:
+    """
+    Experiments only, nothing in production calls it: Qwen3-VL-8B looks at the picture a model was made from
+    and turntable grids of several textures of its shape (trellis2/forge3d_worker/judgeviews.py) and says
+    which a creator would rather use. The job and its result are judge/judge_worker/service.py's:
+
+        modal_app.Judge8B().judge.remote({"picture_png": …, "candidates_png": […], "prompt": "…"})
+    """
+
+    @modal.enter()
+    def load(self) -> None:
+        self.handle = judge_handler("8b")
+
+    @modal.method()
+    def judge(self, job: dict) -> dict:
+        return run_job(self.handle, job)
+
+
+@app.cls(gpu=JUDGE_GPUS["30b"], **JUDGE_OPTIONS)
+class Judge30B:
+    """Judge8B with Qwen3-VL-30B-A3B (a mixture of experts, 62 GB in bf16) on an H100."""
+
+    @modal.enter()
+    def load(self) -> None:
+        self.handle = judge_handler("30b")
+
+    @modal.method()
+    def judge(self, job: dict) -> dict:
+        return run_job(self.handle, job)
+
+
+JUDGES = {"8b": Judge8B, "30b": Judge30B}
+
+
+def judge_class(model: str) -> Any:
+    """The judge class for a size, "8b" or "30b": ``judge_class("30b")().judge.spawn(job)``."""
+    if model not in JUDGES:
+        raise ValueError(f"the judge model is one of {', '.join(JUDGES)}, not {model!r}")
+    return JUDGES[model]
+
+
+# In download order: Pixal3D's script reuses the TRELLIS.2 worker's DINOv3, BiRefNet and decoders. The
+# judge's (both sizes, about 80 GB) only when asked for: production never needs them
 WEIGHT_SCRIPTS = {
     "trellis2": "/root/weights/trellis2.py",
     "reference": "/root/weights/reference.py",
     "multiview": "/root/weights/multiview.py",
     "pixal3d": "/root/weights/pixal3d.py",
+    "judge": "/root/weights/judge.py",
 }
+EXPERIMENT_WEIGHTS = ("judge",)  # left out of --which all
 
 
 @app.function(
@@ -675,11 +768,13 @@ WEIGHT_SCRIPTS = {
 def download_models(which: str = "all", force: bool = False) -> None:
     """
     Downloads the pinned weights (about 119 GB, 44 GB of it Pixal3D's two sets) into the orainge-models
-    volume. CPU only.
+    volume. CPU only. ``--which judge`` adds the experiments' judge (Qwen3-VL in two sizes, about 80 GB),
+    which "all" leaves out.
     """
     if which != "all" and which not in WEIGHT_SCRIPTS:
         raise SystemExit(f"--which must be all, {', '.join(WEIGHT_SCRIPTS)}")
-    for name in WEIGHT_SCRIPTS if which == "all" else [which]:
+    names = [name for name in WEIGHT_SCRIPTS if name not in EXPERIMENT_WEIGHTS] if which == "all" else [which]
+    for name in names:
         _download(name, force)
         models.commit()
 
@@ -1244,6 +1339,7 @@ def build_images() -> None:
         ("reference", flux_image),
         ("multiview", multiview_image),
         ("trellis2", trellis2_image),
+        ("judge", judge_image),
     ]
     with modal.enable_output():
         for name, image in images:

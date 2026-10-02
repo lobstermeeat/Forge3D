@@ -562,6 +562,42 @@ projection (to_glb, unpremultiply, bake, project, shade, export).
   UV seams), and by 0.24 (99% within 4) from renders twice the size: what is left is resampling. About
   60% of its texels, mostly the inner faces of its panels, are seen by no camera and keep their colour.
 
+### The judge (Phase 7, an experiment)
+
+Phase 7's rolls showed that the texture is a lottery: the reviewers' best of four textures of one shape
+was publishable for 16 of 20 objects, production's own texture for 10, and pickers built on image
+statistics agreed with the reviewers barely better than chance. The judge is a self-hosted
+vision-language model asked what the reviewers were asked. Nothing in production calls it.
+
+- **Renders**: `trellis2/forge3d_worker/judgeviews.py`'s `turntable(mesh, size=384, views=6,
+  elevation=20.0, background=0.12)` draws to_glb's mesh (glTF axes, the front +Z) from six azimuths (0,
+  60, ..., 300 degrees from the front, 20 degrees above) in a 3 x 2 grid, 1152 x 768: base colour times
+  ambient plus a key light from the camera's upper left, a faint rim light, a dark background, a 30
+  degree lens at one distance for every view. It uses the projection's torch rasteriser (GPU or CPU).
+- **The judge**: `judge/judge_worker/judge.py`'s `judge(picture, candidates, prompt_text)` makes one chat
+  call with the picture and every candidate's grid, each under a letter (K, L, M, ...; `order` shows
+  them in another order), and returns `{"verdicts": [...], "best": index, "why", "raw", "seconds",
+  "letters", "problems"}`. The verdicts are the reviewers' ("publish", "edits", "reject"); the rubric is
+  theirs, adapted to one shape with several textures (`prompt.py`, the only place the wording lives).
+  Decoding is greedy. A reply is read however it strays from the JSON asked for (`parse.py`); one with
+  no valid pick gives `best` 0, the generation's own texture, and says why in `parse_error`.
+- **The models**: Qwen3-VL through transformers 4.57.6, in two sizes: Qwen3-VL-8B-Instruct (17.5 GB in
+  bf16) and Qwen3-VL-30B-A3B-Instruct (a mixture of experts, 62 GB). Both are Apache-2.0, pinned by
+  revision with every weight file's sha256 (`judge/scripts/download_weights.py`, `download_models --which
+  judge`, about 80 GB, which "all" leaves out). The picture goes in at most 768 pixels a side (576
+  tokens) and each grid at 1152 x 768 (864 tokens): about 5,000 tokens for four candidates. At
+  inference transformers 4.57 runs all 128 of the 30B's experts on every token (about 10 GB more than
+  the weights for such a prompt); the judge switches it to the experts each token uses, the same sum.
+- **On Modal**: `Judge8B` (L40S) and `Judge30B` (H100), one class per size because a class parameter
+  can't choose the GPU; `judge_class("8b" | "30b")` gives the class. One container each, scaling down
+  after a minute idle. A `modal run` script calls
+  `modal_app.judge_class("30b")().judge.remote({"picture_png": …, "candidates_png": […], "prompt": "…",
+  "order": [2, 0, 3, 1]})` (base64 PNG or JPEG; `seed` shuffles instead of `order`) and gets the result
+  above with `"model"`, or `{"error": "invalid input: …" | "judge failed: …"}`.
+- **The experiment**: `ops/exp_judge.py` (in a staging app) makes each picture's final and three more
+  textures as the rolls did, draws their grids, and asks both judges in two mirrored orders; its
+  `summary.json` names each judge's verdicts and pick by candidate.
+
 ### The Pixal3D worker
 
 `pixal3d/pixal3d_worker/service.py` is the `trellis2` contract with Pixal3D behind it, plus views. With
@@ -967,6 +1003,9 @@ tools) on Stable Diffusion XL 1.0, whose CreativeML Open RAIL++-M license has us
 that Orainge's terms of service must pass on to users before the worker serves them. The same applies
 to MV-Adapter's image+geometry adapter (Apache-2.0), which only the experiments' `GeometryViews` runs.
 
+The judge ([`judge/NOTICE.md`](judge/NOTICE.md)), experiments only, runs Qwen3-VL-8B-Instruct and
+Qwen3-VL-30B-A3B-Instruct (both Apache-2.0, pinned by revision) through transformers (Apache-2.0).
+
 ## Tests
 
 ```sh
@@ -976,6 +1015,7 @@ python -m pytest workers/trellis2/tests        # CPU only; set GLTFPACK_BIN to i
 python -m pytest workers/flux-schnell/tests
 python -m pytest workers/pixal3d/tests         # CPU only (torch, trimesh): the recipe on a fake pipeline
 python -m pytest workers/multiview/tests       # torch for the camera checks; no GPU or weights
+python -m pytest workers/judge/tests           # the judge on a fake model; with transformers 4.57+, a tiny random Qwen3-VL too
 ```
 
 Run the folders separately: they share test file names. Each suite also runs from inside its folder
@@ -1003,7 +1043,12 @@ Pixal3D's cameras and views, the NATTEN stand-in (against NATTEN's own definitio
 scripts' pins. The multiview tests hold its cameras to MV-Adapter's code and cover the reference
 picture's preparation and job handling, and for the image+geometry model the control maps' encoding
 and transport, the mesh's placement (against upstream's `load_mesh`), the call into the pipeline and
-its jobs, all with stand-ins for diffusers and the weights. Before the first
+its jobs, all with stand-ins for diffusers and the weights. For the judge they cover the turntable grid
+on synthetic boxes (which side each view sees, the texture where the UVs put it, the background, the
+framing, the light), the chat it sends, its reading of stray replies, its jobs, the weights script's
+pins, the calls into transformers (through a stand-in; with transformers 4.57 or later installed, also
+a tiny random Qwen3-VL, dense and mixture-of-experts, end to end on the CPU), the Modal classes and the
+experiment script's own steps. Before the first
 production deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine
 that has nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real
 hardware.
