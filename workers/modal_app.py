@@ -105,7 +105,8 @@ R2_SECRET = os.environ.get("ORAINGE_R2_SECRET")
 storage_secrets = [modal.Secret.from_name(R2_SECRET)] if R2_SECRET else []
 if modal.is_local():
     print(f"[orainge] results: {f'R2 (secret {R2_SECRET})' if R2_SECRET else 'inline; set ORAINGE_R2_SECRET for R2'}")
-    print(f"[orainge] finals: {FINAL_MODEL} (ORAINGE_FINAL_MODEL={'trellis2' if FINAL_MODEL == 'pixal3d' else 'pixal3d'} for the other)")
+    other = "trellis2" if FINAL_MODEL == "pixal3d" else "pixal3d"
+    print(f"[orainge] finals: {FINAL_MODEL} (ORAINGE_FINAL_MODEL={other} for the other)")
 
 
 def _git(url: str, commit: str, target: str) -> str:
@@ -612,7 +613,10 @@ WEIGHT_SCRIPTS = {
     timeout=3 * 3600,  # generous for slow Hugging Face transfers; an interrupted run resumes
 )
 def download_models(which: str = "all", force: bool = False) -> None:
-    """Downloads the pinned weights (about 80 GB) into the orainge-models volume. CPU only."""
+    """
+    Downloads the pinned weights (about 115 GB, 44 GB of it Pixal3D's two sets) into the orainge-models
+    volume. CPU only.
+    """
     if which != "all" and which not in WEIGHT_SCRIPTS:
         raise SystemExit(f"--which must be all, {', '.join(WEIGHT_SCRIPTS)}")
     for name in WEIGHT_SCRIPTS if which == "all" else [which]:

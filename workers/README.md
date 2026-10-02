@@ -449,7 +449,7 @@ alike (with the recipe on, its container makes the finals with Pixal3D).
    sets (about 44 GB: the multi-view set for most pictures, the single-view set for thin, flat
    objects), MoGe-2 and NAF, and reuses the TRELLIS.2 weights' decoders, DINOv3 and BiRefNet, so it
    comes after `--which trellis2`. Add `--which multiview` only if the server will run with
-   `AI_MULTIVIEW=1`. Without `--which`, `download_models` fetches all four sets, about 80 GB.
+   `AI_MULTIVIEW=1`. Without `--which`, `download_models` fetches all four sets, about 115 GB (Pixal3D's two flow-model sets are 44 GB of it).
 
 5. Update the server's database. From Phase 6 on, the server reads the `views` and `views_error`
    columns of `ai_generations` (`apps/server/src/db/schema.ts`) even with `AI_MULTIVIEW` off, so
