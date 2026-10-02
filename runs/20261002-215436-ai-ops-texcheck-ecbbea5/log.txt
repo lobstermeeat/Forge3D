@@ -1,0 +1,17 @@
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-P43zfTLSzDqgTH5ui8dpf0
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/check_textures.py
+└── ✓ Created Function check.
+final: queued as fc-01M3Z9K7X5W3XWFPPAS8JFWJMD
+Final: 95,991 triangles, 1.4 MB, pipeline 1024_cascade, model trellis2, after 142 s (32 s of GPU work)
+textures: queued as fc-01M3Z9QFN8Q7DAVGAW785KP48G
+Texture 821890765: 96,448 triangles, 1.6 MB, export to_glb in 19.497 s, key ai/textures-check-1790977872/final-821889765-texture-1.glb
+Texture 821891765: 96,448 triangles, 1.4 MB, export rebake in 2.476 s, key ai/textures-check-1790977872/final-821889765-texture-2.glb
+Texture 821892765: 96,448 triangles, 1.6 MB, export rebake in 2.034 s, key ai/textures-check-1790977872/final-821889765-texture-3.glb
+Textures: 3 of 3 after 60 s; pipeline 1024_cascade; timings {"generate_s": 8.829, "retexture_s": 5.601, "export_s": 38.822, "pack_s": 3.672, "upload_s": 0.006}
+Texture options work on the deployed job API ({'final': 141.7, 'textures': 59.7}). Saved the models in ops-out/private/textures-check/
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-P43zfTLSzDqgTH5ui8dpf0
+exit status: 0
