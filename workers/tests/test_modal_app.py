@@ -27,9 +27,11 @@ def test_pins_match_the_runpod_dockerfile():
     assert f"pip install {modal_app.FLASH_ATTN_WHEEL}" in dockerfile
 
 
-def test_defines_both_workers_the_api_and_the_helpers():
+def test_defines_the_workers_the_api_and_the_helpers():
     assert isinstance(modal_app.Trellis2, modal.Cls)
     assert isinstance(modal_app.FluxSchnell, modal.Cls)
+    assert isinstance(modal_app.MultiView, modal.Cls)
+    assert set(modal_app.WEIGHT_SCRIPTS) == {"trellis2", "reference", "multiview"}
     assert isinstance(modal_app.download_models, modal.Function)
     assert isinstance(modal_app.api, modal.Function)
     assert isinstance(modal_app.make_model, modal.Function)
