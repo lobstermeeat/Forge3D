@@ -2,11 +2,14 @@
 
 **Built with DINOv3.**
 
-The Pixal3D worker makes Orainge's finals on Modal, in the TRELLIS.2 worker's container
-(`../modal_app.py`; see "The recipe" in `../README.md`). It runs the components below, on top of
-everything the TRELLIS.2 worker runs (see `../trellis2/NOTICE.md`; its export, texture bake stand-in
-and packing are reused as they are). Both of Pixal3D's weight sets are used: the multi-view set for
-most pictures, the single-view set for thin, flat objects.
+The Pixal3D worker makes Orainge's finals on Modal, in the TRELLIS.2 worker's container, only when the
+app is deployed with `ORAINGE_FINAL_MODEL=pixal3d` (off by default; see "The recipe" in
+`../README.md`). The code below (Pixal3D, MoGe, utils3d, NAF) is installed in that container's image
+either way (`../modal_app.py`); the weights are downloaded only on request
+(`download_models --which pixal3d`). It runs on top of everything the TRELLIS.2 worker runs (see
+`../trellis2/NOTICE.md`; its export, texture bake stand-in and packing are reused as they are). When
+it is on, both of Pixal3D's weight sets are used: the multi-view set for most pictures, the
+single-view set for thin, flat objects.
 
 | Component | Pinned at | Used for | License |
 | --- | --- | --- | --- |
