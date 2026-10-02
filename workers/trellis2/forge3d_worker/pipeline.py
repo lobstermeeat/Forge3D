@@ -7,7 +7,7 @@ import gc
 import json
 import os
 import traceback
-from typing import Any, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 from PIL import Image
 
@@ -180,6 +180,11 @@ class Trellis2Runtime:
     # Deployed in low-VRAM mode (TRELLIS2_LOW_VRAM=1, an A10): the models live off the GPU from the start,
     # and a retry's restore leaves them there
     low_vram_configured: bool = False
+    # An experiment's step between unpremultiplying the texture and the picture's projection (Phase 7:
+    # views baked into the texture, see mvtexture.py). Called with to_glb's mesh and the generated mesh
+    # (which carries the cutout), it may change the texture in place; what it returns is kept as
+    # last_before_projection. None in production
+    before_projection: Optional[Callable[[Any, Any], Any]] = None
 
     def __init__(self, model_dir: str = MODEL_DIR) -> None:
         _configure_environment()
@@ -389,6 +394,7 @@ class Trellis2Runtime:
         ``last_projection`` then summarises the picture's projection (None when the preset has it off).
         """
         self.last_projection: Optional[dict] = None
+        self.last_before_projection: Any = None
         try:
             return self._export(mesh, preset)
         except Exception as err:
@@ -426,6 +432,8 @@ class Trellis2Runtime:
         material = glb.visual.material
         if getattr(material, "baseColorTexture", None) is not None:
             material.baseColorTexture = unpremultiply(material.baseColorTexture)
+            if self.before_projection is not None:
+                self.last_before_projection = self.before_projection(glb, mesh)
             if preset.project_picture:
                 # Before the normals, which may split vertices: the projection works on to_glb's mesh
                 self.last_projection = self._project(glb, getattr(mesh, CUTOUT, None))

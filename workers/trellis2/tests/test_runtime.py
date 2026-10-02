@@ -440,6 +440,39 @@ def test_export_paints_the_picture_on_finals(mode, projects, monkeypatch, capsys
         assert calls == [] and runtime.last_projection is None
 
 
+def test_an_experiment_can_change_the_texture_before_the_projection(monkeypatch):
+    import types
+
+    from forge3d_worker import pipeline as pipeline_module
+
+    steps = []
+
+    def project_picture(glb, picture):
+        steps.append(("projection", glb.visual.material.baseColorTexture.getpixel((0, 0))))
+        return glb, {"applied": True, "reason": "applied"}
+
+    def bake(glb, mesh):
+        # After unpremultiplying (RGB by then); handed the generated mesh, which carries the cutout
+        steps.append(("bake", glb.visual.material.baseColorTexture.mode, mesh.forge3d_cutout.size))
+        glb.visual.material.baseColorTexture = Image.new("RGB", (8, 8), (1, 2, 3))
+        return {"seconds": 0.1}
+
+    monkeypatch.setattr(pipeline_module.projection, "project_picture", project_picture)
+    glb = textured_glb()
+    runtime = runtime_around(FakePipeline())
+    runtime._o_voxel = types.SimpleNamespace(postprocess=types.SimpleNamespace(to_glb=lambda **kwargs: glb))
+    runtime.before_projection = bake
+    mesh = types.SimpleNamespace(vertices=None, faces=None, attrs=None, coords=None, layout=None, voxel_size=None)
+    mesh.forge3d_cutout = cutout()
+    runtime.export(mesh, PRESETS["final"])
+    assert steps == [("bake", "RGB", (64, 64)), ("projection", (1, 2, 3))]  # the projection painted on the bake
+    assert runtime.last_before_projection == {"seconds": 0.1}
+
+
+def test_production_changes_nothing_before_the_projection():
+    assert Trellis2Runtime.before_projection is None
+
+
 def test_export_without_a_picture_says_so():
     import types
 
