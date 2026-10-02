@@ -1,19 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { randomUUID } from 'node:crypto';
 import type { StorageProvider } from '../storage';
+import { MOCK_VIEW_AZIMUTHS, MockWorkers } from './providers/mock';
 import {
   AIStudio,
   LIMITS,
   StudioError,
+  VIEWS_TIMEOUT_MS,
   WARM_INTERVAL_MS,
   type GenerationRecord,
   type GenerationStore,
+  type GenerationView,
 } from './studio';
 import type {
   ModelOutput,
+  ModelView,
   ReferencesOutput,
   StudioWorkers,
+  ViewsOutput,
   WorkerJobState,
   WorkerKind,
 } from './types';
@@ -32,6 +37,8 @@ function memoryStore(): GenerationStore & { rows: Map<string, GenerationRecord> 
         imageUrl: null,
         jobId: null,
         jobKind: null,
+        views: null,
+        viewsError: null,
         referenceImages: null,
         seed: null,
         previewUrl: null,
@@ -97,16 +104,28 @@ function memoryStorage(): StorageProvider & { files: Map<string, Buffer> } {
 /** Workers whose jobs finish (or fail) when the test says so. */
 function scriptedWorkers(prompts = true) {
   const references = new Map<string, WorkerJobState<ReferencesOutput> | Error>();
+  const views = new Map<string, WorkerJobState<ViewsOutput> | Error>();
   const models = new Map<string, WorkerJobState<ModelOutput> | Error>();
   const started: { kind: string; input: Record<string, unknown> }[] = [];
   /** The GPUs asked to start early, in order */
   const warmed: WorkerKind[] = [];
-  /** What the test makes happen: pictures that can't start, and what starting a GPU early does */
-  const control: { startError?: Error; warm?: () => Promise<void> } = {};
+  /** The jobs the studio stopped, as `kind:jobId` */
+  const cancelled: string[] = [];
+  /**
+   * What the test makes happen: pictures, views or models that can't start, and what starting a
+   * GPU early does
+   */
+  const control: {
+    startError?: Error;
+    viewsStartError?: Error;
+    modelStartError?: Error;
+    warm?: () => Promise<void>;
+  } = {};
   let next = 1;
   const workers: StudioWorkers = {
     name: 'test-workers',
     prompts,
+    multiview: true,
     async startReferences(input) {
       if (control.startError) throw control.startError;
       const id = `ref-${next++}`;
@@ -119,7 +138,20 @@ function scriptedWorkers(prompts = true) {
       if (state instanceof Error) throw state;
       return state;
     },
+    async startViews(input) {
+      if (control.viewsStartError) throw control.viewsStartError;
+      const id = `views-${next++}`;
+      started.push({ kind: 'views', input });
+      views.set(id, { status: 'running' });
+      return id;
+    },
+    async views(jobId) {
+      const state = views.get(jobId)!;
+      if (state instanceof Error) throw state;
+      return state;
+    },
     async startModel(input) {
+      if (control.modelStartError) throw control.modelStartError;
       const id = `model-${next++}`;
       started.push({ kind: input.mode, input });
       models.set(id, { status: 'running' });
@@ -134,8 +166,11 @@ function scriptedWorkers(prompts = true) {
       warmed.push(kind);
       await control.warm?.();
     },
+    async cancel(kind, jobId) {
+      cancelled.push(`${kind}:${jobId}`);
+    },
   };
-  return { workers, references, models, started, warmed, control };
+  return { workers, references, views, models, started, warmed, cancelled, control };
 }
 
 const png = (colour: string) =>
@@ -152,12 +187,42 @@ const modelOutput = (seed: number, mode: string): ModelOutput => ({
   credits: ['Built with DINOv3'],
 });
 
-function setup(prompts = true) {
+/** 6 views like the multiview worker's, each a different grey so their order shows */
+const viewsOutput = async (): Promise<ViewsOutput> => ({
+  views: await Promise.all(
+    MOCK_VIEW_AZIMUTHS.map(async (azimuth, i) => ({
+      file: { data: await png(`#${i}${i}${i}`) },
+      azimuth,
+      elevation: 0,
+    })),
+  ),
+  seconds: 21.5,
+});
+
+/** The views a job was started with, as the studio sent them */
+const sentViews = (start: { input: Record<string, unknown> }) =>
+  start.input['views'] as ModelView[] | undefined;
+
+/** AIStudio with scripted workers; `multiview` is AI_MULTIVIEW=1 */
+function setup(prompts = true, { multiview = false }: { multiview?: boolean } = {}) {
   const store = memoryStore();
   const storage = memoryStorage();
   const jobs = scriptedWorkers(prompts);
-  const studio = new AIStudio({ workers: jobs.workers, store, storage });
+  const studio = new AIStudio({ workers: jobs.workers, store, storage, multiview });
   return { studio, store, storage, ...jobs };
+}
+
+/** A prompt's generation with one picture drawn (seed 3), for the user to pick */
+async function picking(
+  { studio, references }: ReturnType<typeof setup>,
+  user = 'u1',
+): Promise<GenerationView> {
+  const gen = await studio.startFromPrompt(user, 'a vintage film camera');
+  references.set([...references.keys()].at(-1)!, {
+    status: 'done',
+    output: { images: [{ file: { data: await png('#c84') }, seed: 3 }] },
+  });
+  return studio.get(user, gen.id);
 }
 
 describe('AIStudio', () => {
@@ -229,6 +294,12 @@ describe('AIStudio', () => {
       status: 'done',
       final: { url: `https://files.test/ai/${gen.id}/final-4242.glb`, triangles: 100_000 },
     });
+
+    // AI_MULTIVIEW is off by default: no views step, and the models get the picture alone
+    expect(started.map((s) => s.kind)).toEqual(['references', 'preview', 'final']);
+    expect(started.some((s) => 'views' in s.input)).toBe(false);
+    expect(gen).toMatchObject({ views: [], viewsError: null });
+    expect(studio.capabilities().multiview).toBe(false);
   });
 
   it('starts a photo at the preview, upright and scaled down', async () => {
@@ -351,6 +422,7 @@ describe('AIStudio', () => {
       available: false,
       prompts: false,
       photos: false,
+      multiview: false,
       mock: false,
     });
     await expectError(none.startFromPhoto('u1', await png('#fff')), 'UNAVAILABLE', /not set up/);
@@ -570,5 +642,417 @@ describe('AIStudio', () => {
     delete control.startError;
     expect(await studio.retry('u2', failed.id)).toMatchObject({ status: 'drawing' });
     expect(warmed).toEqual(['model', 'model']);
+  });
+});
+
+describe('AIStudio with AI_MULTIVIEW=1 (the views step)', () => {
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => warn.mockRestore());
+
+  /** The image a view was sent with */
+  const viewImages = (output: ViewsOutput) =>
+    output.views.map(({ file, azimuth, elevation }) => ({
+      image: 'data' in file ? file.data : null,
+      azimuth,
+      elevation,
+    }));
+
+  it('draws the picked picture from 6 sides, then builds the preview and final from them', async () => {
+    const t = setup(true, { multiview: true });
+    const { studio, store, storage, views, models, started } = t;
+    expect(studio.capabilities().multiview).toBe(true);
+    const steps: string[] = [];
+    const seen = (g: GenerationView) => {
+      if (steps.at(-1) !== g.status) steps.push(g.status);
+      return g;
+    };
+
+    let gen = seen(await studio.startFromPrompt('u1', 'a vintage film camera'));
+    expect(started.map((s) => s.kind)).toEqual(['references']);
+    t.references.set('ref-1', {
+      status: 'done',
+      output: { images: [{ file: { data: await png('#c84') }, seed: 3 }] },
+    });
+    gen = seen(await studio.get('u1', gen.id));
+
+    // Picking a picture draws its other sides, from the picked picture's bytes
+    gen = seen(await studio.pick('u1', gen.id, 0));
+    expect(gen).toMatchObject({ status: 'viewing', views: [], viewsError: null, preview: null });
+    const picture = storage.files.get(`ai/${gen.id}/reference-3.png`);
+    expect(started.at(-1)).toEqual({ kind: 'views', input: { image: picture, requestId: gen.id } });
+    // Still drawing them
+    gen = seen(await studio.get('u1', gen.id));
+    expect(started).toHaveLength(2);
+
+    // Done: they are copied into storage, and the preview starts from the picture and all 6
+    const output = await viewsOutput();
+    views.set('views-2', { status: 'done', output });
+    gen = seen(await studio.get('u1', gen.id));
+    expect(gen.status).toBe('previewing');
+    const keys = MOCK_VIEW_AZIMUTHS.map(
+      (azimuth, i) => `ai/${gen.id}/views-views-2/${i}-${azimuth}.png`,
+    );
+    expect(gen.views).toEqual(
+      MOCK_VIEW_AZIMUTHS.map((azimuth, i) => ({
+        url: `https://files.test/${keys[i]}`,
+        azimuth,
+        elevation: 0,
+      })),
+    );
+    expect(keys.map((key) => storage.files.get(key))).toEqual(
+      viewImages(output).map((view) => view.image),
+    );
+    const previewStart = started.at(-1)!;
+    expect(previewStart).toMatchObject({ kind: 'preview', input: { requestId: gen.id } });
+    expect(previewStart.input['image']).toEqual(picture);
+    expect(previewStart.input['seed']).toBeUndefined();
+    expect(sentViews(previewStart)).toEqual(viewImages(output));
+    // Their GPU time counts
+    expect(store.rows.get(gen.id)!.durationMs).toBe(21_500);
+
+    models.set('model-3', {
+      status: 'done',
+      output: { ...modelOutput(77, 'preview'), viewsUsed: 6 },
+    });
+    gen = seen(await studio.get('u1', gen.id));
+    expect(gen.status).toBe('reviewing');
+    expect(gen.views).toHaveLength(6);
+
+    // The final gets the same views (read back from storage) and the preview's seed
+    gen = seen(await studio.keep('u1', gen.id));
+    const finalStart = started.at(-1)!;
+    expect(finalStart).toMatchObject({ kind: 'final', input: { seed: 77 } });
+    expect(finalStart.input['image']).toEqual(picture);
+    expect(sentViews(finalStart)).toEqual(viewImages(output));
+
+    models.set('model-4', {
+      status: 'done',
+      output: { ...modelOutput(77, 'final'), viewsUsed: 6 },
+    });
+    gen = seen(await studio.get('u1', gen.id));
+    expect(gen.final).toMatchObject({ url: `https://files.test/ai/${gen.id}/final-77.glb` });
+
+    expect(steps).toEqual([
+      'drawing',
+      'picking',
+      'viewing',
+      'previewing',
+      'reviewing',
+      'finishing',
+      'done',
+    ]);
+    expect(started.map((s) => s.kind)).toEqual(['references', 'views', 'preview', 'final']);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('starts a photo at its other sides', async () => {
+    const { studio, storage, views, started } = setup(false, { multiview: true });
+    const gen = await studio.startFromPhoto('u1', await png('#ff000080'));
+    expect(gen).toMatchObject({
+      status: 'viewing',
+      image: `https://files.test/ai/${gen.id}/input.png`,
+    });
+    const photo = storage.files.get(`ai/${gen.id}/input.png`)!;
+    expect(started).toEqual([{ kind: 'views', input: { image: photo, requestId: gen.id } }]);
+
+    const output = await viewsOutput();
+    views.set('views-1', { status: 'done', output });
+    expect(await studio.get('u1', gen.id)).toMatchObject({ status: 'previewing' });
+    expect(started.at(-1)!.input['image']).toEqual(photo);
+    expect(sentViews(started.at(-1)!)).toEqual(viewImages(output));
+  });
+
+  it('has no views step without the multiview worker', async () => {
+    const t = setup(true, { multiview: true });
+    (t.workers as { multiview: boolean }).multiview = false;
+    expect(t.studio.capabilities().multiview).toBe(false);
+    const gen = await picking(t);
+    expect((await t.studio.pick('u1', gen.id, 0)).status).toBe('previewing');
+    expect((await t.studio.startFromPhoto('u1', await png('#fff'))).status).toBe('previewing');
+    expect(t.started.map((s) => s.kind)).toEqual(['references', 'preview', 'preview']);
+    expect(t.started.some((s) => 'views' in s.input)).toBe(false);
+    // Nor is its GPU started, even when asked
+    t.studio.warm('u1', 'multiview');
+    expect(t.warmed).toEqual(['model']);
+  });
+
+  it('makes the model from the picture alone when the views fail, and keeps why', async () => {
+    const t = setup(true, { multiview: true });
+    let gen = await picking(t);
+    await t.studio.pick('u1', gen.id, 0);
+    t.views.set('views-2', { status: 'failed', message: 'generation failed: CUDA out of memory' });
+    gen = await t.studio.get('u1', gen.id);
+    // Not a failure: the preview goes ahead without views
+    expect(gen).toMatchObject({
+      status: 'previewing',
+      views: [],
+      viewsError: 'generation failed: CUDA out of memory',
+      error: null,
+    });
+    expect(t.started.at(-1)!.kind).toBe('preview');
+    expect('views' in t.started.at(-1)!.input).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(gen.id),
+      'generation failed: CUDA out of memory',
+    );
+
+    t.models.set('model-3', { status: 'done', output: modelOutput(5, 'preview') });
+    expect((await t.studio.get('u1', gen.id)).status).toBe('reviewing');
+    // Picking again tries the views again, without the old reason
+    gen = await t.studio.pick('u1', gen.id, 0);
+    expect(gen).toMatchObject({ status: 'viewing', views: [], viewsError: null });
+    t.views.set('views-4', { status: 'done', output: await viewsOutput() });
+    expect(await t.studio.get('u1', gen.id)).toMatchObject({
+      status: 'previewing',
+      viewsError: null,
+    });
+    expect(sentViews(t.started.at(-1)!)).toHaveLength(6);
+  });
+
+  it("goes straight to the preview when the views can't start", async () => {
+    const t = setup(true, { multiview: true });
+    // E.g. a job API without the multiview worker yet
+    t.control.viewsStartError = new Error(
+      `AI worker run failed: 404 {"detail":"unknown worker 'multiview'"}`,
+    );
+    const gen = await picking(t);
+    expect(await t.studio.pick('u1', gen.id, 0)).toMatchObject({
+      status: 'previewing',
+      views: [],
+      viewsError: expect.stringContaining('unknown worker'),
+    });
+    expect(t.started.map((s) => s.kind)).toEqual(['references', 'preview']);
+
+    const photo = await t.studio.startFromPhoto('u1', await png('#fff'));
+    expect(photo).toMatchObject({
+      status: 'previewing',
+      viewsError: expect.stringContaining('404'),
+    });
+    expect(t.started.at(-1)!.input['image']).toEqual(
+      t.storage.files.get(`ai/${photo.id}/input.png`),
+    );
+  });
+
+  it('goes on without views that came back broken', async () => {
+    const t = setup(false, { multiview: true });
+    const broken: [WorkerJobState<ViewsOutput> | Error, RegExp][] = [
+      [{ status: 'done', output: { views: [], seconds: 1 } }, /no views/],
+      [
+        {
+          status: 'done',
+          output: {
+            views: [{ file: { data: Buffer.from('<html>') }, azimuth: 0, elevation: 0 }],
+            seconds: 1,
+          },
+        },
+        /view 1 .* isn't a picture/,
+      ],
+      // A job the host forgot
+      [new Error('AI worker status failed: 404 {"detail":"unknown job"}'), /unknown job/],
+    ];
+    for (const [state, reason] of broken) {
+      const gen = await t.studio.startFromPhoto('u1', await png('#fff'));
+      t.views.set([...t.views.keys()].at(-1)!, state);
+      expect(await t.studio.get('u1', gen.id)).toMatchObject({
+        status: 'previewing',
+        views: [],
+        viewsError: expect.stringMatching(reason),
+      });
+      expect('views' in t.started.at(-1)!.input).toBe(false);
+    }
+  });
+
+  it('waits out network trouble, but stops views that take too long', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const start = Date.parse('2026-10-01T12:00:00Z');
+      vi.setSystemTime(start);
+      const t = setup(false, { multiview: true });
+      const gen = await t.studio.startFromPhoto('u1', await png('#fff'));
+      vi.setSystemTime(start + VIEWS_TIMEOUT_MS - 1000);
+      expect((await t.studio.get('u1', gen.id)).status).toBe('viewing');
+      t.views.set('views-1', new Error('fetch failed'));
+      expect((await t.studio.get('u1', gen.id)).status).toBe('viewing');
+
+      t.views.set('views-1', { status: 'running' });
+      vi.setSystemTime(start + VIEWS_TIMEOUT_MS);
+      expect(await t.studio.get('u1', gen.id)).toMatchObject({
+        status: 'previewing',
+        views: [],
+        viewsError: 'the views took longer than 180 s',
+      });
+      // It bills while it runs, so it's stopped
+      expect(t.cancelled).toEqual(['multiview:views-1']);
+      expect('views' in t.started.at(-1)!.input).toBe(false);
+
+      // Network trouble past the time limit doesn't hold the model up either
+      const other = await t.studio.startFromPhoto('u1', await png('#000'));
+      t.views.set('views-3', new Error('fetch failed'));
+      vi.setSystemTime(start + 2 * VIEWS_TIMEOUT_MS);
+      expect(await t.studio.get('u1', other.id)).toMatchObject({
+        status: 'previewing',
+        viewsError: 'fetch failed',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the views when the preview fails, so Try again uses them', async () => {
+    const t = setup(false, { multiview: true });
+    const gen = await t.studio.startFromPhoto('u1', await png('#fff'));
+    const output = await viewsOutput();
+    t.views.set('views-1', { status: 'done', output });
+    await t.studio.get('u1', gen.id);
+    t.models.set('model-2', { status: 'failed', message: 'CUDA out of memory' });
+    const failed = await t.studio.get('u1', gen.id);
+    expect(failed).toMatchObject({ status: 'failed', error: 'CUDA out of memory' });
+    expect(failed.views).toHaveLength(6);
+    expect((await t.studio.retry('u1', gen.id)).status).toBe('previewing');
+    expect(sentViews(t.started.at(-1)!)).toEqual(viewImages(output));
+    // The views aren't drawn again
+    expect(t.started.map((s) => s.kind)).toEqual(['views', 'preview', 'preview']);
+
+    // Nor when the preview can't even start after them
+    const other = await t.studio.startFromPhoto('u1', await png('#000'));
+    t.views.set('views-4', { status: 'done', output });
+    t.control.modelStartError = new Error('AI worker run failed: 400 {"detail":"bad input"}');
+    expect(await t.studio.get('u1', other.id)).toMatchObject({
+      status: 'failed',
+      error: expect.stringContaining('bad input'),
+      views: expect.arrayContaining([expect.objectContaining({ azimuth: 180 })]),
+    });
+    delete t.control.modelStartError;
+    expect((await t.studio.retry('u1', other.id)).status).toBe('previewing');
+    expect(sentViews(t.started.at(-1)!)).toEqual(viewImages(output));
+  });
+
+  it('starts one preview when two polls find the views done at once', async () => {
+    const store = memoryStore();
+    const storage = memoryStorage();
+    const jobs = scriptedWorkers(false);
+    let release: () => void = () => {};
+    const downloaded = new Promise<void>((resolve) => (release = resolve));
+    const studio = new AIStudio({
+      workers: jobs.workers,
+      store,
+      storage,
+      multiview: true,
+      // Both polls wait here, with the views job done
+      fetchImpl: async () => {
+        await downloaded;
+        return new Response(await png('#456'));
+      },
+    });
+    const gen = await studio.startFromPhoto('u1', await png('#fff'));
+    jobs.views.set('views-1', {
+      status: 'done',
+      output: {
+        views: [{ file: { url: 'https://r2.test/view-0.png' }, azimuth: 0, elevation: 0 }],
+        seconds: 2,
+      },
+    });
+    const polls = [studio.get('u1', gen.id), studio.get('u1', gen.id)];
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    release();
+    for (const poll of await Promise.all(polls)) expect(poll.status).toBe('previewing');
+
+    const previews = jobs.started.filter((s) => s.kind === 'preview');
+    expect(previews).toHaveLength(2);
+    // The generation keeps one; the other is stopped
+    const kept = store.rows.get(gen.id)!.jobId;
+    expect(['model-2', 'model-3']).toContain(kept);
+    expect(jobs.cancelled).toEqual([`model:${kept === 'model-2' ? 'model-3' : 'model-2'}`]);
+  });
+
+  it('starts MV-Adapter and TRELLIS.2 while the pictures are drawn, and TRELLIS.2 for slow pickers', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const start = Date.parse('2026-10-01T12:00:00Z');
+      vi.setSystemTime(start);
+      const t = setup(true, { multiview: true });
+      const gen = await picking(t);
+      expect(t.warmed).toEqual(['model', 'multiview']);
+      // Picked within 2 minutes: TRELLIS.2 is starting or up already
+      await t.studio.pick('u1', gen.id, 0);
+      expect(t.warmed).toEqual(['model', 'multiview']);
+      // A photo's views start TRELLIS.2
+      await t.studio.startFromPhoto('u2', await png('#fff'));
+      expect(t.warmed).toEqual(['model', 'multiview', 'model']);
+      // A slow picker's TRELLIS.2 has scaled down by then, so their views start it again
+      const slow = await picking(t, 'u3');
+      vi.setSystemTime(start + WARM_INTERVAL_MS);
+      await t.studio.pick('u3', slow.id, 0);
+      expect(t.warmed).toEqual(['model', 'multiview', 'model', 'model', 'multiview', 'model']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('counts a generation drawing its views as one in progress', async () => {
+    const { studio } = setup(false, { multiview: true });
+    for (let i = 0; i < LIMITS.running; i++) {
+      expect((await studio.startFromPhoto('u1', await png('#fff'))).status).toBe('viewing');
+    }
+    await expect(studio.startFromPhoto('u1', await png('#fff'))).rejects.toThrow(/in progress/);
+  });
+
+  it('warns when the 3D worker leaves the views out', async () => {
+    const t = setup(false, { multiview: true });
+    const gen = await t.studio.startFromPhoto('u1', await png('#fff'));
+    t.views.set('views-1', { status: 'done', output: await viewsOutput() });
+    await t.studio.get('u1', gen.id);
+    // A 3D worker from before views reports no views_used
+    t.models.set('model-2', { status: 'done', output: modelOutput(5, 'preview') });
+    expect((await t.studio.get('u1', gen.id)).status).toBe('reviewing');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('without the 6 views'));
+  });
+
+  it('runs on the mock workers end to end (AI_WORKERS_MOCK=1)', async () => {
+    const storage = memoryStorage();
+    const studio = new AIStudio({
+      workers: new MockWorkers(0),
+      store: memoryStore(),
+      storage,
+      multiview: true,
+    });
+    let gen = await studio.startFromPrompt('u1', 'a wooden shield with a lion');
+    gen = await studio.get('u1', gen.id);
+    expect(gen.status).toBe('picking');
+    gen = await studio.pick('u1', gen.id, gen.recommended!);
+    expect(gen.status).toBe('viewing');
+    gen = await studio.get('u1', gen.id);
+    expect(gen).toMatchObject({ status: 'previewing', viewsError: null });
+    expect(gen.views.map((view) => [view.azimuth, view.elevation])).toEqual(
+      MOCK_VIEW_AZIMUTHS.map((azimuth) => [azimuth, 0]),
+    );
+    for (const view of gen.views) {
+      const data = storage.files.get(view.url.replace('https://files.test/', ''))!;
+      expect(await sharp(data).metadata()).toMatchObject({ format: 'png', hasAlpha: true });
+    }
+    expect((await studio.get('u1', gen.id)).status).toBe('reviewing');
+    await studio.keep('u1', gen.id);
+    expect((await studio.get('u1', gen.id)).status).toBe('done');
+    // The mock 3D worker says it used them
+    expect(warn).not.toHaveBeenCalled();
+
+    // A photo under 128 px gets no views, and its model is made from the photo alone
+    const small = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: '#888' },
+    })
+      .png()
+      .toBuffer();
+    let photo = await studio.startFromPhoto('u1', small);
+    expect(photo.status).toBe('viewing');
+    photo = await studio.get('u1', photo.id);
+    expect(photo).toMatchObject({
+      status: 'previewing',
+      views: [],
+      viewsError: expect.stringContaining('128 px'),
+    });
+    expect((await studio.get('u1', photo.id)).status).toBe('reviewing');
   });
 });

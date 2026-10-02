@@ -14,6 +14,17 @@
 # branch): with the original seeds 11 of 20 were publishable, with the next seeds 10 of 20, and 12
 # of 20 with either. Verdicts: phase2.phase4-verdicts.json (make_gallery.py --per-group).
 #
+# Phase 5 (1 Oct 2026) did the same with smoothed shading normals, the out-of-memory fallback and the
+# picture painted onto the side it shows: 12 of 20 publishable with Phase 4's seeds, 11 of 20 with the
+# next seeds, 13 of 20 with either. Verdicts: phase2.phase5-verdicts.json.
+#
+# Phase 6 (1-2 Oct 2026) made the finals with the Pixal3D recipe instead (workers/README.md, "The
+# recipe"), in a staging app: 11 of 20 publishable with Phase 4's seeds, 10 of 20 with the next seeds,
+# 13 of 20 with either (everyday 11 of 13, weak spots 2 of 7; Phase 5: 8 and 5). Side by side and
+# blinded, four more reviewers judging both finals of each pair preferred Phase 5's in 24 of 40 pairs
+# (even on everyday asks, 13 to 13; Phase 5 on weak spots, 11 to 3), so finals stay TRELLIS.2's.
+# Verdicts: phase2.phase6-verdicts.json; the pairs: phase2.phase6-paired.json.
+#
 # One run per line: a prompt, or the path of a photo relative to this file (png, jpg, webp).
 # Lines starting with # are notes.
 
