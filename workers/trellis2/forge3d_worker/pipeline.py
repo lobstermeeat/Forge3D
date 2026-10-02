@@ -407,7 +407,8 @@ class Trellis2Runtime:
         mesh = meshes[0]
         try:
             shape = _detached(shape_slat, "cpu")
-            self.last_latent = Latent(shape, int(resolution), pipeline_type, prepared, cutout, seed, noise.get("state"))
+            state = noise.get("state")
+            self.last_latent = Latent(shape, int(resolution), pipeline_type, prepared, cutout, seed, state)
         except Exception as err:  # noqa: BLE001 - only retexture() needs it; the mesh is made
             print(f"[forge3d] the shape latent was not kept: {_one_line(err)}")
         if cutout is not None:
@@ -452,8 +453,14 @@ class Trellis2Runtime:
         replay = latent.noise if seed is None else None
         seed = latent.seed if seed is None else seed
         noise = "generation" if replay is not None else f"seed {seed}"
-        self.last_retexture = {"pipeline": latent.pipeline_type, "sampler": params, "noise": noise, "views_used": len(extra)}
-        line = f"[forge3d] retexturing the {latent.pipeline_type} shape: {json.dumps(params, default=str)}, {noise} noise"
+        self.last_retexture = {
+            "pipeline": latent.pipeline_type,
+            "sampler": params,
+            "noise": noise,
+            "views_used": len(extra),
+        }
+        settings = json.dumps(params, default=str)
+        line = f"[forge3d] retexturing the {latent.pipeline_type} shape: {settings}, {noise} noise"
         if extra:
             weights = ", ".join(f"{weight:g}" for weight in self._weights(extra))
             line += f", {len(extra)} views besides the picture ({self.multiview.mode}; weights {weights})"

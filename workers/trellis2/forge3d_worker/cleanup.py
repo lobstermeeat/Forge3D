@@ -34,8 +34,8 @@ from .normals import _components
 
 # Tuned on Phase 5's 39 finals (see the workers README). Real parts that come loose sit close to the
 # model: a fox's tail tip 0.9 % of the diagonal away, a chair's armrests 0.75 %, a balloon's pilot and
-# burner 1.3 %; sprinkles, pearls and chopsticks touch it (within 0.35 %). The one floater worth dropping,
-# a dragon's tail tip, hung 4.9 % away, as two back-to-back sheets of 5.7 % of the surface together
+# burner up to 1.4 %; sprinkles, pearls and chopsticks touch it (within 0.35 %). The one floater worth
+# dropping, a dragon's tail tip, hung 4.9 % away, as two back-to-back sheets of 5.7 % of the surface
 MAX_AREA_SHARE = 0.08
 MIN_GAP_SHARE = 0.03
 # Bounds on the distance search's working memory: entries of a block of points against the triangles
@@ -80,7 +80,8 @@ def find_pieces(
     positions = np.asarray(vertices, dtype=np.float64).reshape(-1, 3)
     tris = np.asarray(faces, dtype=np.int64).reshape(-1, 3)
     if len(tris) == 0:
-        return Pieces(*(np.zeros(0, dtype) for dtype in (np.int64, np.int64, float, float)), np.zeros((0, 3)), np.zeros(0, bool), ())
+        none = np.zeros(0, dtype=np.int64)
+        return Pieces(none, none, none.astype(float), none.astype(float), np.zeros((0, 3)), none.astype(bool), ())
 
     # Vertices split at UV seams are exact copies of one point: weld them (+ 0.0 makes -0.0 equal 0.0)
     points, weld = np.unique(positions + 0.0, axis=0, return_inverse=True)
@@ -89,10 +90,10 @@ def find_pieces(
     _, face_piece = np.unique(label[welded[:, 0]], return_inverse=True)
     count = int(face_piece.max()) + 1
     # Pieces numbered in the order of their first face
-    first = np.full(count, len(tris))
-    np.minimum.at(first, face_piece.reshape(-1), np.arange(len(tris)))
+    first_face = np.full(count, len(tris))
+    np.minimum.at(first_face, face_piece.reshape(-1), np.arange(len(tris)))
     rank = np.empty(count, dtype=np.int64)
-    rank[np.argsort(first, kind="stable")] = np.arange(count)
+    rank[np.argsort(first_face, kind="stable")] = np.arange(count)
     face_piece = rank[face_piece.reshape(-1)]
 
     corners = points[welded]
@@ -234,7 +235,8 @@ class _Search:
         block = max(1, _MATRIX // max(len(mine), 1))
         for start in range(0, len(theirs), block):
             chunk = theirs[start : start + block]
-            span = (self.points[chunk] ** 2).sum(axis=1)[:, None] + squares[None] - 2 * self.points[chunk] @ own_points.T
+            theirs_points = self.points[chunk]
+            span = (theirs_points**2).sum(axis=1)[:, None] + squares[None] - 2 * theirs_points @ own_points.T
             closest = np.sqrt(np.maximum(span.min(axis=1), 0.0))
             within = closest <= reach
             np.minimum.at(best, self.point_piece[chunk[within]], closest[within])
@@ -254,7 +256,9 @@ class _Search:
         pieces = np.flatnonzero(np.isfinite(best))
         return pieces, best[pieces]
 
-    def distance(self, piece: int, stays: np.ndarray, lo: np.ndarray, hi: np.ndarray, reach: float, limit: float) -> float:
+    def distance(
+        self, piece: int, stays: np.ndarray, lo: np.ndarray, hi: np.ndarray, reach: float, limit: float
+    ) -> float:
         """The least distance from ``piece`` to the faces in ``stays``, searching ever wider from ``reach``."""
         others = stays & (self.face_piece != piece)
         while reach <= 2 * limit:
@@ -306,7 +310,7 @@ def _nearest(points: np.ndarray, triangles: np.ndarray, reach: float, best: floa
 
 
 def _distances(triangles: np.ndarray, points: np.ndarray) -> np.ndarray:
-    """Each point's distance to its triangle; a degenerate triangle (a line or a point) is measured at its corners."""
+    """Each point's distance to its triangle; a degenerate one (a line or a point) is measured at its corners."""
     from trimesh.triangles import closest_point
 
     with np.errstate(invalid="ignore", divide="ignore"):
