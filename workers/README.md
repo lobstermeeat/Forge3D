@@ -143,6 +143,21 @@ a failed gate, or a failed preview, means no levelling, reported. `PIXAL3D_LEVEL
 off; `given` takes a pose the caller sets (experiments). The preview adds 15–25 s to a final on an
 L40S (generation 5–10 s, export 8–12 s, the search 1–2 s) and about 90 s to the container's start.
 
+A picture alone is built with Pixal3D's multi-view weights as a one-view set (they invent far less
+on the unseen side than the single-view weights: a plain back on a helmet, a proper rear on a car),
+except for thin, flat objects, which those weights build hollow or doubled (a shield became a tray,
+a skateboard two decks) and the single-view weights build cleanly. The same TRELLIS.2 preview
+decides: when the smallest extent of its axis-aligned bounding box is at most `PIXAL3D_THIN_RATIO`
+(default 0.20; `none` turns the rule off) of the largest, the single-view weights build the final
+(`pixal3d_worker/thin.py`; on the twenty test previews: shield 0.10, skateboard 0.14, pistol 0.15,
+then arcade 0.37 and everything else higher). A multi-view worker therefore loads the single-view
+flow models too (about 90 s more at start; the decoders and the rest are shared), keeps them on the
+CPU and swaps them onto the GPU for such a job (a few seconds each way). The result carries
+`"weights"` (`"single"` or `"multiview"`) and `"thin"` (the preview's `extents`, `ratio`,
+`threshold`, whether it was `thin` and whether that `decided`). Jobs with views always use the
+multi-view weights. Without a preview (`PIXAL3D_LEVEL` not `preview`) nothing is measured and the
+worker's own weights build the model.
+
 Invalid input (including an image where no object stands out from the background) comes back
 as `{ "error": "invalid input: …" }`. Other failures come back as `generation failed: …`. After
 a GPU fault the worker also replaces its container (RunPod: `refresh_worker`; Modal: the

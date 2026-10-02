@@ -30,6 +30,8 @@ class FakeRuntime:
         self.pipeline_used, self.views_used = "pixal3d-1024_cascade", 0
         self.last_camera = {"fov_deg": 31.0, "tilt": {"elevation": 21.2, "roll": 0.0, "source": "preview"}}
         self.last_pose = {"applied": True, "reason": "found", "pose": {"elevation": 21.2}, "iou": 0.98}
+        self.last_thin = {"extents": [0.15, 0.86, 1.0], "ratio": 0.15, "threshold": 0.2, "thin": True, "source": "preview", "decided": True}
+        self.last_weights = "single"
         return "mesh"
 
     def generate_views(self, image, views, preset, seed, camera):
@@ -38,6 +40,7 @@ class FakeRuntime:
         self.calls.append(("views", [(v.azimuth, v.elevation) for v in views], camera, seed))
         self.pipeline_used, self.views_used = "pixal3d-mv-1024_cascade", len(views)
         self.last_camera = {"views": [[0, 0]], "half_extent": camera.half_extent}
+        self.last_thin, self.last_weights = None, "multiview"
         return "mesh"
 
     def export(self, mesh, preset):
@@ -68,6 +71,7 @@ def test_views_reach_the_runtime_and_the_result():
     assert result["pipeline"] == "pixal3d-mv-1024_cascade"
     assert result["projection"] == {"applied": True, "reason": "applied"}
     assert result["camera"]["half_extent"] == 0.55
+    assert result["weights"] == "multiview" and "thin" not in result
     assert result["credits"] == list(service.CREDITS)
     assert result["glb"]["key"] == "ai/job-1/final-5.glb" and result["bytes"] == 4
 
@@ -86,6 +90,7 @@ def test_without_views_it_is_production():
     assert result["views_used"] == 0 and result["mode"] == "preview"
     assert result["camera"]["fov_deg"] == 31.0 and result["camera"]["tilt"]["elevation"] == 21.2
     assert result["pose"]["applied"] is True and result["level"] == {"applied": True, "elevation": 21.2, "roll": 0.0}
+    assert result["weights"] == "single" and result["thin"]["ratio"] == 0.15 and result["thin"]["thin"] is True
     assert "projection" not in result
 
 

@@ -6,7 +6,8 @@ Input: production's ``{"image_url" | "image_base64", "mode", "seed"?, "request_i
 (the multiview worker's; MV-Adapter's framing when absent). With views, both the preview and the final
 are made from the picture and the views; the picture stays the main image, and the final's projection
 still paints from it. The result is production's, plus ``"views_used"``: how many of the job's views
-went into the model (0 without views).
+went into the model (0 without views), ``"weights"``: which of Pixal3D's weights built it ("single" |
+"multiview"), and for a picture alone ``"thin"``: the preview's bounding-box measurement that chose them.
 """
 
 from __future__ import annotations
@@ -79,9 +80,13 @@ def handle_job(
         result["views_used"] = bound.views_used
         result["credits"] = list(CREDITS)
         # The picture's camera (field of view, the tilt levelled by), the pose search that found it
-        # against TRELLIS.2's preview, and what the export turned the model by
-        for key, attribute in (("camera", "last_camera"), ("pose", "last_pose"), ("level", "last_level")):
+        # against TRELLIS.2's preview, what the export turned the model by, which weights built it
+        # ("single" | "multiview") and the preview's thin measurement that decided
+        for key, attribute in (("camera", "last_camera"), ("pose", "last_pose"), ("level", "last_level"), ("thin", "last_thin")):
             value = getattr(runtime, attribute, None)
             if isinstance(value, dict) and value:
                 result[key] = value
+        weights = getattr(runtime, "last_weights", None)
+        if isinstance(weights, str) and weights:
+            result["weights"] = weights
     return result
