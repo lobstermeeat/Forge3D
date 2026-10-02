@@ -47,7 +47,7 @@ def saved(asset: dict, target: pathlib.Path) -> int:
 
 
 @app.local_entrypoint()
-def check(only: str = "04,12", count: int = 3, out: str = "ops-out/private/texjob") -> None:
+def check(only: str = "04,12", count: int = 3, out: str = "ops-out/private/texjob", judge: bool = False) -> None:
     print(f"[texjob] app {prod.APP_NAME}")
     root = pathlib.Path(out)
     pictures = runs_by_number(prod.outputs, "phase2")
@@ -60,7 +60,9 @@ def check(only: str = "04,12", count: int = 3, out: str = "ops-out/private/texjo
         seed = int(state["seed"])
         base = {"image_base64": base64.b64encode(picture).decode(), "seed": seed, "request_id": f"p7-texjob-{number}"}
         entry: dict = {"source": source, "seed": seed}
-        for mode, extra in (("final", {}), ("textures", {"count": count})):
+        prompt = state.get("prompt") or ""
+        textures = {"count": count, **({"judge": True, "prompt": prompt} if judge else {})}
+        for mode, extra in (("final", {}), ("textures", textures)):
             clock = time.time()
             result = worker.generate.remote({"id": f"{mode}-{number}", "input": {**base, "mode": mode, **extra}})
             seconds = round(time.time() - clock, 1)
@@ -80,7 +82,10 @@ def check(only: str = "04,12", count: int = 3, out: str = "ops-out/private/texjo
                                      "projection": (texture.get("projection") or {}).get("reason")})
                 entry[mode] = {"seconds": seconds, "textures": textures, "texture_errors": result.get("texture_errors"),
                                "pipeline": result.get("pipeline"), "timings": result.get("timings"),
-                               "keys": [t["glb"].get("key") for t in result.get("textures", [])]}
+                               "keys": [t["glb"].get("key") for t in result.get("textures", [])],
+                               "exports": [(t.get("export") or {}).get("path") for t in result.get("textures", [])],
+                               "own_texture": result.get("own_texture"), "judge": result.get("judge"),
+                               "judge_error": result.get("judge_error")}
             print(f"[texjob] {source} {mode}: {json.dumps(entry[mode], default=str)}")
         (root / source / "picture.png").parent.mkdir(parents=True, exist_ok=True)
         (root / source / "picture.png").write_bytes(picture)
