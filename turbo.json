@@ -9,7 +9,8 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["*"]
     },
     "lint": {
       "dependsOn": ["^build"]

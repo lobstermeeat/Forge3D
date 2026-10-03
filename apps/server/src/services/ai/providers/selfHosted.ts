@@ -11,6 +11,7 @@ import type {
   ReferenceImageProvider,
   ReferencesOutput,
   StudioWorkers,
+  TexturesOutput,
   ViewsOutput,
   WorkerFile,
   WorkerJobState,
@@ -37,6 +38,30 @@ interface Trellis2Output {
   credits: string[];
   /** How many views the model was built from (3D workers that take views) */
   views_used?: unknown;
+  /** The pipeline that made the shape, e.g. "1024_cascade" */
+  pipeline?: unknown;
+  /** The model that made it, "trellis2" or "pixal3d" (Orainge's job API on Modal only) */
+  model?: unknown;
+  error?: string;
+}
+
+/** A "textures" job's output: texture options for a final (workers/README.md, Job contracts) */
+interface TexturesJobOutput {
+  request_id?: string;
+  mode?: 'textures';
+  seed?: unknown;
+  textures?: {
+    texture_seed?: unknown;
+    glb?: StoredAsset;
+    bytes?: unknown;
+    triangles?: unknown;
+  }[];
+  /** The textures that failed while the others were made; left out when none did */
+  texture_errors?: { texture_seed?: unknown; error?: unknown }[];
+  /** The shape's pipeline: "1024_cascade", or "512" when the cascade ran out of GPU memory */
+  pipeline?: unknown;
+  timings?: Record<string, unknown>;
+  credits?: string[];
   error?: string;
 }
 
@@ -67,7 +92,8 @@ interface ReferenceOutput {
  * The intended flow: `referenceImages(prompt)` -> user picks one ->
  * `generate({ type: 'image-to-3d', imageUrl, quality: 'preview' })` -> user keeps it ->
  * `generate({ ..., quality: 'final', seed: previewSeed })`. The Studio's panel runs the same
- * flow as jobs to poll (StudioWorkers), with the views step in it.
+ * flow as jobs to poll (StudioWorkers), with the views step in it and texture options after the
+ * final.
  */
 export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, StudioWorkers {
   readonly name = 'forge3d-trellis2';
@@ -145,15 +171,7 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
   }): Promise<string> {
     return this.trellis2.run({
       image_base64: input.image.toString('base64'),
-      ...(input.views?.length
-        ? {
-            views: input.views.map(({ image, azimuth, elevation }) => ({
-              image_base64: image.toString('base64'),
-              azimuth,
-              elevation,
-            })),
-          }
-        : {}),
+      ...(input.views?.length ? { views: inlineViews(input.views) } : {}),
       mode: input.mode,
       seed: input.seed,
       request_id: input.requestId,
@@ -171,8 +189,61 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
         seconds: Object.values(output.timings).reduce((sum, t) => sum + t, 0),
         credits: output.credits,
         ...(viewsUsed === undefined ? {} : { viewsUsed }),
+        ...(typeof output.pipeline === 'string' ? { pipeline: output.pipeline } : {}),
+        ...(typeof output.model === 'string' ? { model: output.model } : {}),
       };
     });
+  }
+
+  /**
+   * Texture options: TRELLIS.2 makes the final's shape again from the same picture, seed and
+   * views (and with "512" when the final fell back to it), then `count` more textures for it.
+   * Same endpoint as the preview and the final.
+   */
+  startTextures(input: {
+    image: Buffer;
+    views?: ModelView[];
+    seed: number;
+    count: number;
+    pipeline?: string;
+    requestId: string;
+  }): Promise<string> {
+    return this.trellis2.run({
+      image_base64: input.image.toString('base64'),
+      ...(input.views?.length ? { views: inlineViews(input.views) } : {}),
+      mode: 'textures',
+      seed: input.seed,
+      count: input.count,
+      ...(input.pipeline ? { pipeline: input.pipeline } : {}),
+      request_id: input.requestId,
+    });
+  }
+
+  async textures(jobId: string): Promise<WorkerJobState<TexturesOutput>> {
+    return jobState(await this.trellis2.status<TexturesJobOutput>(jobId), (output) => ({
+      textures: (Array.isArray(output.textures) ? output.textures : []).flatMap((texture) => {
+        const textureSeed = finite(texture.texture_seed);
+        // Without its file or its seed, a texture can't be offered
+        if (textureSeed === undefined || !texture.glb) return [];
+        return [
+          {
+            file: workerFile(texture.glb),
+            textureSeed,
+            triangles: finite(texture.triangles) ?? 0,
+            bytes: finite(texture.bytes) ?? 0,
+          },
+        ];
+      }),
+      errors: (Array.isArray(output.texture_errors) ? output.texture_errors : []).map((failed) => ({
+        textureSeed: finite(failed.texture_seed) ?? null,
+        message: typeof failed.error === 'string' ? failed.error : 'failed',
+      })),
+      ...(typeof output.pipeline === 'string' ? { pipeline: output.pipeline } : {}),
+      seconds: Object.values(output.timings ?? {}).reduce<number>(
+        (sum, t) => sum + (finite(t) ?? 0),
+        0,
+      ),
+    }));
   }
 
   /** On Modal, starts the worker's GPU ahead of its job. RunPod has no route for it: no-op. */
@@ -321,6 +392,15 @@ function rating(image: { score?: unknown; issues?: unknown }): {
 
 function finite(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/** Views as the 3D worker takes them: inline, like the picture */
+function inlineViews(views: ModelView[]) {
+  return views.map(({ image, azimuth, elevation }) => ({
+    image_base64: image.toString('base64'),
+    azimuth,
+    elevation,
+  }));
 }
 
 function workerFile(asset: StoredAsset): WorkerFile {

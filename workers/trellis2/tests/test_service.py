@@ -99,6 +99,17 @@ def test_the_projection_summary_rides_along_when_the_runtime_has_one():
     assert "refresh_worker" not in out
 
 
+def test_the_floaters_dropped_ride_along_when_the_export_dropped_any():
+    runtime = FakeRuntime()
+    job = {"id": "rp-5", "input": {"image_base64": b64(png_bytes())}}
+    runtime.last_cleanup = None  # production's presets: the cleanup is off
+    assert "floaters" not in handle_job(job, runtime, FakeStorage(), pack)
+    runtime.last_cleanup = {"pieces": 40, "dropped": 2, "faces_dropped": 5690, "area_dropped": 0.05653, "floaters": [], "seconds": 1.1}
+    out = handle_job(job, runtime, FakeStorage(), pack)
+    assert out["floaters"] == runtime.last_cleanup and "refresh_worker" not in out
+    assert set(out["timings"]) == {"generate_s", "export_s", "compress_s", "upload_s"}
+
+
 def test_a_gpu_fault_while_projecting_keeps_the_model_but_restarts_the_worker():
     runtime = FakeRuntime()
     reason = "error: RuntimeError: CUDA error: an illegal memory access"

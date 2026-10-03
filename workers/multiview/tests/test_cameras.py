@@ -8,7 +8,17 @@ import sys
 import numpy as np
 import pytest
 
-from multiview_worker.cameras import AZIMUTHS, HALF_EXTENT, IMAGE_SIZE, camera_info, camera_to_world, project
+from multiview_worker.cameras import (
+    AZIMUTHS,
+    HALF_EXTENT,
+    IG2MV_AZIMUTHS,
+    IG2MV_ELEVATIONS,
+    IG2MV_VIEWS,
+    IMAGE_SIZE,
+    camera_info,
+    camera_to_world,
+    project,
+)
 
 WORKER = pathlib.Path(__file__).parent.parent
 FRONT, RIGHT, BACK, LEFT, TOP = (0, -0.5, 0), (0.5, 0, 0), (0, 0.5, 0), (-0.5, 0, 0), (0, 0, 0.5)
@@ -81,6 +91,46 @@ def test_matches_mv_adapters_own_cameras():
     assert isinstance(cameras.c2w, torch.Tensor)
 
 
+def test_the_image_geometry_cameras_are_mv_adapters_own():
+    pytest.importorskip("torch")
+    from mvadapter.utils.mesh_utils import get_orthogonal_camera
+
+    # As scripts/inference_ig2mv_sdxl.py calls it
+    cameras = get_orthogonal_camera(
+        elevation_deg=[0, 0, 0, 0, 89.99, -89.99],
+        distance=[1.8] * 6,
+        left=-0.55,
+        right=0.55,
+        bottom=-0.55,
+        top=0.55,
+        azimuth_deg=[x - 90 for x in [0, 90, 180, 270, 180, 180]],
+    )
+    assert IG2MV_VIEWS == ("front", "right", "back", "left", "top", "bottom")
+    for index, (azimuth, elevation) in enumerate(zip(IG2MV_AZIMUTHS, IG2MV_ELEVATIONS)):
+        expected = camera_to_world(azimuth, elevation)
+        np.testing.assert_allclose(cameras.c2w[index].double().numpy(), expected, atol=1e-5)
+
+
+def test_the_image_geometry_views_are_turned_as_the_models_attention_expects():
+    views = dict(zip(IG2MV_VIEWS, zip(IG2MV_AZIMUTHS, IG2MV_ELEVATIONS)))
+    # Rows: the four level views share their up axis, so an image row is one height in all four
+    for name in ("front", "right", "back", "left"):
+        np.testing.assert_allclose(camera_to_world(*views[name])[:3, 1], [0, 0, 1], atol=1e-9)
+    # Columns: the back, top and bottom views and the front mirrored all have -X as image right
+    for name in ("back", "top", "bottom"):
+        np.testing.assert_allclose(camera_to_world(*views[name])[:3, 0], [-1, 0, 0], atol=1e-6)
+    np.testing.assert_allclose(camera_to_world(*views["front"])[:3, 0], [1, 0, 0], atol=1e-9)
+    # From above: the front at the image's top, +X on its left; from below: the front at the bottom
+    np.testing.assert_allclose(camera_to_world(*views["top"])[:3, 3], [0, 0, 1.8], atol=1e-3)
+    front_x, front_y = project(np.array([FRONT]), *views["top"])[0]
+    right_x, _ = project(np.array([RIGHT]), *views["top"])[0]
+    assert front_y < IMAGE_SIZE / 2 and right_x < IMAGE_SIZE / 2 and front_x == pytest.approx(IMAGE_SIZE / 2)
+    np.testing.assert_allclose(camera_to_world(*views["bottom"])[:3, 3], [0, 0, -1.8], atol=1e-3)
+    _, front_y = project(np.array([FRONT]), *views["bottom"])[0]
+    right_x, _ = project(np.array([RIGHT]), *views["bottom"])[0]
+    assert front_y > IMAGE_SIZE / 2 and right_x < IMAGE_SIZE / 2
+
+
 def test_control_images_carry_each_views_direction():
     pytest.importorskip("torch")
     from multiview_worker.generator import control_images
@@ -115,5 +165,6 @@ def test_the_pipeline_imports_without_nvdiffrast():
     code = (
         "import sys; sys.modules['nvdiffrast'] = None; sys.modules['trimesh'] = None\n"
         "from mvadapter.pipelines.pipeline_mvadapter_i2mv_sdxl import MVAdapterI2MVSDXLPipeline\n"
+        "from mvadapter.models.attention_processor import DecoupledMVRowColSelfAttnProcessor2_0\n"
     )
     subprocess.run([sys.executable, "-c", code], cwd=WORKER, check=True)

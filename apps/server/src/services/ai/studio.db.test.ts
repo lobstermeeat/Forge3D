@@ -1,15 +1,16 @@
 /**
- * The views step on Postgres: the ai_generations columns as drizzle-kit creates them, and the
- * guard that lets only one of two overlapping polls start the preview. It runs where
- * DATABASE_URL reaches a server that lets it create a database (CI's Postgres service), in a
- * database of its own made from the schema and dropped afterwards, so it never touches the app's
- * tables. Without a reachable server it is skipped.
+ * The views step and the texture options on Postgres: the ai_generations columns as drizzle-kit
+ * creates them, and the guards that let only one of two overlapping polls start the preview, or
+ * the textures job. It runs where DATABASE_URL reaches a server that lets it create a database
+ * (CI's Postgres service), in a database of its own made from the schema and dropped afterwards,
+ * so it never touches the app's tables. Without a reachable server it is skipped.
  */
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import { drizzle } from 'drizzle-orm/postgres-js';
+import type { Database } from '../../db';
 import * as schema from '../../db/schema';
 import type { StorageProvider } from '../storage';
 import { MOCK_VIEW_AZIMUTHS, MockWorkers } from './providers/mock';
@@ -63,6 +64,7 @@ describe.skipIf(!available)('AIStudio on Postgres (ai_generations)', () => {
   const name = `forge3d_test_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
   let admin: postgres.Sql;
   let sql: postgres.Sql;
+  let db: Database;
   let store: GenerationStore;
 
   /** The generation's row as Postgres has it */
@@ -70,6 +72,20 @@ describe.skipIf(!available)('AIStudio on Postgres (ai_generations)', () => {
     const [found] = await sql`
       select status, job_id, job_kind, views, views_error from ai_generations where id = ${id}`;
     return found!;
+  };
+
+  /** The generation's final and texture options as Postgres has them */
+  const texturesRow = async (id: string) => {
+    const [found] = await sql`
+      select status, final_pipeline, textures_status, textures_job_id, textures, textures_error
+      from ai_generations where id = ${id}`;
+    return found!;
+  };
+
+  /** Another user, so each test's models in progress stay under the limit */
+  const user = async (id: string) => {
+    await db.insert(schema.users).values({ id, email: `${id}@example.test`, name: 'Tester' });
+    return id;
   };
 
   beforeAll(async () => {
@@ -85,8 +101,8 @@ describe.skipIf(!available)('AIStudio on Postgres (ai_generations)', () => {
       generateDrizzleJson(schema),
     );
     for (const statement of statements) await sql.unsafe(statement);
-    const db = drizzle(sql, { schema });
-    await db.insert(schema.users).values({ id: 'u1', email: 'u1@example.test', name: 'Tester' });
+    db = drizzle(sql, { schema });
+    await user('u1');
     store = drizzleGenerationStore(db);
   }, 60_000);
 
@@ -189,5 +205,190 @@ describe.skipIf(!available)('AIStudio on Postgres (ai_generations)', () => {
     const kept = (await row(gen.id))['job_id'] as string;
     expect(['model-1', 'model-2']).toContain(kept);
     expect(cancelled).toEqual([`model:${kept === 'model-1' ? 'model-2' : 'model-1'}`]);
+  });
+
+  it('keeps the texture options with the generation, through a restart', async () => {
+    const id = await user('u-textures');
+    const storage = memoryStorage();
+    // The GPU jobs outlive a server process, so a restarted studio gets the same workers
+    const workers = new MockWorkers(0);
+    const studio = new AIStudio({ workers, store, storage });
+    let gen = await studio.startFromPrompt(id, 'a brass ship compass');
+    gen = await studio.get(id, gen.id);
+    gen = await studio.pick(id, gen.id, gen.recommended!);
+    expect((await studio.get(id, gen.id)).status).toBe('reviewing');
+    await studio.keep(id, gen.id);
+    gen = await studio.get(id, gen.id);
+    // The final is done at once; the next poll starts its textures job, kept with it
+    expect(gen).toMatchObject({ status: 'done', textures: { status: 'running', options: [] } });
+    expect(await texturesRow(gen.id)).toMatchObject({ textures_job_id: null });
+    gen = await studio.get(id, gen.id);
+    expect(await texturesRow(gen.id)).toMatchObject({
+      status: 'done',
+      final_pipeline: '1024_cascade',
+      textures_status: 'running',
+      textures_job_id: expect.stringMatching(/^mock-/),
+      textures: null,
+      textures_error: null,
+    });
+
+    const restarted = new AIStudio({ workers, store, storage });
+    gen = await restarted.get(id, gen.id);
+    expect(gen.textures).toMatchObject({ status: 'done', error: null });
+    expect(gen.textures!.options).toHaveLength(3);
+    const stored = await texturesRow(gen.id);
+    expect(stored).toMatchObject({
+      status: 'done',
+      textures_status: 'done',
+      textures_job_id: null,
+      textures_error: null,
+    });
+    expect(stored['textures']).toEqual(gen.textures!.options);
+
+    // Another picture clears them, with the final
+    await restarted.pick(id, gen.id, 0);
+    expect(await texturesRow(gen.id)).toMatchObject({
+      status: 'previewing',
+      final_pipeline: null,
+      textures_status: null,
+      textures_job_id: null,
+      textures: null,
+      textures_error: null,
+    });
+  });
+
+  it('lets one of two overlapping polls start the textures job', async () => {
+    const id = await user('u-race');
+    let release: () => void = () => {};
+    const ready = new Promise<void>((resolve) => (release = resolve));
+    let texturesJobs = 0;
+    const cancelled: string[] = [];
+    const workers: StudioWorkers = {
+      name: 'db-test',
+      prompts: false,
+      multiview: false,
+      startReferences: () => Promise.reject(new Error('photos only')),
+      references: () => Promise.reject(new Error('photos only')),
+      startViews: () => Promise.reject(new Error('no views')),
+      views: () => Promise.reject(new Error('no views')),
+      startModel: async ({ mode }) => `${mode}-1`,
+      model: async (jobId) => ({
+        status: 'done',
+        output: {
+          file: { data: Buffer.from(jobId) },
+          seed: 11,
+          triangles: 1,
+          bytes: 1,
+          seconds: 1,
+          credits: [],
+          pipeline: jobId.startsWith('final') ? '1024_cascade' : '512',
+        },
+      }),
+      // Both polls wait here, then race to record their textures job
+      startTextures: async () => {
+        await ready;
+        return `textures-${++texturesJobs}`;
+      },
+      textures: async () => ({ status: 'running' }),
+      cancel: async (kind, jobId) => {
+        cancelled.push(`${kind}:${jobId}`);
+      },
+    };
+    const studio = new AIStudio({ workers, store, storage: memoryStorage() });
+    const gen = await studio.startFromPhoto(id, await photo(256));
+    expect((await studio.get(id, gen.id)).status).toBe('reviewing');
+    await studio.keep(id, gen.id);
+    expect((await studio.get(id, gen.id)).status).toBe('done');
+
+    const polls = [studio.get(id, gen.id), studio.get(id, gen.id)];
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    release();
+    for (const poll of await Promise.all(polls)) {
+      expect(poll).toMatchObject({ status: 'done', textures: { status: 'running' } });
+    }
+    expect(texturesJobs).toBe(2);
+    const kept = (await texturesRow(gen.id))['textures_job_id'] as string;
+    expect(['textures-1', 'textures-2']).toContain(kept);
+    expect(cancelled).toEqual([`model:${kept === 'textures-1' ? 'textures-2' : 'textures-1'}`]);
+  });
+
+  it('records a textures job, and how it ended, only for the final it was started for', async () => {
+    const id = await user('u-final');
+    const finalUrl = 'https://files.test/ai/g/final-777.glb';
+    const earlier = 'https://files.test/ai/g/final-4242.glb';
+    // A done final whose textures job is still to start
+    const record = await store.create({
+      userId: id,
+      provider: 'db-test',
+      source: 'photo',
+      status: 'done',
+      seed: 777,
+      finalUrl,
+      texturesStatus: 'running',
+    });
+    // A slow start made for the final before this one is refused
+    const old = { texturesJobId: 'textures-old' };
+    expect(await store.finishTextures(record.id, { finalUrl: earlier, jobId: null }, old)).toBeNull();
+    // This final's is recorded, once
+    expect(
+      await store.finishTextures(record.id, { finalUrl, jobId: null }, { texturesJobId: 'tex-1' }),
+    ).toMatchObject({ texturesJobId: 'tex-1' });
+    expect(
+      await store.finishTextures(record.id, { finalUrl, jobId: null }, { texturesJobId: 'tex-2' }),
+    ).toBeNull();
+    // And its end lands only on its own final
+    const failed = { texturesStatus: 'failed', texturesJobId: null };
+    expect(await store.finishTextures(record.id, { finalUrl: earlier, jobId: 'tex-1' }, failed)).toBeNull();
+    expect(
+      await store.finishTextures(record.id, { finalUrl, jobId: 'tex-1' }, failed),
+    ).toMatchObject({ texturesStatus: 'failed', texturesJobId: null });
+  });
+
+  it('reads and clears the textures job in one statement, so Pick never misses one', async () => {
+    const id = await user('u-take');
+    const done = {
+      userId: id,
+      provider: 'db-test',
+      source: 'photo',
+      status: 'done',
+      seed: 11,
+      finalUrl: 'https://files.test/ai/g/final-11.glb',
+      texturesStatus: 'running',
+    };
+    const picked = { finalUrl: null, seed: null, texturesStatus: null, status: 'previewing' };
+    const record = await store.create(done);
+    // A poll records its textures job in a transaction that hasn't committed yet...
+    let commit: () => void = () => {};
+    const committing = new Promise<void>((resolve) => (commit = resolve));
+    let recorded: () => void = () => {};
+    const written = new Promise<void>((resolve) => (recorded = resolve));
+    const poll = sql.begin(async (tx) => {
+      await tx.unsafe(
+        `update ai_generations set textures_job_id = 'textures-late'
+         where id = $1 and textures_job_id is null`,
+        [record.id],
+      );
+      recorded();
+      await committing;
+    });
+    await written;
+    // ...when Pick clears the final: it waits for the poll, and so gets its job
+    const take = store.takeTexturesJob(record.id, picked);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    commit();
+    await poll;
+    const taken = await take;
+    expect(taken.texturesJobId).toBe('textures-late');
+    expect(taken.record).toMatchObject({ ...picked, id: record.id, texturesJobId: null });
+    expect(await texturesRow(record.id)).toMatchObject({
+      status: 'previewing',
+      textures_status: null,
+      textures_job_id: null,
+    });
+
+    // A job recorded before is read the same way, and a row without one gives null
+    const other = await store.create({ ...done, texturesJobId: 'textures-7' });
+    expect((await store.takeTexturesJob(other.id, picked)).texturesJobId).toBe('textures-7');
+    expect((await store.takeTexturesJob(other.id, picked)).texturesJobId).toBeNull();
   });
 });

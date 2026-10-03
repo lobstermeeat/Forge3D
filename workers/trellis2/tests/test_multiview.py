@@ -3,6 +3,7 @@ Several pictures per sample (multiview.py) on CPU: upstream's samplers, or a fai
 driven by mock flow models, and a fake pipeline whose run() calls them the way upstream's does.
 """
 
+import dataclasses
 import os
 import sys
 import types
@@ -293,13 +294,19 @@ class SamplingPipeline:
     and the texture with the shape as concat_cond. A picture is a number; its tokens are picture(number).
     """
 
+    device = "cpu"
+
     def __init__(self, sampler_class=FlowEulerGuidanceInterval) -> None:
         self.sparse_structure_sampler = sampler_class(sigma_min=1e-5)
         self.shape_slat_sampler = sampler_class(sigma_min=1e-5)
         self.tex_slat_sampler = sampler_class(sigma_min=1e-5)
-        self.flows = {name: Flow(scale) for name, scale in [("ss", 1.0), ("shape", 0.9), ("tex", 1.1)]}
+        self.tex_slat_sampler_params = dict(TEXTURE)  # from pipeline.json
+        scales = [("ss", 1.0), ("shape", 0.9), ("tex", 1.1), ("tex512", 1.2)]
+        self.flows = {name: Flow(scale) for name, scale in scales}
+        self.models = {"tex_slat_flow_model_1024": self.flows["tex"], "tex_slat_flow_model_512": self.flows["tex512"]}
         self.cond_calls = []  # (pictures, resolution) per get_cond call
         self.sampler_calls = []  # (sampler, cond rows, neg_cond rows) per sample() call
+        self.tex_calls = []  # per sample_tex_slat call: its flow, params, shape and sampler
         self.rembg_model = None
 
     def get_cond(self, image, resolution, include_neg_cond=True):
@@ -313,26 +320,40 @@ class SamplingPipeline:
     def _sample(self, name, flow, noise, cond, params, **extra):
         sampler = getattr(self, name)
         self.sampler_calls.append((name, cond["cond"].shape[0], cond["neg_cond"].shape[0]))
-        return sampler.sample(self.flows[flow], noise, **cond, **params, verbose=False, **extra).samples
+        return sampler.sample(flow, noise, **cond, **params, verbose=False, **extra).samples
 
-    def run(self, image, seed=42, pipeline_type="1024_cascade", preprocess_image=True, **_):
+    def sample_tex_slat(self, cond, flow_model, shape_slat, sampler_params={}):  # noqa: B006 - upstream's
+        """Upstream's order: the noise first, from torch's CPU generator, then the sampler on params over the defaults."""
+        noise = torch.randn(1, 5, 3)
+        params = {**self.tex_slat_sampler_params, **sampler_params}
+        call = {"flow": flow_model, "params": params, "shape": shape_slat, "sampler": self.tex_slat_sampler, "noise": noise}
+        self.tex_calls.append(call)
+        return self._sample("tex_slat_sampler", flow_model, noise, cond, params, concat_cond=shape_slat)
+
+    def decode_latent(self, shape_slat, tex_slat, resolution):
+        return [types.SimpleNamespace(shape=shape_slat, tex=tex_slat, resolution=resolution)]
+
+    def run(self, image, seed=42, pipeline_type="1024_cascade", preprocess_image=True, return_latent=False, **_):
         torch.manual_seed(seed)
         cond_512 = self.get_cond([image], 512)
         cond_1024 = self.get_cond([image], 1024) if pipeline_type != "512" else None
-        coords = self._sample("sparse_structure_sampler", "ss", torch.randn(1, 5, 3), cond_512, STRUCTURE)
+        coords = self._sample("sparse_structure_sampler", self.flows["ss"], torch.randn(1, 5, 3), cond_512, STRUCTURE)
         if pipeline_type == "512":
-            shape = self._sample("shape_slat_sampler", "shape", torch.randn(1, 5, 3), cond_512, STRUCTURE)
-            tex_cond = cond_512
+            shape = self._sample("shape_slat_sampler", self.flows["shape"], torch.randn(1, 5, 3), cond_512, STRUCTURE)
+            tex = self.sample_tex_slat(cond_512, self.models["tex_slat_flow_model_512"], shape)
+            resolution = 512
         else:
-            low = self._sample("shape_slat_sampler", "shape", torch.randn(1, 5, 3), cond_512, STRUCTURE)
-            shape = self._sample("shape_slat_sampler", "shape", torch.randn(1, 5, 3) + low, cond_1024, STRUCTURE)
-            tex_cond = cond_1024
-        tex = self._sample("tex_slat_sampler", "tex", torch.randn(1, 5, 3), tex_cond, TEXTURE, concat_cond=shape)
-        return [types.SimpleNamespace(coords=coords, shape=shape, tex=tex)]
+            low = self._sample("shape_slat_sampler", self.flows["shape"], torch.randn(1, 5, 3), cond_512, STRUCTURE)
+            shape = self._sample("shape_slat_sampler", self.flows["shape"], torch.randn(1, 5, 3) + low, cond_1024, STRUCTURE)
+            tex = self.sample_tex_slat(cond_1024, self.models["tex_slat_flow_model_1024"], shape)
+            resolution = 1024
+        meshes = self.decode_latent(shape, tex, resolution)
+        meshes[0].coords = coords  # upstream's shape latent carries its coordinates; this one doesn't
+        return (meshes, (shape, tex, resolution)) if return_latent else meshes
 
 
-def same_mesh(a, b) -> bool:
-    return all(torch.equal(getattr(a, k), getattr(b, k)) for k in ("coords", "shape", "tex"))
+def same_mesh(a, b, parts=("coords", "shape", "tex")) -> bool:
+    return all(torch.equal(getattr(a, k), getattr(b, k)) for k in parts)
 
 
 @pytest.mark.parametrize("cls", SAMPLER_CLASSES)
@@ -401,8 +422,8 @@ class Picture:
 class RuntimePipeline(SamplingPipeline):
     """SamplingPipeline with upstream's preprocess_image (cut out and crop) and device handling."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, sampler_class=FlowEulerGuidanceInterval) -> None:
+        super().__init__(sampler_class)
         self.low_vram = False
         self.prepared = []
 
@@ -479,7 +500,7 @@ def test_the_projection_still_paints_the_picture():
         pass
 
     pipeline = RuntimePipeline()
-    pipeline.run = lambda image, **options: [Mesh()]
+    pipeline.run = lambda image, **options: ([Mesh()], (torch.zeros(1, 5, 3), None, 1024))
     picture = Picture(0.3, mode="RGBA")  # its own alpha: its own cutout
     mesh = runtime_around(pipeline).generate(picture, PRESETS["final"], seed=11, views=views(-0.2))
     assert mesh.forge3d_cutout is picture
@@ -487,8 +508,7 @@ def test_the_projection_still_paints_the_picture():
 
 def test_views_carry_through_the_out_of_memory_fallback(monkeypatch, capsys):
     monkeypatch.setattr(torch.cuda, "empty_cache", lambda: None)
-    pipeline = RuntimePipeline()
-    pipeline.models = {}
+    pipeline = RuntimePipeline()  # its models (the texture flows) move about like the others
     pipeline.image_cond_model = Flow(1.0)
     pipeline.rembg_model = Flow(1.0)
     stock = {name: getattr(pipeline, name) for name in multiview.SAMPLERS}
@@ -607,3 +627,207 @@ def test_a_job_with_views_conditions_every_flow_and_reports_them(capsys):
     log = capsys.readouterr().out.splitlines()
     assert log[0] == "[forge3d] views[1] (azimuth 180) left out: no object found in it"
     assert log[1] == "[forge3d] views[2] (azimuth 225) left out: its object runs off the frame (left, right)"
+
+
+# --- retexture(): the texture flow again, alone, on the generation's shape --------------------------------
+
+
+def flow_calls(pipeline) -> dict:
+    return {name: len(flow.model.calls) for name, flow in pipeline.flows.items()}
+
+
+@pytest.mark.parametrize("cls", SAMPLER_CLASSES)
+@pytest.mark.parametrize("mode, flow, resolution", [("final", "tex", 1024), ("preview", "tex512", 512)])
+def test_retexture_draws_the_generations_texture_again_from_its_own_noise(cls, mode, flow, resolution, capsys):
+    pipeline = RuntimePipeline(cls)
+    runtime = runtime_around(pipeline)
+    mesh = runtime.generate(Picture(0.3), PRESETS[mode], seed=11)
+    before = flow_calls(pipeline)
+    pipeline.cond_calls.clear()
+
+    again = runtime.retexture()
+
+    # Bit for bit: the same shape latent, condition, noise and sampler settings
+    assert same_mesh(again, mesh, parts=("shape", "tex")) and again.resolution == resolution
+    assert torch.equal(pipeline.tex_calls[-1]["noise"], pipeline.tex_calls[0]["noise"])
+    # Only the texture flow ran (no structure, no shape), on the picture's condition at its resolution
+    after = flow_calls(pipeline)
+    assert {name for name in after if after[name] != before[name]} == {flow}
+    assert pipeline.cond_calls == [([0.3], resolution)]
+    assert pipeline.tex_calls[-1]["flow"] is pipeline.flows[flow] and pipeline.tex_calls[-1]["params"] == TEXTURE
+    pipeline_type = PRESETS[mode].pipeline_type
+    assert runtime.last_retexture == {"pipeline": pipeline_type, "sampler": TEXTURE, "noise": "generation", "views_used": 0}
+    assert capsys.readouterr().out.startswith(f"[forge3d] retexturing the {pipeline_type} shape: {{")
+
+
+def test_retexture_puts_its_sampler_params_over_the_defaults():
+    pipeline = RuntimePipeline()
+    runtime = runtime_around(pipeline)
+    mesh = runtime.generate(Picture(0.3), PRESETS["final"], seed=11)
+    calls = len(pipeline.flows["tex"].model.calls)
+
+    again = runtime.retexture(sampler_params={"steps": 20, "guidance_strength": 3.0})
+
+    expected = {**TEXTURE, "steps": 20, "guidance_strength": 3.0}
+    assert pipeline.tex_calls[-1]["params"] == expected and runtime.last_retexture["sampler"] == expected
+    # 20 steps; with guidance, the unconditional pass inside the guidance interval
+    steps = pipeline.flows["tex"].model.calls[calls:]
+    assert len([c for c in steps if c[1] != 0.0]) == 20 and 0 < len([c for c in steps if c[1] == 0.0]) < 20
+    # The same noise and shape, another texture; the pipeline's defaults untouched
+    assert torch.equal(pipeline.tex_calls[-1]["noise"], pipeline.tex_calls[0]["noise"])
+    assert torch.equal(again.shape, mesh.shape) and not torch.allclose(again.tex, mesh.tex)
+    assert pipeline.tex_slat_sampler_params == TEXTURE
+
+
+def test_retexture_seeds_its_noise_so_variants_share_it():
+    pipeline = RuntimePipeline()
+    runtime = runtime_around(pipeline)
+    mesh = runtime.generate(Picture(0.3), PRESETS["final"], seed=11)
+
+    five = runtime.retexture(seed=5)
+    assert runtime.last_retexture["noise"] == "seed 5" and not torch.allclose(five.tex, mesh.tex)
+    assert torch.equal(runtime.retexture(seed=5).tex, five.tex)
+    runtime.retexture(seed=5, sampler_params={"steps": 30})
+    assert torch.equal(pipeline.tex_calls[-1]["noise"], pipeline.tex_calls[-3]["noise"])  # other settings, same noise
+    assert not torch.allclose(runtime.retexture(seed=6).tex, five.tex)
+    # A latent whose texture noise wasn't seen: seed None means the generation's seed
+    latent = dataclasses.replace(runtime.last_latent, noise=None)
+    assert torch.equal(runtime.retexture(latent=latent).tex, runtime.retexture(seed=11).tex)
+    assert runtime.last_retexture["noise"] == "seed 11"
+
+
+def test_retexture_takes_an_older_generations_latent():
+    pipeline = RuntimePipeline()
+    runtime = runtime_around(pipeline)
+    first = runtime.generate(Picture(0.3), PRESETS["final"], seed=11)
+    latent = runtime.last_latent
+    second = runtime.generate(Picture(-0.4), PRESETS["final"], seed=12)
+    assert runtime.last_latent is not latent and not torch.allclose(second.shape, first.shape)
+    assert same_mesh(runtime.retexture(latent=latent), first, parts=("shape", "tex"))
+
+
+@pytest.mark.parametrize("mode", multiview.MODES)
+def test_views_steer_the_texture_flow_alone(mode, capsys):
+    pipeline = RuntimePipeline()
+    runtime = runtime_around(pipeline, MultiView(mode=mode, picture_weight=2.0))
+    mesh = runtime.generate(Picture(0.3), PRESETS["final"], seed=11)
+    plain = runtime.retexture()
+    stock = {name: getattr(pipeline, name) for name in multiview.SAMPLERS}
+    before = flow_calls(pipeline)
+    for log in (pipeline.cond_calls, pipeline.sampler_calls, pipeline.prepared):
+        log.clear()
+    capsys.readouterr()
+
+    steered = runtime.retexture(views=views(-0.2, 0.5, weights=[1.0, 0.5]))
+
+    assert pipeline.prepared == [-0.2, 0.5]  # cut out and cropped as generate() does its views
+    assert pipeline.cond_calls == [([v], 1024) for v in (0.3, -0.2, 0.5)]  # each on its own, at 1024
+    assert [rows for _, *rows in pipeline.sampler_calls] == [[3, 1]]  # one flow, on the three pictures
+    sampler = pipeline.tex_calls[-1]["sampler"]
+    assert sampler.mv_weights == (2.0, 1.0, 0.5) and sampler.mv_mode == mode
+    # The structure and shape flows never ran; the shape and the noise are the generation's
+    after = flow_calls(pipeline)
+    assert {name for name in after if after[name] != before[name]} == {"tex"}
+    assert torch.equal(pipeline.tex_calls[-1]["noise"], pipeline.tex_calls[0]["noise"])
+    assert torch.equal(steered.shape, mesh.shape) and not torch.allclose(steered.tex, plain.tex)
+    # Upstream's samplers and get_cond are back for the next run
+    assert all(getattr(pipeline, name) is stock[name] for name in multiview.SAMPLERS)
+    assert "get_cond" not in vars(pipeline) and "sample_tex_slat" not in vars(pipeline)
+    assert runtime.last_retexture["views_used"] == 2
+    assert capsys.readouterr().out.endswith(f", 2 views besides the picture ({mode}; weights 2, 1, 0.5)\n")
+
+
+def test_a_view_with_no_object_is_left_out_of_a_retexture(capsys):
+    pipeline = RuntimePipeline()
+    runtime = runtime_around(pipeline)
+    runtime.generate(Picture(0.3), PRESETS["final"], seed=11)
+    pipeline.sampler_calls.clear()
+    runtime.retexture(views=views(None, 0.5))
+    assert [rows for _, *rows in pipeline.sampler_calls] == [[2, 1]] and runtime.last_retexture["views_used"] == 1
+    assert "[forge3d] views[0] (azimuth 90) left out: no object found in it" in capsys.readouterr().out
+
+
+def test_retexture_keeps_the_picture_for_the_projection():
+    pipeline = RuntimePipeline()
+    runtime = runtime_around(pipeline)
+    picture = Picture(0.3, mode="RGBA")  # its own alpha: its own cutout
+    assert runtime.generate(picture, PRESETS["final"], seed=11).forge3d_cutout is picture
+    assert runtime.last_latent.cutout is picture and runtime.last_latent.image == 0.3
+    assert runtime.retexture().forge3d_cutout is picture
+    assert runtime.retexture(views=views(-0.2)).forge3d_cutout is picture
+
+
+def test_generate_leaves_upstreams_texture_sampling_as_it_was():
+    """The runtime notes the texture's noise by wrapping sample_tex_slat during run(), and only then."""
+    pipeline = RuntimePipeline()
+    runtime = runtime_around(pipeline)
+    runtime.generate(Picture(0.3), PRESETS["final"], seed=11)
+    assert "sample_tex_slat" not in vars(pipeline) and isinstance(runtime.last_latent.noise, torch.Tensor)
+
+    def run(image, **options):
+        assert "sample_tex_slat" in vars(pipeline)  # wrapped while upstream runs
+        raise ValueError("Invalid pipeline type")
+
+    pipeline.run = run
+    with pytest.raises(ValueError):
+        runtime.generate(Picture(0.3), PRESETS["final"], seed=11)
+    assert "sample_tex_slat" not in vars(pipeline) and runtime.last_latent is None
+
+
+def test_a_textures_job_retextures_the_finals_shape_from_the_rolls_seeds():
+    """
+    handle_job end to end with mode "textures": TRELLIS.2's run() once, as the final's (its pipeline and
+    seed), then the texture flow alone per texture on that shape, its noise drawn from seed + 1000 * k.
+    """
+    import base64
+    import io
+
+    from forge3d_worker.service import handle_job
+
+    class PicturePipeline(RuntimePipeline):
+        """A picture's number is its red channel over 255."""
+
+        def preprocess_image(self, image):
+            value = image.convert("RGB").getpixel((32, 32))[0] / 255
+            self.prepared.append(value)
+            return value
+
+    buffer = io.BytesIO()
+    cutout().save(buffer, "PNG")
+    pipeline = PicturePipeline()
+    runtime = runtime_around(pipeline)
+    runs = []
+    stock_run = pipeline.run
+
+    def run(image, **options):
+        runs.append((options["pipeline_type"], options["seed"]))
+        return stock_run(image, **options)
+
+    pipeline.run = run
+    exported = []
+
+    def export(mesh, preset):
+        exported.append((mesh, preset))
+        return b"glb" * 10, 1234
+
+    runtime.export = export
+    stored = []
+    storage = types.SimpleNamespace(put=lambda key, data, kind: stored.append(key) or {"key": key})
+    picture = base64.b64encode(buffer.getvalue()).decode()
+    job = {"id": "j", "input": {"image_base64": picture, "mode": "textures", "seed": 11, "request_id": "gen_42"}}
+
+    out = handle_job(job, runtime, storage, lambda raw, size: raw)
+
+    assert "error" not in out and out["pipeline"] == "1024_cascade"
+    assert runs == [("1024_cascade", 11)]  # the shape, once, as the final made it
+    generated, *textures = pipeline.tex_calls
+    assert len(textures) == 3 and len(exported) == 3  # the generation's own texture isn't exported
+    for k, (call, (mesh, preset)) in enumerate(zip(textures, exported), 1):
+        torch.manual_seed(11 + 1000 * k)
+        assert torch.equal(call["noise"], torch.randn(1, 5, 3))
+        assert call["flow"] is pipeline.flows["tex"] and call["params"] == TEXTURE
+        # The generation's shape, a texture of its own, the final's export settings
+        assert torch.equal(mesh.shape, generated["shape"]) and preset is PRESETS["final"]
+        assert not torch.allclose(mesh.tex, exported[k % 3][0].tex)
+    assert [texture["texture_seed"] for texture in out["textures"]] == [1011, 2011, 3011]
+    assert stored == [f"ai/gen_42/final-11-texture-{k}.glb" for k in (1, 2, 3)]

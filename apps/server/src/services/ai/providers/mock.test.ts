@@ -120,6 +120,62 @@ describe('mock workers', () => {
     expect(await workers.views('mock-404')).toMatchObject({ status: 'failed' });
   });
 
+  it("make texture options: the final's house in other colours, or none for a small photo", async () => {
+    const workers = new MockWorkers(0);
+    const picture = await sharp({
+      create: { width: 256, height: 256, channels: 3, background: '#888' },
+    })
+      .png()
+      .toBuffer();
+    // The final says which pipeline made it, as TRELLIS.2's do
+    const final = await workers.model(
+      await workers.startModel({ image: picture, mode: 'final', seed: 42 }),
+    );
+    expect(final).toMatchObject({ status: 'done', output: { seed: 42, pipeline: '1024_cascade' } });
+
+    const made = await workers.textures(
+      await workers.startTextures({ image: picture, seed: 42, count: 3 }),
+    );
+    expect(made).toMatchObject({
+      status: 'done',
+      output: { errors: [], pipeline: '1024_cascade' },
+    });
+    const textures = made.status === 'done' ? made.output.textures : [];
+    // The worker's seeds: the final's + 1000 · k
+    expect(textures.map((texture) => texture.textureSeed)).toEqual([1042, 2042, 3042]);
+    const finalGlb = readGlb(mockGlb(42, 'final'));
+    const colours = new Set([JSON.stringify(finalGlb.materials[0].pbrMetallicRoughness)]);
+    for (const { file, bytes } of textures) {
+      const data = 'data' in file ? file.data : Buffer.alloc(0);
+      expect(bytes).toBe(data.length);
+      const glb = readGlb(data);
+      // The same house, painted another colour
+      expect(glb.accessors).toEqual(finalGlb.accessors);
+      colours.add(JSON.stringify(glb.materials[0].pbrMetallicRoughness));
+    }
+    expect(colours.size).toBe(4);
+    expect(
+      await workers.textures(await workers.startTextures({ image: picture, seed: 5, count: 1 })),
+    ).toMatchObject({ status: 'done', output: { textures: [{ textureSeed: 1005 }] } });
+    // For a final that fell back to 512, the shape is made with it, as the worker does
+    expect(
+      await workers.textures(
+        await workers.startTextures({ image: picture, seed: 5, count: 1, pipeline: '512' }),
+      ),
+    ).toMatchObject({ status: 'done', output: { pipeline: '512' } });
+
+    // A photo under 256 px gets none, so the panel's note can be seen
+    const small = await sharp({
+      create: { width: 200, height: 200, channels: 3, background: '#888' },
+    })
+      .png()
+      .toBuffer();
+    expect(
+      await workers.textures(await workers.startTextures({ image: small, seed: 42, count: 3 })),
+    ).toMatchObject({ status: 'failed', message: expect.stringContaining('256 px') });
+    expect(await workers.textures('mock-404')).toMatchObject({ status: 'failed' });
+  });
+
   it('build models from the views they are sent, and stop jobs', async () => {
     const workers = new MockWorkers(0);
     const picture = await sharp({

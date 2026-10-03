@@ -2,11 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { randomUUID } from 'node:crypto';
 import type { StorageProvider } from '../storage';
+import type { FetchLike } from './providers/jobEndpoint';
 import { MOCK_VIEW_AZIMUTHS, MockWorkers } from './providers/mock';
 import {
   AIStudio,
   LIMITS,
   StudioError,
+  TEXTURE_COUNT,
+  TEXTURES_START_MS,
+  TEXTURES_TIMEOUT_MS,
   VIEWS_TIMEOUT_MS,
   WARM_INTERVAL_MS,
   type GenerationRecord,
@@ -18,6 +22,7 @@ import type {
   ModelView,
   ReferencesOutput,
   StudioWorkers,
+  TexturesOutput,
   ViewsOutput,
   WorkerJobState,
   WorkerKind,
@@ -45,6 +50,11 @@ function memoryStore(): GenerationStore & { rows: Map<string, GenerationRecord> 
         previewTriangles: null,
         finalUrl: null,
         finalTriangles: null,
+        finalPipeline: null,
+        texturesStatus: null,
+        texturesJobId: null,
+        textures: null,
+        texturesError: null,
         credits: null,
         resultAssetId: null,
         creditsUsed: 0,
@@ -71,6 +81,19 @@ function memoryStore(): GenerationStore & { rows: Map<string, GenerationRecord> 
     async finishJob(id, jobId, patch) {
       if (rows.get(id)?.jobId !== jobId) return null;
       return this.update(id, patch);
+    },
+    async finishTextures(id, { finalUrl, jobId }, patch) {
+      const row = rows.get(id);
+      if (row?.status !== 'done' || row.texturesStatus !== 'running') return null;
+      if (row.finalUrl !== finalUrl || row.texturesJobId !== jobId) return null;
+      return this.update(id, patch);
+    },
+    async takeTexturesJob(id, patch) {
+      // Read and cleared with nothing in between, as Postgres does it in one statement
+      const texturesJobId = rows.get(id)?.texturesJobId ?? null;
+      const record = { ...rows.get(id)!, ...patch, texturesJobId: null } as GenerationRecord;
+      rows.set(id, record);
+      return { record: { ...record }, texturesJobId };
     },
     async recent(userId, limit) {
       return [...rows.values()]
@@ -106,19 +129,23 @@ function scriptedWorkers(prompts = true) {
   const references = new Map<string, WorkerJobState<ReferencesOutput> | Error>();
   const views = new Map<string, WorkerJobState<ViewsOutput> | Error>();
   const models = new Map<string, WorkerJobState<ModelOutput> | Error>();
+  const textures = new Map<string, WorkerJobState<TexturesOutput> | Error>();
   const started: { kind: string; input: Record<string, unknown> }[] = [];
   /** The GPUs asked to start early, in order */
   const warmed: WorkerKind[] = [];
   /** The jobs the studio stopped, as `kind:jobId` */
   const cancelled: string[] = [];
   /**
-   * What the test makes happen: pictures, views or models that can't start, and what starting a
-   * GPU early does
+   * What the test makes happen: pictures, views, models or textures that can't start, and what
+   * starting a GPU early does
    */
   const control: {
     startError?: Error;
     viewsStartError?: Error;
     modelStartError?: Error;
+    texturesStartError?: Error;
+    /** Holds a textures job's start until it resolves */
+    texturesStart?: Promise<void>;
     warm?: () => Promise<void>;
   } = {};
   let next = 1;
@@ -162,6 +189,19 @@ function scriptedWorkers(prompts = true) {
       if (state instanceof Error) throw state;
       return state;
     },
+    async startTextures(input) {
+      if (control.texturesStartError) throw control.texturesStartError;
+      await control.texturesStart;
+      const id = `textures-${next++}`;
+      started.push({ kind: 'textures', input });
+      textures.set(id, { status: 'running' });
+      return id;
+    },
+    async textures(jobId) {
+      const state = textures.get(jobId)!;
+      if (state instanceof Error) throw state;
+      return state;
+    },
     async warm(kind) {
       warmed.push(kind);
       await control.warm?.();
@@ -170,7 +210,7 @@ function scriptedWorkers(prompts = true) {
       cancelled.push(`${kind}:${jobId}`);
     },
   };
-  return { workers, references, views, models, started, warmed, cancelled, control };
+  return { workers, references, views, models, textures, started, warmed, cancelled, control };
 }
 
 const png = (colour: string) =>
@@ -203,12 +243,29 @@ const viewsOutput = async (): Promise<ViewsOutput> => ({
 const sentViews = (start: { input: Record<string, unknown> }) =>
   start.input['views'] as ModelView[] | undefined;
 
-/** AIStudio with scripted workers; `multiview` is AI_MULTIVIEW=1 */
-function setup(prompts = true, { multiview = false }: { multiview?: boolean } = {}) {
+/**
+ * AIStudio with scripted workers; `multiview` is AI_MULTIVIEW=1 and `textureOptions` is
+ * AI_TEXTURE_OPTIONS (on unless false)
+ */
+function setup(
+  prompts = true,
+  {
+    multiview = false,
+    textureOptions,
+    fetchImpl,
+  }: { multiview?: boolean; textureOptions?: boolean; fetchImpl?: FetchLike } = {},
+) {
   const store = memoryStore();
   const storage = memoryStorage();
   const jobs = scriptedWorkers(prompts);
-  const studio = new AIStudio({ workers: jobs.workers, store, storage, multiview });
+  const studio = new AIStudio({
+    workers: jobs.workers,
+    store,
+    storage,
+    multiview,
+    textureOptions,
+    fetchImpl,
+  });
   return { studio, store, storage, ...jobs };
 }
 
@@ -295,8 +352,12 @@ describe('AIStudio', () => {
       final: { url: `https://files.test/ai/${gen.id}/final-4242.glb`, triangles: 100_000 },
     });
 
-    // AI_MULTIVIEW is off by default: no views step, and the models get the picture alone
+    // AI_MULTIVIEW is off by default: no views step, and the models get the picture alone. The
+    // texture options follow the final, from the next poll on (on by default; see 'AIStudio
+    // texture options')
     expect(started.map((s) => s.kind)).toEqual(['references', 'preview', 'final']);
+    expect((await studio.get('u1', gen.id)).textures?.status).toBe('running');
+    expect(started.map((s) => s.kind)).toEqual(['references', 'preview', 'final', 'textures']);
     expect(started.some((s) => 'views' in s.input)).toBe(false);
     expect(gen).toMatchObject({ views: [], viewsError: null });
     expect(studio.capabilities().multiview).toBe(false);
@@ -366,6 +427,9 @@ describe('AIStudio', () => {
       'ref-1',
       new Error('AI worker status failed: 503 {"detail":"Modal can\'t be reached"}'),
     );
+    expect((await studio.get('u1', gen.id)).status).toBe('drawing');
+    // A state that didn't come in time is asked again
+    references.set('ref-1', new Error('AI worker status timed out after 30 s'));
     expect((await studio.get('u1', gen.id)).status).toBe('drawing');
     references.set('ref-1', new Error('AI worker status failed: 404 {"detail":"unknown job"}'));
     expect((await studio.get('u1', gen.id)).status).toBe('failed');
@@ -744,6 +808,7 @@ describe('AIStudio with AI_MULTIVIEW=1 (the views step)', () => {
       'finishing',
       'done',
     ]);
+    // The final's texture options start on the next poll
     expect(started.map((s) => s.kind)).toEqual(['references', 'views', 'preview', 'final']);
     expect(warn).not.toHaveBeenCalled();
   });
@@ -1054,5 +1119,800 @@ describe('AIStudio with AI_MULTIVIEW=1 (the views step)', () => {
       viewsError: expect.stringContaining('128 px'),
     });
     expect((await studio.get('u1', photo.id)).status).toBe('reviewing');
+  });
+});
+
+describe('AIStudio texture options', () => {
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => warn.mockRestore());
+
+  /**
+   * Picks picture 0 of a prompt's generation and takes it to a final (seed `seed`, made by the
+   * cascade unless `final` says otherwise) that is done on the workers but not yet polled.
+   */
+  async function makeFinal(
+    t: ReturnType<typeof setup>,
+    user: string,
+    id: string,
+    { seed = 4242, final = {} }: { seed?: number; final?: Partial<ModelOutput> } = {},
+  ): Promise<void> {
+    await t.studio.pick(user, id, 0);
+    t.models.set([...t.models.keys()].at(-1)!, {
+      status: 'done',
+      output: modelOutput(seed, 'preview'),
+    });
+    await t.studio.get(user, id);
+    await t.studio.keep(user, id);
+    t.models.set([...t.models.keys()].at(-1)!, {
+      status: 'done',
+      output: { ...modelOutput(seed, 'final'), pipeline: '1024_cascade', ...final },
+    });
+  }
+
+  /** A prompt's generation whose final is done on the workers, not yet polled */
+  async function finalReady(
+    t: ReturnType<typeof setup>,
+    user = 'u1',
+    options: { seed?: number; final?: Partial<ModelOutput> } = {},
+  ): Promise<GenerationView> {
+    const gen = await picking(t, user);
+    await makeFinal(t, user, gen.id, options);
+    return gen;
+  }
+
+  /**
+   * A prompt's generation taken to its final (seed 4242, made by the cascade unless `final` says
+   * otherwise). The poll that finds the final done returns it; the next starts its textures job.
+   */
+  async function finished(
+    t: ReturnType<typeof setup>,
+    user = 'u1',
+    final: Partial<ModelOutput> = {},
+  ): Promise<GenerationView> {
+    const gen = await finalReady(t, user, { final });
+    await t.studio.get(user, gen.id);
+    return t.studio.get(user, gen.id);
+  }
+
+  /** What the 3D worker sends back for a textures job: one texture per seed, on the cascade */
+  const texturesOutput = (seeds: number[], more: Partial<TexturesOutput> = {}): TexturesOutput => ({
+    textures: seeds.map((textureSeed) => ({
+      file: { data: Buffer.from(`glb-texture-${textureSeed}`) },
+      textureSeed,
+      triangles: 96_000,
+      bytes: 20,
+    })),
+    errors: [],
+    pipeline: '1024_cascade',
+    seconds: 90.5,
+    ...more,
+  });
+
+  const texturesJob = (t: ReturnType<typeof setup>, gen: GenerationView) =>
+    t.store.rows.get(gen.id)!.texturesJobId!;
+
+  /** The textures jobs the workers were asked for, in order */
+  const texturesStarts = (t: ReturnType<typeof setup>) =>
+    t.started.filter((s) => s.kind === 'textures');
+
+  /** What fetch throws when it can't connect: no byte of the request was sent */
+  const refused = () =>
+    new TypeError('fetch failed', {
+      cause: Object.assign(new Error('connect ECONNREFUSED 10.0.0.7:443'), {
+        code: 'ECONNREFUSED',
+      }),
+    });
+  /** What fetch throws when the connection drops once the request is out */
+  const reset = () =>
+    new TypeError('fetch failed', {
+      cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }),
+    });
+
+  it('makes 3 more textures for a done final, from what the final was made from', async () => {
+    const t = setup();
+    const ready = await finalReady(t);
+    // The poll that finds the final done returns it at once, in use; its textures follow
+    let gen = await t.studio.get('u1', ready.id);
+    expect(gen).toMatchObject({
+      status: 'done',
+      error: null,
+      final: { url: `https://files.test/ai/${gen.id}/final-4242.glb`, triangles: 100_000 },
+      textures: { status: 'running', count: 3, options: [], error: null },
+    });
+    expect(TEXTURE_COUNT).toBe(3);
+    expect(texturesStarts(t)).toEqual([]);
+    // The next poll starts their job: the final's picture and seed, and no views (it had none)
+    gen = await t.studio.get('u1', gen.id);
+    expect(gen.textures).toEqual({ status: 'running', count: 3, options: [], error: null });
+    expect(t.started.at(-1)).toEqual({
+      kind: 'textures',
+      input: {
+        image: t.storage.files.get(`ai/${gen.id}/reference-3.png`),
+        seed: 4242,
+        count: 3,
+        requestId: gen.id,
+      },
+    });
+    const jobId = texturesJob(t, gen);
+    expect(t.store.rows.get(gen.id)).toMatchObject({
+      finalPipeline: '1024_cascade',
+      texturesStatus: 'running',
+      texturesJobId: expect.stringMatching(/^textures-/),
+    });
+
+    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+    t.textures.set(jobId, { status: 'done', output: texturesOutput([5242, 6242, 7242]) });
+    gen = await t.studio.get('u1', gen.id);
+    const key = (seed: number) => `ai/${gen.id}/final-4242-texture-${seed}.glb`;
+    expect(gen).toMatchObject({ status: 'done', error: null });
+    expect(gen.textures).toEqual({
+      status: 'done',
+      count: 3,
+      options: [5242, 6242, 7242].map((textureSeed) => ({
+        url: `https://files.test/${key(textureSeed)}`,
+        triangles: 96_000,
+        textureSeed,
+      })),
+      error: null,
+    });
+    // Copied into storage beside the final, and kept with the generation
+    expect(t.storage.files.get(key(6242))?.toString()).toBe('glb-texture-6242');
+    expect(t.store.rows.get(gen.id)).toMatchObject({
+      texturesStatus: 'done',
+      texturesJobId: null,
+      textures: gen.textures!.options,
+      texturesError: null,
+    });
+    // Their GPU time counts, after the preview's and the final's
+    expect(t.store.rows.get(gen.id)!.durationMs).toBe(12_250 + 40_500 + 90_500);
+
+    // The job isn't asked again
+    t.textures.set(jobId, new Error('asked again'));
+    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('done');
+    expect((await t.studio.recent('u1'))[0]!.textures).toEqual(gen.textures);
+    expect(t.started.map((s) => s.kind)).toEqual(['references', 'preview', 'final', 'textures']);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("returns the final's poll without waiting for its textures job to start", async () => {
+    const t = setup();
+    // A start that never answers
+    t.control.texturesStart = new Promise<void>(() => {});
+    const gen = await finalReady(t);
+    const poll = t.studio.get('u1', gen.id);
+    const outcome = await Promise.race([
+      poll.then((g) => g.status),
+      new Promise((resolve) => setTimeout(() => resolve('still waiting'), 200)),
+    ]);
+    expect(t.store.rows.get(gen.id)!.status).toBe('done');
+    expect(outcome).toBe('done');
+    // The panel polls on while textures are to come, and its next poll starts them
+    expect(await poll).toMatchObject({ textures: { status: 'running', options: [] } });
+    expect(texturesStarts(t)).toEqual([]);
+  });
+
+  it("sends the final's views with its textures (AI_MULTIVIEW=1)", async () => {
+    const t = setup(false, { multiview: true });
+    const gen = await t.studio.startFromPhoto('u1', await png('#ff000080'));
+    t.views.set('views-1', { status: 'done', output: await viewsOutput() });
+    await t.studio.get('u1', gen.id);
+    t.models.set('model-2', {
+      status: 'done',
+      output: { ...modelOutput(8, 'preview'), viewsUsed: 6 },
+    });
+    await t.studio.get('u1', gen.id);
+    await t.studio.keep('u1', gen.id);
+    t.models.set('model-3', {
+      status: 'done',
+      output: { ...modelOutput(8, 'final'), viewsUsed: 6 },
+    });
+    expect((await t.studio.get('u1', gen.id)).status).toBe('done');
+    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+
+    const [finalStart, texturesStart] = t.started.slice(-2);
+    expect(texturesStart).toMatchObject({
+      kind: 'textures',
+      input: { seed: 8, count: 3, requestId: gen.id },
+    });
+    expect(texturesStart!.input['image']).toEqual(finalStart!.input['image']);
+    expect(sentViews(texturesStart!)).toHaveLength(6);
+    expect(sentViews(texturesStart!)).toEqual(sentViews(finalStart!));
+  });
+
+  it('keeps the textures that were made when some failed', async () => {
+    const t = setup(true, {
+      // The worker's copy of texture 3 is gone
+      fetchImpl: async (url) =>
+        url.endsWith('texture-3.glb')
+          ? new Response('Not found', { status: 404 })
+          : new Response(`fetched ${url}`),
+    });
+    let gen = await finished(t);
+    const file = (k: number) => ({
+      url: `https://r2.test/ai/${gen.id}/final-4242-texture-${k}.glb`,
+    });
+    t.textures.set(texturesJob(t, gen), {
+      status: 'done',
+      output: texturesOutput([], {
+        textures: [
+          { file: file(1), textureSeed: 5242, triangles: 96_000, bytes: 20 },
+          { file: file(3), textureSeed: 7242, triangles: 95_000, bytes: 20 },
+        ],
+        errors: [{ textureSeed: 6242, message: 'ConnectionError: R2 unreachable' }],
+      }),
+    });
+    gen = await t.studio.get('u1', gen.id);
+    expect(gen).toMatchObject({ status: 'done', error: null });
+    expect(gen.textures).toEqual({
+      status: 'done',
+      count: 3,
+      options: [
+        {
+          url: `https://files.test/ai/${gen.id}/final-4242-texture-5242.glb`,
+          triangles: 96_000,
+          textureSeed: 5242,
+        },
+      ],
+      error: `texture 6242: ConnectionError: R2 unreachable; texture 7242: Couldn't download ${file(3).url}: 404`,
+    });
+    expect(t.storage.files.get(`ai/${gen.id}/final-4242-texture-5242.glb`)?.toString()).toBe(
+      `fetched ${file(1).url}`,
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(gen.id), gen.textures!.error);
+  });
+
+  it('never fails the generation when its textures fail', async () => {
+    const t = setup();
+    let gen = await finished(t);
+    t.textures.set(texturesJob(t, gen), {
+      status: 'failed',
+      message: 'texture options need TRELLIS.2 finals',
+    });
+    gen = await t.studio.get('u1', gen.id);
+    expect(gen).toMatchObject({
+      status: 'done',
+      error: null,
+      final: { url: `https://files.test/ai/${gen.id}/final-4242.glb` },
+      textures: { status: 'failed', options: [], error: 'texture options need TRELLIS.2 finals' },
+    });
+    expect(t.store.rows.get(gen.id)).toMatchObject({
+      status: 'done',
+      jobKind: 'final',
+      texturesJobId: null,
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining(gen.id),
+      'texture options need TRELLIS.2 finals',
+    );
+
+    // Nor a job the host forgot
+    const lost = await finished(t, 'u2');
+    t.textures.set(
+      texturesJob(t, lost),
+      new Error('AI worker status failed: 404 {"detail":"unknown job"}'),
+    );
+    expect(await t.studio.get('u2', lost.id)).toMatchObject({
+      status: 'done',
+      textures: { status: 'failed', error: expect.stringContaining('unknown job') },
+    });
+
+    // Nor one that can't start, nor one that brings no textures back
+    t.control.texturesStartError = new Error('AI worker run failed: 400 {"detail":"bad input"}');
+    expect(await finished(t, 'u3')).toMatchObject({
+      status: 'done',
+      textures: { status: 'failed', error: expect.stringContaining('bad input') },
+    });
+    delete t.control.texturesStartError;
+    const empty = await finished(t, 'u4');
+    t.textures.set(texturesJob(t, empty), { status: 'done', output: texturesOutput([]) });
+    expect(await t.studio.get('u4', empty.id)).toMatchObject({
+      status: 'done',
+      textures: { status: 'failed', options: [], error: 'no textures came back' },
+    });
+  });
+
+  it('tries a start again only while it never reached the workers, for 2 minutes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      let now = Date.parse('2026-10-01T12:00:00Z');
+      vi.setSystemTime(now);
+      const t = setup();
+      // The job API can't be connected to, so no job was queued: the next poll tries again
+      t.control.texturesStartError = refused();
+      let gen = await finished(t);
+      expect(gen).toMatchObject({ status: 'done', textures: { status: 'running' } });
+      expect(t.store.rows.get(gen.id)!.texturesJobId).toBeNull();
+      vi.setSystemTime(now + TEXTURES_START_MS - 1000);
+      expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+      delete t.control.texturesStartError;
+      gen = await t.studio.get('u1', gen.id);
+      expect(texturesJob(t, gen)).toMatch(/^textures-/);
+      expect(texturesStarts(t)).toHaveLength(1);
+
+      // Storage trouble before anything is sent is tried again the same way
+      const other = await finalReady(t, 'u2');
+      await t.studio.get('u2', other.id);
+      const read = t.storage.read;
+      t.storage.read = async () => {
+        throw new Error('read ECONNRESET');
+      };
+      expect((await t.studio.get('u2', other.id)).textures?.status).toBe('running');
+      t.storage.read = read;
+      expect(texturesJob(t, await t.studio.get('u2', other.id))).toMatch(/^textures-/);
+      expect(warn).not.toHaveBeenCalled();
+
+      // But not from 2 minutes after the final on
+      now += 60 * 60 * 1000;
+      vi.setSystemTime(now);
+      t.control.texturesStartError = refused();
+      const late = await finished(t, 'u3');
+      expect(late.textures?.status).toBe('running');
+      vi.setSystemTime(now + TEXTURES_START_MS);
+      expect(await t.studio.get('u3', late.id)).toMatchObject({
+        status: 'done',
+        textures: { status: 'failed', options: [], error: 'fetch failed' },
+      });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(late.id), 'fetch failed');
+
+      // A start first made later than that (the panel was closed, say) is made all the same
+      delete t.control.texturesStartError;
+      const reopened = await finalReady(t, 'u4');
+      await t.studio.get('u4', reopened.id);
+      vi.setSystemTime(now + 10 * TEXTURES_START_MS);
+      expect(texturesJob(t, await t.studio.get('u4', reopened.id))).toMatch(/^textures-/);
+      expect(texturesStarts(t)).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never starts a textures job on every poll while starts fail', async () => {
+    const t = setup();
+    const stock = t.workers.startTextures!.bind(t.workers);
+    // The job API queued the job, but its answer was lost on the way back: a 503 from the gateway,
+    // a connection reset after the request went out, or no answer in time
+    let failure: Error = new Error(
+      'AI worker run failed: 503 {"detail":"Modal can\'t be reached right now; try again"}',
+    );
+    t.workers.startTextures = async (input) => {
+      await stock(input);
+      throw failure;
+    };
+    const gen = await finalReady(t);
+    expect(await t.studio.get('u1', gen.id)).toMatchObject({ textures: { status: 'running' } });
+    for (let poll = 0; poll < 20; poll++) await t.studio.get('u1', gen.id);
+    // One GPU job (about 2 minutes of the TRELLIS.2 container), and the panel stops waiting
+    expect(texturesStarts(t)).toHaveLength(1);
+    expect(await t.studio.get('u1', gen.id)).toMatchObject({
+      status: 'done',
+      error: null,
+      textures: { status: 'failed', options: [], error: expect.stringContaining('503') },
+    });
+
+    for (failure of [reset(), new Error('AI worker run timed out after 30 s')]) {
+      const other = await finished(t, 'u2');
+      for (let poll = 0; poll < 5; poll++) await t.studio.get('u2', other.id);
+      expect((await t.studio.get('u2', other.id)).textures).toMatchObject({
+        status: 'failed',
+        error: failure.message,
+      });
+    }
+    expect(texturesStarts(t)).toHaveLength(3);
+  });
+
+  it('waits out network trouble while the textures job runs', async () => {
+    const t = setup();
+    const gen = await finished(t);
+    const jobId = texturesJob(t, gen);
+    for (const trouble of [
+      new Error('AI worker status failed: 503 {"detail":"Modal can\'t be reached"}'),
+      new Error('AI worker status timed out after 30 s'),
+      reset(),
+    ]) {
+      t.textures.set(jobId, trouble);
+      expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+    }
+    t.textures.set(jobId, { status: 'done', output: texturesOutput([5242]) });
+    expect((await t.studio.get('u1', gen.id)).textures).toMatchObject({
+      status: 'done',
+      options: [{ textureSeed: 5242 }],
+    });
+    expect(texturesStarts(t)).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('stops a textures job that takes longer than 15 minutes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const start = Date.parse('2026-10-01T12:00:00Z');
+      vi.setSystemTime(start);
+      const t = setup();
+      const gen = await finished(t);
+      const jobId = texturesJob(t, gen);
+      vi.setSystemTime(start + TEXTURES_TIMEOUT_MS - 1000);
+      expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+      t.textures.set(jobId, new Error('AI worker status timed out after 30 s'));
+      expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+
+      t.textures.set(jobId, { status: 'running' });
+      vi.setSystemTime(start + TEXTURES_TIMEOUT_MS);
+      expect(await t.studio.get('u1', gen.id)).toMatchObject({
+        status: 'done',
+        final: { url: `https://files.test/ai/${gen.id}/final-4242.glb` },
+        textures: {
+          status: 'failed',
+          options: [],
+          error: 'the textures took longer than 15 minutes',
+        },
+      });
+      // It bills while it runs, so it's stopped
+      expect(t.cancelled).toEqual([`model:${jobId}`]);
+      expect(t.store.rows.get(gen.id)).toMatchObject({ status: 'done', texturesJobId: null });
+
+      // Network trouble past the time limit ends them too, and stops the job, which may still run
+      const other = await finished(t, 'u2');
+      const otherJob = texturesJob(t, other);
+      t.textures.set(otherJob, new Error('AI worker status failed: 503 {"detail":"…"}'));
+      vi.setSystemTime(start + 2 * TEXTURES_TIMEOUT_MS);
+      expect((await t.studio.get('u2', other.id)).textures).toMatchObject({
+        status: 'failed',
+        error: expect.stringContaining('503'),
+      });
+      expect(t.cancelled).toEqual([`model:${jobId}`, `model:${otherJob}`]);
+
+      // Textures done by then are still offered
+      const third = await finished(t, 'u3');
+      t.textures.set(texturesJob(t, third), { status: 'done', output: texturesOutput([5242]) });
+      vi.setSystemTime(start + 4 * TEXTURES_TIMEOUT_MS);
+      expect((await t.studio.get('u3', third.id)).textures?.status).toBe('done');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never records a textures job started for one final on the next', async () => {
+    const t = setup();
+    const stock = t.workers.startTextures!.bind(t.workers);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let calls = 0;
+    t.workers.startTextures = async (input) => {
+      const call = ++calls;
+      // The first final's start is slow
+      if (call === 1) await gate;
+      // The next final's first start can't connect: tried again on the next poll
+      if (call === 2) throw refused();
+      return stock(input);
+    };
+    const gen = await finalReady(t);
+    expect((await t.studio.get('u1', gen.id)).status).toBe('done');
+    // Poll A starts the first final's textures; the start hangs
+    const pollA = t.studio.get('u1', gen.id);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Meanwhile (API only: the panel hides the pictures once done) another picture becomes the
+    // final, whose textures job is still to start
+    await makeFinal(t, 'u1', gen.id, { seed: 777 });
+    expect(await t.studio.get('u1', gen.id)).toMatchObject({
+      status: 'done',
+      textures: { status: 'running' },
+    });
+    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+    expect(calls).toBe(2);
+    expect(t.store.rows.get(gen.id)).toMatchObject({ seed: 777, texturesJobId: null });
+
+    // Poll A's start comes back at last, with a job made for the first final's shape
+    release();
+    await pollA;
+    const [oldStart] = texturesStarts(t);
+    expect(oldStart!.input['seed']).toBe(4242);
+    // It isn't recorded for the next final, and is stopped
+    const [oldJob] = [...t.textures.keys()];
+    expect(t.store.rows.get(gen.id)).toMatchObject({
+      seed: 777,
+      texturesStatus: 'running',
+      texturesJobId: null,
+    });
+    expect(t.cancelled).toEqual([`model:${oldJob}`]);
+
+    // The next poll starts the next final's own, whose textures are offered
+    await t.studio.get('u1', gen.id);
+    expect(texturesStarts(t).at(-1)!.input['seed']).toBe(777);
+    t.textures.set(texturesJob(t, gen), { status: 'done', output: texturesOutput([1777]) });
+    expect((await t.studio.get('u1', gen.id)).textures).toMatchObject({
+      status: 'done',
+      options: [{ url: `https://files.test/ai/${gen.id}/final-777-texture-1777.glb` }],
+    });
+  });
+
+  it("never ends the next final's texture options with the last one's failed start", async () => {
+    const t = setup();
+    const stock = t.workers.startTextures!.bind(t.workers);
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let calls = 0;
+    t.workers.startTextures = async (input) => {
+      // The first final's start is slow, and refused in the end
+      if (++calls === 1) {
+        await gate;
+        throw new Error('AI worker run failed: 400 {"detail":"bad input"}');
+      }
+      return stock(input);
+    };
+    const gen = await finalReady(t);
+    await t.studio.get('u1', gen.id);
+    const pollA = t.studio.get('u1', gen.id);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await makeFinal(t, 'u1', gen.id, { seed: 777 });
+    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+
+    release();
+    await pollA;
+    expect(t.store.rows.get(gen.id)).toMatchObject({
+      seed: 777,
+      texturesStatus: 'running',
+      texturesJobId: null,
+      texturesError: null,
+    });
+    // The next final's own job starts on the next poll
+    expect((await t.studio.get('u1', gen.id)).textures?.status).toBe('running');
+    expect(texturesStarts(t)).toMatchObject([{ input: { seed: 777 } }]);
+  });
+
+  it('stops a textures job a poll records while another picture is picked', async () => {
+    const t = setup();
+    const gen = await finalReady(t);
+    await t.studio.get('u1', gen.id);
+    const { finalUrl } = t.store.rows.get(gen.id)!;
+    // A poll records its textures job just after Pick has read the generation
+    const find = t.store.find.bind(t.store);
+    t.store.find = async (id, userId) => {
+      const row = await find(id, userId);
+      t.store.find = find;
+      await t.store.finishTextures(id, { finalUrl, jobId: null }, { texturesJobId: 'textures-9' });
+      return row;
+    };
+    expect(await t.studio.pick('u1', gen.id, 0)).toMatchObject({
+      status: 'previewing',
+      final: null,
+      textures: null,
+    });
+    // It bills while it runs, and its textures would never be offered
+    expect(t.cancelled).toEqual(['model:textures-9']);
+    expect(t.store.rows.get(gen.id)).toMatchObject({ texturesStatus: null, texturesJobId: null });
+  });
+
+  it("tells the textures job when the final fell back to 512, and offers no textures of another shape", async () => {
+    const t = setup();
+    // The final ran out of GPU memory on the cascade, so the 512 pipeline made it: the worker is
+    // told, so it makes that shape again
+    let gen = await finished(t, 'u1', { pipeline: '512' });
+    expect(t.store.rows.get(gen.id)!.finalPipeline).toBe('512');
+    expect(t.started.at(-1)).toMatchObject({
+      kind: 'textures',
+      input: { seed: 4242, count: 3, pipeline: '512' },
+    });
+    // A worker from before ignores it and makes the cascade's shape: its textures fit another shape
+    t.textures.set(texturesJob(t, gen), {
+      status: 'done',
+      output: texturesOutput([5242, 6242, 7242], { pipeline: '1024_cascade' }),
+    });
+    gen = await t.studio.get('u1', gen.id);
+    expect(gen).toMatchObject({
+      status: 'done',
+      textures: {
+        status: 'failed',
+        options: [],
+        error: "the textures fit another shape (pipeline 1024_cascade; the final's is 512)",
+      },
+    });
+    // None was copied
+    expect([...t.storage.files.keys()].filter((key) => key.includes('texture'))).toEqual([]);
+
+    // The same pipeline is fine, and so is a final whose worker didn't say (and nothing is sent)
+    const same = await finished(t, 'u2', { pipeline: '512' });
+    t.textures.set(texturesJob(t, same), {
+      status: 'done',
+      output: texturesOutput([5242], { pipeline: '512' }),
+    });
+    expect((await t.studio.get('u2', same.id)).textures?.status).toBe('done');
+    const unsaid = await finished(t, 'u3', { pipeline: undefined });
+    expect(t.store.rows.get(unsaid.id)!.finalPipeline).toBeNull();
+    expect('pipeline' in texturesStarts(t).at(-1)!.input).toBe(false);
+    t.textures.set(texturesJob(t, unsaid), { status: 'done', output: texturesOutput([5242]) });
+    expect((await t.studio.get('u3', unsaid.id)).textures?.status).toBe('done');
+  });
+
+  it("makes none when switched off (AI_TEXTURE_OPTIONS=0), or with workers that can't", async () => {
+    const off = setup(true, { textureOptions: false });
+    const gen = await finished(off);
+    expect(gen).toMatchObject({ status: 'done', textures: null });
+    expect(off.store.rows.get(gen.id)).toMatchObject({
+      finalPipeline: '1024_cascade',
+      texturesStatus: null,
+      texturesJobId: null,
+    });
+    expect(off.started.map((s) => s.kind)).toEqual(['references', 'preview', 'final']);
+
+    const without = setup();
+    delete without.workers.startTextures;
+    delete without.workers.textures;
+    expect(await finished(without)).toMatchObject({ status: 'done', textures: null });
+    expect(without.started.map((s) => s.kind)).toEqual(['references', 'preview', 'final']);
+  });
+
+  it('makes none for a final Pixal3D made, which the worker would refuse', async () => {
+    const t = setup();
+    // The job API on Modal says which model made a final: with the recipe on, Pixal3D
+    const pixal3d = await finished(t, 'u1', { model: 'pixal3d', pipeline: 'pixal3d-1024_cascade' });
+    expect(pixal3d).toMatchObject({ status: 'done', error: null, textures: null });
+    expect(t.store.rows.get(pixal3d.id)).toMatchObject({ texturesStatus: null });
+    expect(texturesStarts(t)).toEqual([]);
+    // TRELLIS.2's get them, and so do finals whose host doesn't say (RunPod, older workers)
+    expect((await finished(t, 'u2', { model: 'trellis2' })).textures?.status).toBe('running');
+    expect((await finished(t, 'u3')).textures?.status).toBe('running');
+    expect(texturesStarts(t)).toHaveLength(2);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('picks the textures up again after a restart', async () => {
+    const t = setup();
+    const gen = await finished(t);
+    const jobId = texturesJob(t, gen);
+    // A new server process: only the generation's row and the workers' job are left
+    const restarted = new AIStudio({ workers: t.workers, store: t.store, storage: t.storage });
+    t.textures.set(jobId, { status: 'done', output: texturesOutput([5242, 6242, 7242]) });
+    expect((await restarted.get('u1', gen.id)).textures).toMatchObject({
+      status: 'done',
+      options: [{ textureSeed: 5242 }, { textureSeed: 6242 }, { textureSeed: 7242 }],
+    });
+
+    // A server that stopped before it recorded the textures job starts one when polled
+    const other = await finished(t, 'u2');
+    const unrecorded = texturesJob(t, other);
+    await t.store.update(other.id, { texturesJobId: null });
+    expect((await restarted.get('u2', other.id)).textures?.status).toBe('running');
+    expect(t.started.at(-1)).toMatchObject({
+      kind: 'textures',
+      input: { seed: 4242, count: 3, requestId: other.id },
+    });
+    expect(texturesJob(t, other)).toMatch(/^textures-/);
+    expect(texturesJob(t, other)).not.toBe(unrecorded);
+
+    // With texture options switched off since, one still to start isn't started
+    const third = await finished(t, 'u3');
+    await t.store.update(third.id, { texturesJobId: null });
+    const off = new AIStudio({
+      workers: t.workers,
+      store: t.store,
+      storage: t.storage,
+      textureOptions: false,
+    });
+    expect(await off.get('u3', third.id)).toMatchObject({
+      status: 'done',
+      textures: { status: 'failed', error: 'Texture options are off on this server' },
+    });
+
+    // A server without workers still shows the final; its textures end there
+    const fourth = await finished(t, 'u4');
+    const none = new AIStudio({ workers: null, store: t.store, storage: t.storage });
+    expect(await none.get('u4', fourth.id)).toMatchObject({
+      status: 'done',
+      final: { url: `https://files.test/ai/${fourth.id}/final-4242.glb` },
+      textures: { status: 'failed', error: expect.stringContaining('not set up') },
+    });
+  });
+
+  it('starts one textures job when two polls start one at once', async () => {
+    const t = setup();
+    let release: () => void = () => {};
+    // Both polls wait here, then race to record their textures job
+    t.control.texturesStart = new Promise<void>((resolve) => (release = resolve));
+    const gen = await finalReady(t);
+    expect((await t.studio.get('u1', gen.id)).status).toBe('done');
+
+    const polls = [t.studio.get('u1', gen.id), t.studio.get('u1', gen.id)];
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    release();
+    for (const poll of await Promise.all(polls)) {
+      expect(poll).toMatchObject({ status: 'done', textures: { status: 'running' } });
+    }
+    expect(texturesStarts(t)).toHaveLength(2);
+    // The generation keeps one; the other is stopped
+    const kept = texturesJob(t, gen);
+    const [first, second] = [...t.textures.keys()];
+    expect([first, second]).toContain(kept);
+    expect(t.cancelled).toEqual([`model:${kept === first ? second : first}`]);
+  });
+
+  it("stops the textures job when another picture is picked, and doesn't keep its textures", async () => {
+    let release: () => void = () => {};
+    const downloaded = new Promise<void>((resolve) => (release = resolve));
+    const t = setup(true, {
+      // A slow poll waits here while it copies the textures
+      fetchImpl: async (url) => {
+        await downloaded;
+        return new Response(`fetched ${url}`);
+      },
+    });
+    let gen = await finished(t);
+    const jobId = texturesJob(t, gen);
+    t.textures.set(jobId, {
+      status: 'done',
+      output: texturesOutput([], {
+        textures: [
+          {
+            file: { url: 'https://r2.test/texture-1.glb' },
+            textureSeed: 5242,
+            triangles: 1,
+            bytes: 1,
+          },
+        ],
+      }),
+    });
+    const slow = t.studio.get('u1', gen.id);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Another picture: the old final and its textures go, and their job is stopped
+    gen = await t.studio.pick('u1', gen.id, 0);
+    expect(gen).toMatchObject({ status: 'previewing', final: null, textures: null });
+    expect(t.cancelled).toEqual([`model:${jobId}`]);
+    expect(t.store.rows.get(gen.id)).toMatchObject({
+      finalPipeline: null,
+      texturesStatus: null,
+      texturesJobId: null,
+      textures: null,
+      texturesError: null,
+    });
+
+    // The slow poll can't put the old textures back
+    release();
+    expect(await slow).toMatchObject({ status: 'previewing', textures: null });
+    expect(t.store.rows.get(gen.id)).toMatchObject({ texturesStatus: null, textures: null });
+  });
+
+  it('makes texture options on the mock workers (AI_WORKERS_MOCK=1)', async () => {
+    const store = memoryStore();
+    const storage = memoryStorage();
+    const studio = new AIStudio({ workers: new MockWorkers(0), store, storage });
+    let gen = await studio.startFromPrompt('u1', 'a wooden shield with a lion');
+    gen = await studio.get('u1', gen.id);
+    gen = await studio.pick('u1', gen.id, gen.recommended!);
+    expect((await studio.get('u1', gen.id)).status).toBe('reviewing');
+    await studio.keep('u1', gen.id);
+    gen = await studio.get('u1', gen.id);
+    expect(gen).toMatchObject({ status: 'done', textures: { status: 'running' } });
+    // This poll starts their job, and the next finds it done
+    expect((await studio.get('u1', gen.id)).textures?.status).toBe('running');
+    gen = await studio.get('u1', gen.id);
+    expect(gen.textures).toMatchObject({ status: 'done', error: null });
+    const seed = store.rows.get(gen.id)!.seed!;
+    expect(gen.textures!.options.map((option) => option.textureSeed - seed)).toEqual([
+      1000, 2000, 3000,
+    ]);
+    for (const { url } of gen.textures!.options) {
+      const data = storage.files.get(url.replace('https://files.test/', ''))!;
+      expect(data.toString('ascii', 0, 4)).toBe('glTF');
+    }
+
+    // A photo under 256 px gets none, and the final stays done
+    const small = await sharp({
+      create: { width: 200, height: 200, channels: 3, background: '#888' },
+    })
+      .png()
+      .toBuffer();
+    let photo = await studio.startFromPhoto('u1', small);
+    expect((await studio.get('u1', photo.id)).status).toBe('reviewing');
+    await studio.keep('u1', photo.id);
+    expect((await studio.get('u1', photo.id)).textures?.status).toBe('running');
+    expect((await studio.get('u1', photo.id)).textures?.status).toBe('running');
+    photo = await studio.get('u1', photo.id);
+    expect(photo).toMatchObject({
+      status: 'done',
+      textures: { status: 'failed', error: expect.stringContaining('256 px') },
+    });
   });
 });

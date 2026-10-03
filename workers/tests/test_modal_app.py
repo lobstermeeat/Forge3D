@@ -1,6 +1,8 @@
 """modal_app.py without Modal's servers: its pins, its shape and the per-job wrapper."""
 
+import ast
 import base64
+import io
 import json
 import pathlib
 import re
@@ -47,6 +49,7 @@ def test_defines_the_workers_the_api_and_the_helpers():
     assert isinstance(modal_app.Trellis2, modal.Cls)
     assert isinstance(modal_app.FluxSchnell, modal.Cls)
     assert isinstance(modal_app.MultiView, modal.Cls)
+    assert isinstance(modal_app.GeometryViews, modal.Cls)
     assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d"]  # download order
     assert isinstance(modal_app.download_models, modal.Function)
     assert isinstance(modal_app.api, modal.Function)
@@ -128,6 +131,62 @@ def test_complete_downloads_are_kept_and_not_repeated(volume, monkeypatch):
         modal_app._download("trellis2", force=True)
     with pytest.raises(RuntimeError):
         modal_app._require_weights("trellis2")
+
+
+# GeometryViews: MV-Adapter's image+geometry model, for experiments only
+
+
+def test_geometry_views_is_a_small_experiment_worker():
+    """MultiView's image and GPU, one container that soon scales down, and nothing in production calls it."""
+    tree = ast.parse((WORKERS / "modal_app.py").read_text())
+    cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "GeometryViews")
+    options = {keyword.arg: keyword.value for keyword in cls.decorator_list[0].keywords}
+    assert ast.unparse(options["image"]) == "multiview_image" and ast.unparse(options["gpu"]) == "MULTIVIEW_GPU"
+    assert modal_app.MULTIVIEW_GPU == "A10G"
+    assert ast.literal_eval(options["max_containers"]) == 1
+    assert ast.literal_eval(options["scaledown_window"]) < 60  # MultiView's
+    assert "secrets" not in options  # the views come back inline, never to R2
+    assert [node.name for node in cls.body if isinstance(node, ast.FunctionDef)] == ["load", "generate"]
+    # The job API routes nothing to it
+    api = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "api")
+    assert "GeometryViews" not in ast.unparse(api)
+
+
+def test_geometry_views_loads_the_model_once_and_handles_jobs(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(WORKERS / "multiview"))
+    np = pytest.importorskip("numpy")
+    from PIL import Image
+
+    from multiview_worker import geometry
+
+    built = []
+
+    class Model:
+        last_timings = {"views_s": 1.0}
+
+        def __init__(self, models_root):
+            built.append(models_root)
+
+        def draw_views(self, reference, control, prompt, seed, **settings):
+            return [Image.new("RGB", (768, 768), (10 * i, 0, 0)) for i in range(6)]
+
+    monkeypatch.setattr(geometry, "GeometryViewGenerator", Model)
+    models = tmp_path / "models"
+    models.mkdir()
+    monkeypatch.setattr(modal_app, "MODELS", str(models))
+    with pytest.raises(RuntimeError, match="download_models --which multiview"):
+        modal_app.geometry_views_handler()
+
+    (models / ".multiview-weights").write_text("digest")
+    handle = modal_app.geometry_views_handler()
+    assert built == [str(models)]
+    picture = io.BytesIO()
+    Image.new("RGB", (32, 32), (200, 30, 30)).save(picture, format="PNG")
+    control = geometry.pack_control(np.full(geometry.CONTROL_SHAPE, 0.5, dtype=np.float32))
+    # run_job adds the call's id to the job
+    out = handle({"id": "fc-01K6", "image_base64": base64.b64encode(picture.getvalue()).decode(), "control_pngs": control})
+    assert len(out["views"]) == 6 and out["timings"] == {"views_s": 1.0} and built == [str(models)]
+    assert handle({"id": "fc-01K7", "control_pngs": control}) == {"error": "invalid input: image_base64 must be a base64 string"}
 
 
 # Two models in one container: TRELLIS.2 for previews, Pixal3D for finals
@@ -264,6 +323,46 @@ def test_finals_fall_back_to_trellis2_when_pixal3d_is_not_there(capsys):
     pool = pool_with_both()
     result = modal_app.handle_with_models(job("final"), pool, "trellis2", handlers, None, None)
     assert result["model"] == "trellis2" and pool.resident == "trellis2" and "fallback" not in result
+
+
+@pytest.mark.parametrize("final_model", ["trellis2", "pixal3d"])
+def test_texture_options_are_trellis2s(final_model):
+    payload = {"mode": "textures", "seed": 7}
+    assert modal_app.choose_model({"input": payload}, final_model, {"trellis2", "pixal3d"}) == "trellis2"
+
+
+def test_texture_options_for_trellis2s_finals_go_to_trellis2():
+    pool = modal_app.ModelPool(FakeRuntime("trellis2"))
+    handlers = Handlers({"trellis2": {"mode": "textures", "textures": [{"texture_seed": 1007}]}})
+    result = modal_app.handle_with_models(job("textures", seed=7), pool, "trellis2", handlers, "storage", "pack")
+    assert result == {"mode": "textures", "textures": [{"texture_seed": 1007}], "model": "trellis2"}
+    assert handlers.calls == [("trellis2", "trellis2", "textures", "storage", "pack")]
+    # An error is passed on as it is, with no model named
+    handlers = Handlers({"trellis2": {"error": "invalid input: seed is required for textures: send the final's seed"}})
+    result = modal_app.handle_with_models(job("textures"), pool, "trellis2", handlers, None, None)
+    assert result == {"error": "invalid input: seed is required for textures: send the final's seed"}
+
+
+@pytest.mark.parametrize("pixal3d", ["loaded", "missing"])
+def test_texture_options_are_refused_with_the_recipe_on(pixal3d, capsys):
+    """A Pixal3D final has another shape than TRELLIS.2 would make, and only TRELLIS.2 retextures."""
+    if pixal3d == "loaded":
+        pool = pool_with_both()
+    else:  # its finals are TRELLIS.2's here, but the creator's final may come from a container where it loaded
+        pool = modal_app.ModelPool(FakeRuntime("trellis2"))
+        pool.count_out("pixal3d", "its weights are missing")
+    handlers = Handlers({"trellis2": {"glb": "t"}, "pixal3d": {"glb": "p"}})
+    result = modal_app.handle_with_models(job("textures", seed=7), pool, "pixal3d", handlers, None, None)
+    assert result == {"error": "texture options need TRELLIS.2 finals"}
+    assert handlers.calls == []  # nothing ran
+    assert pool.resident == "trellis2" and pool.runtimes["trellis2"].log == []  # nor did TRELLIS.2 go to sleep
+    assert "[orainge] a textures job refused: the finals are pixal3d's" in capsys.readouterr().out
+
+
+def test_the_refusal_is_the_trellis2_workers_own():
+    """The TRELLIS.2 worker's service refuses a runtime that can't retexture with the same words."""
+    service = (WORKERS / "trellis2" / "forge3d_worker" / "service.py").read_text()
+    assert f'TEXTURES_NEED_TRELLIS2 = "{modal_app.TEXTURES_NEED_TRELLIS2}"' in service
 
 
 class MovableRuntime(FakeRuntime):

@@ -12,7 +12,10 @@ const PHOTO_DATA_URL = /^data:image\/(png|jpeg|webp);base64,/;
 
 const id = z.object({ id: z.string().uuid() });
 
-/** The Studio's AI panel: prompt or photo -> pick a picture -> preview -> keep -> final. */
+/**
+ * The Studio's AI panel: prompt or photo -> pick a picture -> preview -> keep -> final, then
+ * texture options for the final.
+ */
 export const aiRouter = router({
   capabilities: publicProcedure.query(() => getStudio().capabilities()),
 
@@ -53,7 +56,10 @@ export const aiRouter = router({
       );
     }),
 
-  /** Polled while a step runs: moves the generation on when its job has finished. */
+  /**
+   * Polled while a step runs, and while a done final's texture options are made: moves the
+   * generation on when its job has finished. The options come back in `textures`.
+   */
   get: protectedProcedure
     .input(id)
     .query(({ ctx, input }) => studioCall(() => getStudio().get(ctx.user.id, input.id))),

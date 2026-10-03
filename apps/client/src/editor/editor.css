@@ -1593,6 +1593,33 @@
   flex-shrink: 0;
   margin-top: 2px;
 }
+/* Texture options: the final's own texture (1) and the others made for its shape. The pressed
+   chip is the one the scene shows */
+.f3-ai-texwait {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+/* Level with the first line when the text wraps */
+.f3-ai-texwait .f3-spin {
+  margin-top: 2.5px;
+}
+.f3-ai-textures {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--tx3);
+}
+.f3-ai-texpicks {
+  display: flex;
+  gap: 4px;
+}
+.f3-ai-texpicks .f3-chip {
+  min-width: 28px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .f3-ai-recent {
   display: flex;
   flex-direction: column;

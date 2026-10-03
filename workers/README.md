@@ -57,6 +57,36 @@ and the result's optional `projection` field says why (`applied`, `reason`, `iou
 `seconds`). Previews skip it: it adds a few seconds and the preview is only for choosing. With the
 recipe on, Pixal3D's finals go through the same export, after they are levelled (The recipe, step 4).
 
+**Floating pieces can be dropped** (`trellis2/forge3d_worker/cleanup.py`, `Preset.drop_floaters`, off by
+default). TRELLIS.2 sometimes leaves a bit of a model in the air beside it: one of Phase 5's dragons has
+the tip of its tail hanging loose. With the flag on, the export removes a connected piece right after
+`to_glb` (before the projection) only when it is both small, under 8 % of the surface, and apart, more
+than 3 % of the bounding-box diagonal from what stays. Pieces within that gap of each other count as one,
+so a part reaches the model through the parts it touches (a basket through its ropes), and the floaters
+together never take more than 8 % of the surface (more would be several separate things, not floaters).
+Distances are between surfaces, so a piece resting on one large flat triangle touches it.
+
+On Phase 5's 39 finals it drops the dragon's tail tip (two back-to-back sheets, 5.7 % of the surface,
+4.9 % of the diagonal away) and three specks hidden inside a balloon's envelope and a cabin, and nothing
+else. The real parts that come loose sit much closer: a fox's tail tip 0.9 % away, a chair's armrests
+0.75 %, a balloon's pilot and burner up to 1.4 %; sprinkles, pearls and chopsticks touch the model
+(within 0.35 %). It takes 0.1 to 1.3 s per final on one CPU core.
+
+**A generation's shape can be retextured** (for experiments: `Trellis2Runtime.retexture`). After
+`generate()`, `last_latent` holds the shape latent TRELLIS.2 sampled (a few MB, on the CPU), with the
+picture, its cutout and the seed. `retexture(sampler_params=…, seed=…, views=…)` samples only the
+texture flow again on that shape, so the geometry stays the one approved: `sampler_params` go over
+pipeline.json's (12 steps, guidance strength 1, guidance interval [0.6, 0.9]), and `views` (other sides
+of the object) steer the texture flow alone, as job views steer every flow. Without a seed it draws the
+noise the generation's own texture was drawn from, so `retexture()` alone gives that texture back and
+settings can be compared on one noise. The mesh goes through `export()` like any other.
+
+**Texture options** (`mode: "textures"`; see Texture options under Job contracts). On the sides the picture
+doesn't show, TRELLIS.2's texture is a lottery. In Phase 7's three sets of rolls (the 20 test prompts each
+time), the final's own texture was publishable for 35 of 60, and the best of four textures on the same shape
+for about 47. So after a final, the worker makes three more textures for the same shape with `retexture`,
+and the creator picks one.
+
 ## The recipe: Pixal3D finals, off by default
 
 Phase 5's finals, made by TRELLIS.2 alone, invented wrong backs: the arcade machine's back was a dark
@@ -142,7 +172,8 @@ turns the recipe off. With the recipe on, TRELLIS.2 still makes a final when Pix
 missing, when Pixal3D failed to load, and when a Pixal3D final runs out of GPU memory even after one
 retry in Pixal3D's low-VRAM mode (Pixal3D's models then move off the GPU while TRELLIS.2 makes the
 final, and back afterwards). The result's `fallback` says why each time. Other Pixal3D failures come
-back as errors, as TRELLIS.2's do. Results name the model that made them in `model`.
+back as errors, as TRELLIS.2's do. Results name the model that made them in `model`. Texture options are
+TRELLIS.2's alone, so with the recipe on they are refused (Texture options, under Job contracts).
 
 **One container, two models.** With the recipe on, the TRELLIS.2 container holds both (`ModelPool` in
 `modal_app.py`); with it off, TRELLIS.2 alone. TRELLIS.2 loads first and stays on the GPU, so previews
@@ -168,7 +199,9 @@ and a 15-minute timeout either way.
 `image_base64` can replace `image_url`, which is only fetched from hosts listed in
 `ALLOWED_IMAGE_HOSTS`. `seed` is optional (a random one is returned). Outputs are stored at
 `ai/<request_id>/<mode>-<seed>.glb`, so every result has its own URL and caches never serve a
-stale one. With the recipe on, the same input makes Pixal3D's finals (The recipe, above).
+stale one. With the recipe on, the same input makes Pixal3D's finals (The recipe, above). `mode` is
+`"preview"`, `"final"` (the default) or `"textures"`, which makes more textures for a final's shape
+(Texture options, below).
 
 `views` (optional) adds up to 8 other pictures of the object, such as the multiview worker's, so
 TRELLIS.2 doesn't have to invent its back and sides:
@@ -212,7 +245,7 @@ final's settings, and reports `"pipeline": "512"`. A final that runs out while T
 already off the GPU (deployed in low-VRAM mode, or asleep beside Pixal3D) goes to that pipeline at once.
 The same seed gives that pipeline the shape the user approved in the preview, and its memory use is known
 to fit, while TRELLIS.2's cascade has no cheaper setting for a 1024³ final (see `FALLBACK_PIPELINE` in
-`trellis2/forge3d_worker/pipeline.py`).
+`trellis2/forge3d_worker/settings.py`).
 
 `model` (Modal only) is the model that made it: `"trellis2"`, or `"pixal3d"` for a final when the
 recipe is on. With the recipe on, a final that TRELLIS.2 made instead says why in `fallback`: Pixal3D's
@@ -224,7 +257,8 @@ sent when a view is left out: one with no object in it, or one whose object runs
 off, and the model comes out crumpled; `CLIPPED_EDGE` in `pipeline.py`).
 
 Finals also carry `projection`, whether the picture was painted onto the model (see above); its
-time is part of `export_s`.
+time is part of `export_s`. A preset with `drop_floaters` adds `floaters`: how many pieces the model had,
+how many were dropped, their faces and share of the surface, and the largest of them.
 
 A final made by the recipe has the same fields, with Pixal3D in its `credits`, and says what the recipe
 did. For example:
@@ -317,6 +351,104 @@ with their angles; the camera and framing are the 3D worker's to know.
 Settings: 30 steps (the same views as MV-Adapter's 50 in 62% of the time), guidance 3, the reference
 at 90% of the frame; 46 s per picture on an A10G, 19 GiB of GPU memory at the peak.
 
+### Texture options
+
+Phase 7's rolls made three more textures for each of the twenty finals of `test-sets/phase2.txt`, on the
+final's own shape, three times (Phase 4's seeds; the next seeds; Phase 4's seeds with other texture noise).
+Four reviewers graded every texture, blinded. The final's own texture was publishable for 10, 11 and 14 of
+20; the best of the four for 16 each time (15.8, 15.7 and 15.8 when two reviewers pick and the other two
+judge the pick). No automatic pick was trustworthy: image statistics (agreement with MV-Adapter's views of
+the shape, the four's medoid, ghost, grey-patch and palette scores) agreed with the reviewers barely better
+than chance, and a self-hosted judge, Qwen3-VL-8B looking at turntables of the four, picked a publishable
+texture for 27.5 of 40 against 25 for the final's own (30B-A3B: worse; the code is on the
+`phase7-judge-experiment` branch). So the creator picks (`test-sets/phase2.phase7-textures.json` has the
+data). A `"textures"` job makes those textures for a final the creator already has:
+
+```json
+{ "image_url": "https://…", "mode": "textures", "seed": 1234, "request_id": "gen_42", "count": 3 }
+```
+
+It takes what the final took: the same picture, the final's `seed` (required here: another seed would make
+another shape) and the final's `views`, if it had any. `count` is how many textures to make, 1 to 4 (3 if
+left out). The worker makes the final's shape again, as the final job did (the final's preset, seed and
+views), but doesn't export its texture: the creator has it. `pipeline` (optional) is the final's: send
+`"512"` for a final that fell back to it (its result said `"pipeline": "512"`), and the shape is made with
+that pipeline at once, as the fallback made it (the final's preset with the fallback's pipeline, through the
+same `generate()`; `FALLBACK_PIPELINE` in `settings.py`). The cascade would make another shape, or run out
+of memory again first. `"1024_cascade"` is the same as leaving it out, and anything else is invalid input.
+Previews and finals ignore `count` and `pipeline`. Then, for k = 1 to `count`, TRELLIS.2's texture
+flow alone samples a new texture for that shape (`Trellis2Runtime.retexture`), from the picture alone, with
+its noise drawn from seed `seed + 1000 * k` (the rolls' seeds; `TEXTURE_SEED_STEP` in
+`trellis2/forge3d_worker/settings.py`). Each texture is exported and packed as a final is (to_glb,
+unpremultiply, the picture's projection, shading normals, gltfpack) and stored beside the final's model, at
+`ai/<request_id>/final-<seed>-texture-<k>.glb`. A second job with the same input makes the same textures
+again (give or take the GPU's own nondeterminism) and stores them under the same keys. Output:
+
+```json
+{
+  "request_id": "gen_42",
+  "mode": "textures",
+  "seed": 1234,
+  "textures": [
+    {
+      "texture_seed": 2234,
+      "glb": { "key": "ai/gen_42/final-1234-texture-1.glb", "url": "https://assets…/ai/gen_42/final-1234-texture-1.glb" },
+      "bytes": 1550172,
+      "raw_bytes": 8915432,
+      "triangles": 96205,
+      "projection": { "applied": true, "reason": "applied", "iou": 0.9755, "…": "…" },
+      "export": { "path": "to_glb", "seconds": "…", "captured": true }
+    },
+    {
+      "texture_seed": 4234,
+      "glb": { "key": "ai/gen_42/final-1234-texture-3.glb", "…": "…" },
+      "export": { "path": "rebake", "seconds": "…" },
+      "…": "…"
+    }
+  ],
+  "texture_errors": [{ "texture_seed": 3234, "error": "ConnectionError: R2 unreachable" }],
+  "pipeline": "1024_cascade",
+  "model": "trellis2",
+  "views_used": 0,
+  "timings": { "generate_s": 27.7, "retexture_s": 30.6, "export_s": 70.8, "pack_s": 4.5, "upload_s": 0.9 },
+  "credits": ["Built with DINOv3", "3D generation: TRELLIS.2 (Microsoft, MIT)"]
+}
+```
+
+- Each texture has a final's fields: `glb`, `bytes`, `raw_bytes`, `triangles` and `projection` (and
+  `floaters`, with a preset that drops them). `texture_seed` is the seed its noise came from.
+- `export` says how the texture's model was made. TRELLIS.2's `to_glb` does the same geometry work for
+  every texture of one shape (filling holes, remeshing, unwrapping UVs, finding where each texel lies on the
+  surface); only the texture changes. So the first texture runs it in full and keeps that work, the
+  texture layout (`"path": "to_glb"`, `"captured": true`), and the others only sample their texture at the
+  kept texels and build the material as `to_glb` does (`"path": "rebake"`;
+  `trellis2/forge3d_worker/rebake.py`). `seconds` is that step's time. A layout serves one shape in one job:
+  when it doesn't fit (other voxels, say) or the rebake fails, `to_glb` runs in full and `fallback` says why.
+  Finals and previews always run `to_glb` in full, as before, and keep nothing.
+- A texture that fails doesn't lose the others: it is listed in `texture_errors` (present only then), and
+  the job completes with the rest, in order. When none is made, the job fails as other jobs do (`{"error":
+  "generation failed: none of the 3 textures was made: …"}`), and so it does when the shape can't be made.
+  After a GPU fault the container is replaced once the job is done, either way.
+- `pipeline` is the shape's: `"1024_cascade"`, or `"512"` when the cascade ran out of GPU memory even in
+  low-VRAM mode, or when the job asked for `"512"`. Textures for a `512` shape fit the final only if the
+  final's own `pipeline` was `"512"` too, so a job for a final that fell back should say so; the server
+  checks the two match either way.
+- `timings`: the shape's generation, then each step summed over the textures, failed attempts included.
+  `views_used` and `model` (Modal only) are as for a final.
+- **Pixal3D finals.** Retexturing is TRELLIS.2's, and a recipe final has Pixal3D's shape, so with
+  `ORAINGE_FINAL_MODEL=pixal3d` every textures job fails at once with
+  `{"error": "texture options need TRELLIS.2 finals"}`, before anything runs (`handle_with_models` in
+  `modal_app.py`). That holds in a container whose Pixal3D couldn't load as well, since the final may come
+  from one where it did. The Pixal3D worker's own service refuses them the same way.
+
+**Cost:** one shape generation (Phase 5's finals: a median of 28 s on an L40S), then per texture its
+sampling (2-7 s; much longer for very detailed shapes such as the books), its export and about 1.5 s of
+packing. The first texture's export runs `to_glb` in full (15-25 s); the later ones rebake on its layout in
+6-9 s, the same model as a full export of that mesh would give (`ops/exp_rebake.py` on an L40S: no visible
+difference on the same mesh; `to_glb` 9-19 s against a rebake of about 3 s). Measured on the arcade machine
+and the skateboard: 87 and 56 s for three textures, against 111 and 71 s without the cached layout. That is
+about $0.04-0.06 of the TRELLIS.2 container (Cost, below).
+
 ### The views' cameras
 
 `multiview/multiview_worker/cameras.py` has these in code (`camera_to_world`, `project`); they are
@@ -347,6 +479,102 @@ them to its code.
   The other views share it, so an object that is deeper than it is wide overflows the frame in the
   views that show its long axis (a stack of books at 45° and 315°; a car in all four side views, wheels
   cut). A view's cutout touching the frame edge means "unknown beyond here", not the object's edge.
+
+### Views of a given mesh (experiments only)
+
+MV-Adapter's image+geometry model ("ig2mv", `mvadapter_ig2mv_sdxl.safetensors`) draws six views of a
+mesh it is given, from a picture of the object: the views follow the mesh, so they can be baked onto
+its texture. `multiview/multiview_worker/geometry.py` runs it as MV-Adapter's
+`scripts/inference_ig2mv_sdxl.py` does, except that the caller renders the mesh (upstream renders
+with nvdiffrast, which is never installed here; the TRELLIS.2 worker's torch rasteriser,
+`rasterize_depth` and `rasterize_faces` in `trellis2/forge3d_worker/projection.py`, can). On
+Modal it is the `GeometryViews` class: MultiView's image on an A10G, one container that scales down
+after 30 s idle. Nothing in production calls it. A `modal run` script calls it as
+`modal_app.GeometryViews().generate.remote(job)` with
+
+```json
+{
+  "image_base64": "…",
+  "control_pngs": ["…12 base64 PNGs…"],
+  "prompt": "a wooden shield with a lion",
+  "seed": 0,
+  "steps": 30,
+  "guidance": 3.0,
+  "reference_scale": 1.0,
+  "control_scale": 1.0
+}
+```
+
+where only `image_base64` and `control_pngs` are needed (the rest are the defaults shown, except
+`prompt`, which is "high quality" by default; steps 1–100, guidance 0–20, scales 0–3). It returns
+`{"views": [six base64 RGB PNGs], "seconds", "timings"}`, or `{"error": "invalid input: …" |
+"generation failed: …"}`. The views are 768 x 768, drawn on mid-gray with lighting, in the cameras'
+order; the caller knows the mesh's masks.
+
+The conventions, copied from upstream's script and its training config:
+
+- **Cameras**, in this order: front, right, back, left, top, bottom (`cameras.py`: `IG2MV_VIEWS`,
+  `IG2MV_AZIMUTHS = (0, 90, 180, 270, 180, 180)`, `IG2MV_ELEVATIONS = (0, 0, 0, 0, 89.99, -89.99)`,
+  `camera_to_world`). Upstream: `get_orthogonal_camera(elevation_deg=[0, 0, 0, 0, 89.99, -89.99],
+  distance=[1.8] * 6, left=-0.55, right=0.55, bottom=-0.55, top=0.55, azimuth_deg=[x - 90 for x in
+  [0, 90, 180, 270, 180, 180]])`. They are the views' cameras above (same world, distance, frame and
+  pixel grid, row 0 at the top), plus one looking down with the front at the image's top and +X on
+  its left, and one looking up with the front at the bottom and +X on the left. The order matters:
+  the model's attention runs along rows across the four level views and along columns across the
+  back, top, bottom and the mirrored front.
+- **The mesh** goes where upstream's `load_mesh(path, rescale=True)` puts it: scaled so that its
+  largest |coordinate| is 0.5, without re-centring, and turned from glTF's +Y up to +Z up, a glTF point
+  (x, y, z) becoming (x, -z, y) (`mesh_to_world`, `gltf_to_world` for normals). glTF's front (+Z) then
+  faces the front camera. TRELLIS.2's finals are centred and mostly have the pictured side there (the
+  Phase 5 arcade machine and shield do), but a picture taken from high above can leave it facing up:
+  Phase 5's guitar, pictured lying down, has its strings in the top and back views.
+- **The control maps** are in that world, not relative to the camera: per view, channels 0–2 are the
+  surface position + 0.5 and channels 3–5 the unit normal / 2 + 0.5, clamped to [0, 1], and both are
+  0.5 where no surface is (upstream renders with `normal_background=0.0`; positions are 0 there). That
+  is `encode_control`, giving the (6, 6, 768, 768) array `draw_views` takes. MV-Adapter's training data
+  is encoded the same way (world positions + 0.5; world normals, `use_camera_space_normal` off; 0.5
+  for the background). Upstream interpolates the mesh's vertex normals and normalises them per pixel.
+- **Transport**: `pack_control` turns the array into the job's 12 PNGs (8-bit RGB): the six position
+  maps, then the six normal maps, each in view order; `unpack_control` reverses it. 8 bits keep
+  positions within 0.002 units (1.4 px) and normals within 0.004; a TRELLIS.2 final's maps are
+  0.4–1.3 MB of base64.
+- **Settings**: those of the views above (BiRefNet's cutout of the picture framed by `preprocess_image`
+  on mid-gray, ShiftSNR with shift scale 8, the fp16-fix VAE, guidance 3, the negative prompt), 30 steps
+  (the script's default is 50; the training config evaluates at 30), and control and reference scales 1.
+
+Checked on MV-Adapter's own demo mesh (`assets/demo/ig2mv/1ccd5c1563ea4f5fb8152eac59dabd5c.glb`):
+its maps rendered this way outline the six views upstream drew for it (`…_mv.png`) at a silhouette IoU
+of 0.96–0.98 in every view, against 0.38–0.55 with the rows flipped, top and bottom swapped or right
+and left swapped. The weights come with `download_models --which multiview` (3.6 GB more; a volume
+filled before Phase 7 needs that run again). Licenses as for the views above: MV-Adapter's code and
+weights are Apache-2.0, SDXL's license is CreativeML Open RAIL++-M.
+
+### Views baked into the texture (Phase 7, an experiment)
+
+`trellis2/forge3d_worker/mvtexture.py` is the geometry side of letting MV-Adapter's image+geometry
+model (ig2mv, `scripts/inference_ig2mv_sdxl.py`) draw the sides the picture doesn't show: it renders
+the final's own shape as the position and normal maps ig2mv draws six views from, and bakes those
+views into the base-colour texture. Nothing in production calls it: an experiment sets
+`Trellis2Runtime.before_projection`, which runs between unpremultiplying the texture and the picture's
+projection (to_glb, unpremultiply, bake, project, shade, export).
+
+- **Its cameras are not the image-only model's**: six orthographic views at the same scale (768 px
+  over [-0.55, 0.55]), of the front (glTF +Z), the side on its right (+X), the back, the left side, the
+  top (the front at the top of the image) and the bottom (the back at the top), in that order.
+- `frame_for(mesh, azimuth)` places to_glb's mesh as upstream's `load_mesh(rescale=True)` does (+Y up
+  becomes +Z, the largest coordinate 0.5, not re-centred), after turning it so that the picture's
+  azimuth (the projection's `pose`) faces the front camera.
+- `control_maps` and `as_control` give the control image upstream renders, (6, 6, 768, 768): world
+  positions + 0.5, then world normals / 2 + 0.5, both 0.5 off the mesh.
+- `bake_views` writes six drawn views into the texture: per texel a depth test in each view, a weight
+  cos³ (none under a cosine of 0.2), fades within 4 px of silhouettes and depth edges, a blend in
+  linear light, one colour match to the old texture for all six views; the old colour where the
+  weights add up to little, fading in; the views' grey background left out; the change carried into
+  the gutters. Each of these is a keyword argument.
+- On the Phase 5 arcade machine, its own texture rendered from the six cameras and baked back changes
+  by 0.64/255 on average where it is baked (99% of texels within 12.3; the rest sit at sharp edges and
+  UV seams), and by 0.24 (99% within 4) from renders twice the size: what is left is resampling. About
+  60% of its texels, mostly the inner faces of its panels, are seen by no camera and keep their colour.
 
 ### The Pixal3D worker
 
@@ -408,8 +636,9 @@ Modal bills GPUs by the second and includes $30 of free compute a month on its S
 `modal_app.py` defines the workers, a volume for the weights and a small job API
 (`job_api.py`) with the same routes as a RunPod endpoint (`/run`, `/runsync`, `/status/{id}`,
 `/cancel/{id}`), under `/trellis2`, `/reference` and `/multiview`, plus `/warm`, which starts a
-worker's container ahead of a job without waiting for it. `/trellis2` takes previews and finals
-alike (with the recipe on, its container makes the finals with Pixal3D).
+worker's container ahead of a job without waiting for it. `/trellis2` takes previews, finals and
+texture options alike (with the recipe on, its container makes the finals with Pixal3D and refuses
+texture options).
 
 1. On Hugging Face, request access to
    [DINOv3](https://huggingface.co/facebook/dinov3-vitl16-pretrain-lvd1689m) (Meta approves it
@@ -449,7 +678,9 @@ alike (with the recipe on, its container makes the finals with Pixal3D).
    sets (about 44 GB: the multi-view set for most pictures, the single-view set for thin, flat
    objects), MoGe-2 and NAF, and reuses the TRELLIS.2 weights' decoders, DINOv3 and BiRefNet, so it
    comes after `--which trellis2`. Add `--which multiview` only if the server will run with
-   `AI_MULTIVIEW=1`. Without `--which`, `download_models` fetches all four sets, about 115 GB (Pixal3D's two flow-model sets are 44 GB of it).
+   `AI_MULTIVIEW=1` (it also fetches the image+geometry adapter the experiments use, 3.6 GB). Without
+   `--which`, `download_models` fetches all four sets, about 119 GB (Pixal3D's two flow-model sets are
+   44 GB of it).
 
 5. Update the server's database. From Phase 6 on, the server reads the `views` and `views_error`
    columns of `ai_generations` (`apps/server/src/db/schema.ts`) even with `AI_MULTIVIEW` off, so
@@ -592,7 +823,9 @@ and the `ai_generations` table as in `apps/server/src/db/schema.ts`
 (`pnpm --filter @forge3d/server exec drizzle-kit push` in development; Deploying on Modal, step 5,
 for production). Pictures and models are copied into the server's storage (`UPLOAD_DIR`), so they
 outlive the workers' outputs. Each user can have 3 models in progress and 30 an hour until credits
-exist (`apps/server/src/services/ai/studio.ts`).
+exist (`apps/server/src/services/ai/studio.ts`). Each request to the job API gives up after 30 s
+(`REQUEST_TIMEOUT_MS` in `providers/jobEndpoint.ts`; `runsync`, which the host holds open, after 150 s),
+so no poll hangs on it; a job's state that didn't come in time is asked again on the next poll.
 
 **The other sides (`AI_MULTIVIEW=1`, off by default).** The 3D models invent the sides a picture
 doesn't show. With `AI_MULTIVIEW=1` on the server, the picked picture (or the uploaded photo) first
@@ -619,12 +852,53 @@ multiview weights (`download_models --which multiview`); without them each views
 model is made from the picture alone. On RunPod, give the server `RUNPOD_MULTIVIEW_ENDPOINT_ID`;
 without it the step is skipped.
 
+**Texture options (`AI_TEXTURE_OPTIONS`, on by default).** On the sides the picture doesn't show,
+TRELLIS.2's texture is a lottery. In three runs of the 20 test prompts, the final's own texture was good
+enough to publish 35 times in 60, and the best of four textures of the same shape about 47 times (Phase
+7's rolls). No automatic pick was trustworthy, so the creator picks:
+
+1. The poll that finds the final done returns it at once, so it is in the scene and usable; under it
+   the panel says "Making 3 more textures to choose from…" and polls on every 5 s (after a reload too).
+   The next poll starts a `"textures"` job on the `trellis2` worker (Texture options, under Job
+   contracts) with what the final was made from: the picture, the final's seed and its views, `count` 3,
+   and `"pipeline": "512"` when the final fell back to it.
+2. About a minute or two later the panel shows "Texture 1 2 3 4". 1 is the final's own texture. Picking
+   another swaps the model in the scene in place: the same object where it stands, so it saves with
+   the scene, and Undo puts the last one back. The pressed number is the one in the scene. If the model
+   was removed, picking one places it again.
+
+The textures are copied into the server's storage beside the final and kept with the generation (the
+`textures_status`, `textures_job_id`, `textures` and `textures_error` columns, and `final_pipeline`), so
+a restarted server picks a running job up again. They never fail a generation. If their job can't
+start or fails, or its textures fit another shape (the job's `pipeline` isn't the final's, as when a
+worker from before `pipeline` makes a fallen-back final's textures on the cascade), the panel says
+quietly that no more textures could be made, and the server logs why. When some textures fail, the
+panel offers the others. Picking another picture drops them, and stops their job if it still runs
+(the job is read and cleared in one statement, so one a poll records meanwhile is stopped too). A job,
+or its textures, meant for one final never land on the next: the server records them only while that
+final is still the generation's.
+
+The job API's `run` isn't idempotent, so the server starts a textures job once. A start that fails
+once its request may have reached the workers (a 5xx, a dropped connection, no answer in 30 s) could
+have queued the job anyway, so it ends the texture options instead of queueing another on every poll.
+Only a start that never reached them (the connection refused, the host not found) is tried again, by
+the polls in the 2 minutes after the final (`TEXTURES_START_MS` in `apps/server/src/services/ai/studio.ts`).
+A job still running 15 minutes after it started (`TEXTURES_TIMEOUT_MS`) is stopped and ends them the
+same way, so the panel never waits for ever. Each final's options take about 1-1.5 minutes of the
+TRELLIS.2 container (about $0.04-0.06).
+
+`AI_TEXTURE_OPTIONS=0` (or `false`, `off` or `no`) on the server turns them off. A final that another
+model made gets none (on Modal its result's `model` says, e.g. `"pixal3d"` with the recipe on):
+retexturing is TRELLIS.2's. Workers with the recipe on (`ORAINGE_FINAL_MODEL=pixal3d`) refuse every
+textures job, even for a final TRELLIS.2 made in Pixal3D's place, so turn them off there too.
+
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
 labelled pictures (rated, with the second always the best) and return a small house model after
-a second or two. A prompt with the word "fail", or a photo under 64 px, shows the error states.
-With `AI_MULTIVIEW=1` too, they draw 6 views of a box (the front orange, the sides green and the
-back blue), except for a photo under 128 px, whose model is then made from the photo alone.
-It refuses to run in production.
+a second or two, then the final's house in 3 other colours as its texture options. A prompt with
+the word "fail", or a photo under 64 px, shows the error states, and a photo under 256 px gets no
+texture options. With `AI_MULTIVIEW=1` too, they draw 6 views of a box (the front orange, the sides
+green and the back blue), except for a photo under 128 px, whose model is then made from the photo
+alone. It refuses to run in production.
 
 ## Deploying on RunPod
 
@@ -680,6 +954,7 @@ GiB-hour of memory, so about $2.30/h for a FLUX container and $2.50/h for a TREL
 | 4 reference images                                                                 | 10–20 s         | ~$0.01      |
 | Preview                                                                            | 20–40 s         | ~$0.01–0.03 |
 | Final                                                                              | 1–2 min         | ~$0.04–0.08 |
+| Texture options: the final's shape again, then 3 textures (the first ~30 s, the others ~15 s) | 1–1.5 min | ~$0.04–0.06 |
 | Cold start and 60 s idle, per container scaled up                                  | ~2 min          | ~$0.08      |
 | Six views (multiview, A10G at ~$1.30/h all-in)                                     | 46 s            | ~$0.02      |
 | Final by the recipe, when `ORAINGE_FINAL_MODEL=pixal3d`                            | 45–103 s        | ~$0.03–0.07 |
@@ -721,7 +996,8 @@ Never installed: NATTEN (not a licensing matter; the one call NAF makes is compu
 The multiview worker ([`multiview/NOTICE.md`](multiview/NOTICE.md)), off by default, runs MV-Adapter
 (Apache-2.0; its pipeline code is vendored in `multiview/mvadapter/` without the nvdiffrast-based mesh
 tools) on Stable Diffusion XL 1.0, whose CreativeML Open RAIL++-M license has use-based restrictions
-that Orainge's terms of service must pass on to users before the worker serves them.
+that Orainge's terms of service must pass on to users before the worker serves them. The same applies
+to MV-Adapter's image+geometry adapter (Apache-2.0), which only the experiments' `GeometryViews` runs.
 
 ## Tests
 
@@ -736,19 +1012,30 @@ python -m pytest workers/multiview/tests       # torch for the camera checks; no
 
 Run the folders separately: they share test file names. Each suite also runs from inside its folder
 (`cd workers/pixal3d && python -m pytest`). With `TRELLIS2_SRC` pointing at a TRELLIS.2 checkout, the
-trellis2 tests also run the views through TRELLIS.2's own samplers, not only a reduction of them;
-without diffusers installed, one multiview camera check is skipped.
+trellis2 tests also run the views through TRELLIS.2's own samplers, not only a reduction of them, and
+the cached texture layout through TRELLIS.2's own `to_glb` (skipped without it); without diffusers
+installed, one multiview camera check is skipped.
 
 The tests cover input validation, job handling, the out-of-memory retry and fallback, shading
 normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check, the job API, the
-nvdiffrast stand-in (against a brute-force rasterizer and analytic results) and the picture
+nvdiffrast stand-in (against a brute-force rasterizer and analytic results), the picture
 projection (synthetic models pictured from known cameras: the camera found, the colours painted,
-the fall-backs). For the recipe they cover, on fakes, the default (TRELLIS.2's finals) and the choice
+the fall-backs), the floater cleanup (synthetic donuts, bowls, balloons, cabins and dragons: what floats
+apart goes, what touches or is big stays, UVs and texture kept), retexturing (the texture flow alone
+on the generation's shape, its noise drawn again bit for bit, views, the low-VRAM retry), texture options
+(the final's shape once, the rolls' seeds, the count, the keys, one texture or all of them failing, the
+refusal where the finals aren't TRELLIS.2's, the timings), the cached texture layout (TRELLIS.2's own
+`to_glb` on CPU stand-ins for CuMesh and FlexGEMM, with `TRELLIS2_SRC`: what the capture sees, a rebake
+equal to `to_glb` bit for bit, the fallbacks, finals untouched) and the views' bake (MV-Adapter's ig2mv cameras held to its code, the control maps of
+a box, boxes baked from views painted per side: hidden sides, the background, the fades, the colour
+match, the gutters). For the recipe they cover, on fakes, the default (TRELLIS.2's finals) and the choice
 of model, the container's model pool, the fallbacks to TRELLIS.2 and what they report, the weights a
 run fetches, the recipe's preview, levelling and its gate, the thin rule and the weight swap,
 Pixal3D's cameras and views, the NATTEN stand-in (against NATTEN's own definition) and the weights
 scripts' pins. The multiview tests hold its cameras to MV-Adapter's code and cover the reference
-picture's preparation and job handling. Before the first
+picture's preparation and job handling, and for the image+geometry model the control maps' encoding
+and transport, the mesh's placement (against upstream's `load_mesh`), the call into the pipeline and
+its jobs, all with stand-ins for diffusers and the weights. Before the first
 production deploy, run `workers/trellis2/scripts/compare_nvdiffrast.py` once on a GPU machine
 that has nvdiffrast installed (evaluation use) to confirm the stand-in matches it on real
 hardware.

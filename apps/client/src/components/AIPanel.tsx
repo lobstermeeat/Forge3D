@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import type { ModelData } from '@forge3d/shared';
 import { trpc } from '@/api/trpc';
 import { useSession } from '@/auth/client';
+import { TextureOptions } from '@/components/TextureOptions';
 import { Icon } from '@/editor/Icon';
 import { modelName } from '@/editor/modelName';
 import { photoToDataUrl } from '@/editor/photo';
+import { TEXTURES_POLL_MS, texturesRunning, type TextureChoice } from '@/editor/textureOptions';
 import type { EditorActions } from '@/hooks/useEditorActions';
 import { useAIStore } from '@/stores/aiStore';
 import { useEditorStore } from '@/stores/editorStore';
@@ -104,6 +106,7 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
     setPhoto,
     watched,
     watch,
+    markPlaced,
     restored,
     markRestored,
   } = useAIStore();
@@ -118,7 +121,13 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
     { id: currentId ?? '' },
     {
       enabled: signedIn && !!currentId,
-      refetchInterval: (query) => (RUNNING.has(query.state.data?.status as Status) ? 2000 : false),
+      // While a step runs, and more slowly while a done final's texture options are made
+      refetchInterval: ({ state: { data } }) =>
+        RUNNING.has(data?.status as Status)
+          ? 2000
+          : texturesRunning(data)
+            ? TEXTURES_POLL_MS
+            : false,
       retry: 1,
     },
   );
@@ -156,19 +165,22 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
     if (signedIn && multiview && choosingPhoto) warm({ worker: 'multiview' });
   }, [signedIn, multiview, choosingPhoto, warm]);
 
-  // After a reload, carry on with this scene's unfinished generation (once per page load)
+  // After a reload, carry on with this scene's unfinished generation (once per page load),
+  // counting a final whose texture options are still being made
   useEffect(() => {
     if (restored || !recent.data) return;
     markRestored();
     if (currentId) return;
     const open = recent.data.find(
-      (r) => r.status !== 'done' && r.status !== 'failed' && (!sceneId || r.sceneId === sceneId),
+      (r) =>
+        ((r.status !== 'done' && r.status !== 'failed') || texturesRunning(r)) &&
+        (!sceneId || r.sceneId === sceneId),
     );
     if (open) setCurrentId(open.id);
   }, [recent.data, restored, markRestored, currentId, sceneId, setCurrentId]);
 
-  // Place what finished while the panel watched: the preview, then the final in its place
-  const placed = useRef(new Set<string>());
+  // Place what finished while the panel watched: the preview, then the final in its place. Each
+  // file once a session: reopening the panel keeps the texture the user picked since
   useEffect(() => {
     if (!g) return;
     if (RUNNING.has(g.status)) {
@@ -184,13 +196,13 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
           : null;
     if (!quality) return;
     const model = modelData(g, quality);
-    if (placed.current.has(model.url)) return;
-    placed.current.add(model.url);
+    if (useAIStore.getState().placed[model.url]) return;
+    markPlaced(model.url);
     const existing = actions.findModelEntity(g.id);
     if (existing) actions.replaceModel(existing, model);
     else actions.insertModel(model, modelName(g.prompt));
     void utils.ai.recent.invalidate();
-  }, [g, watched, watch, actions, utils]);
+  }, [g, watched, watch, markPlaced, actions, utils]);
 
   // Recent shows each generation's step, so refresh it as steps change
   useEffect(() => {
@@ -365,6 +377,12 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
     const running = RUNNING.has(g.status);
     const entityId = actions.findModelEntity(g.id);
     const title = g.source === 'photo' ? 'From a photo' : `“${g.prompt}”`;
+    // A texture option swaps the model in the scene in place, or places it if it isn't there
+    const chooseTexture = (choice: TextureChoice) => {
+      const model = { ...modelData(g, 'final'), url: choice.url };
+      if (entityId) actions.replaceModel(entityId, model, `texture ${choice.number}`);
+      else actions.insertModel(model, modelName(g.prompt));
+    };
     card = (
       <section className="f3-ai-card" aria-live="polite" aria-label="Current AI model">
         <header>
@@ -418,7 +436,8 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
         {g.status === 'reviewing' && g.preview && (
           <div className="f3-ai-result">
             <p>
-              <Icon name="ok" size={14} /> The preview is in your scene
+              <Icon name="ok" size={14} />{' '}
+              {entityId ? 'The preview is in your scene' : 'The preview is ready'}
               {g.preview.triangles ? ` (${g.preview.triangles.toLocaleString()} triangles)` : ''}.
             </p>
             <button
@@ -458,9 +477,16 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
         {g.status === 'done' && g.final && (
           <div className="f3-ai-result">
             <p>
-              <Icon name="ok" size={14} /> The final model is in your scene
+              <Icon name="ok" size={14} />{' '}
+              {entityId ? 'The final model is in your scene' : 'The final model is ready'}
               {g.final.triangles ? ` (${g.final.triangles.toLocaleString()} triangles)` : ''}.
             </p>
+            <TextureOptions
+              generation={g}
+              sceneUrl={entityId ? actions.modelOf(entityId)?.url : null}
+              disabled={playing}
+              onChoose={chooseTexture}
+            />
             {!entityId && (
               <button
                 type="button"
