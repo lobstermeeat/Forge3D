@@ -12,11 +12,12 @@ name: AI ops (Modal)
 
 on:
   push:
-    branches: [ai-ops]
+    # ai-ops, plus one ai-ops-<name> branch per line of work, so experiments run side by side
+    branches: [ai-ops, 'ai-ops-*']
   workflow_dispatch:
 
 concurrency:
-  group: ai-ops
+  group: ai-ops-${{ github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -69,7 +70,7 @@ jobs:
           PY
           # Never save private results in the clear, even if encrypting them fails
           bash ops/seal.sh seal ops-out || { echo "Not saved: ops-out/private/"; rm -rf ops-out/private ops-out/private.*; }
-          run_dir="runs/$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
+          run_dir="runs/$(date -u +%Y%m%d-%H%M%S)-${GITHUB_REF_NAME}-${GITHUB_SHA::7}"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Earlier results were kept on the ai-results branch; they carry on in the new ref
@@ -86,10 +87,23 @@ jobs:
           cp ops/run.sh "results/$run_dir/run.sh"
           git -C results add -A
           git -C results commit -qm "ops: $run_dir (${{ job.status }})"
-          if git -C results push origin HEAD:refs/ops/results; then
-            echo "Saved to refs/ops/results: $run_dir"
-          else
+          # Runs on other ai-ops-* branches may save at the same time: on a refused push, take the
+          # newest results and add this run's folder on top again
+          saved=""
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if git -C results push origin HEAD:refs/ops/results; then
+              saved=1
+              echo "Saved to refs/ops/results: $run_dir"
+              break
+            fi
+            sleep $((RANDOM % 15 + 5))
+            git -C results fetch --depth=1 origin +refs/ops/results:refs/remotes/origin/ops-results
+            git -C results reset -q --mixed origin/ops-results
+            git -C results add -A "$run_dir"
+            git -C results commit -qm "ops: $run_dir (${{ job.status }})"
+          done
+          if [ -z "$saved" ]; then
             # Keep the results even if the ref is refused
-            git -C results push origin HEAD:refs/heads/ai-results
-            echo "Saved to the ai-results branch: $run_dir"
+            git -C results push origin "HEAD:refs/heads/ai-results-${GITHUB_REF_NAME}"
+            echo "Saved to the ai-results-${GITHUB_REF_NAME} branch: $run_dir"
           fi
