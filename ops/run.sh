@@ -3,5 +3,7 @@
 # (see .github/workflows/ai-ops.yml). Files written to ops-out/ are saved with the log.
 set -euo pipefail
 
-# Phase 8: the multi-view painter on the BMW, end to end (staging app; nothing is deployed)
-ORAINGE_APP_NAME=orainge-p8-paint modal run ops/exp_paint.py::check --only bmw
+# Phase 8, run 2: the shapes of all six objects kept; the BMW and the arcade machine painted with five
+# editing strategies (staging app; nothing is deployed)
+ORAINGE_APP_NAME=orainge-p8-paint modal run ops/exp_paint.py::check \
+  --only bmw,04,06,08,12,13 --paint bmw,04 --variants edit,edit-ref,i2i-ref-91,i2i-ref-80,i2i-80
