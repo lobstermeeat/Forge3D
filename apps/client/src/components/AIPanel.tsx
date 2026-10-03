@@ -436,7 +436,8 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
         {g.status === 'reviewing' && g.preview && (
           <div className="f3-ai-result">
             <p>
-              <Icon name="ok" size={14} /> The preview is in your scene
+              <Icon name="ok" size={14} />{' '}
+              {entityId ? 'The preview is in your scene' : 'The preview is ready'}
               {g.preview.triangles ? ` (${g.preview.triangles.toLocaleString()} triangles)` : ''}.
             </p>
             <button
@@ -476,7 +477,8 @@ export function AIPanel({ actions, sceneId }: { actions: EditorActions; sceneId?
         {g.status === 'done' && g.final && (
           <div className="f3-ai-result">
             <p>
-              <Icon name="ok" size={14} /> The final model is in your scene
+              <Icon name="ok" size={14} />{' '}
+              {entityId ? 'The final model is in your scene' : 'The final model is ready'}
               {g.final.triangles ? ` (${g.final.triangles.toLocaleString()} triangles)` : ''}.
             </p>
             <TextureOptions
