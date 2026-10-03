@@ -41,6 +41,29 @@ speak the same job protocol, so the server talks to either through `apps/server/
 
 Uploaded images can skip step 1. Images with transparency skip background removal.
 
+**Glass comes out as dark, glossy glass** (`trellis2/forge3d_worker/glass.py`). TRELLIS.2 bakes an alpha
+channel with the base colour, and the GLB is opaque, so the export folds the alpha into the colour. The
+alpha means two things. Spurious alpha: the texture pass sometimes returns an opaque surface's colour
+already multiplied by an alpha below 1 (Phase 2's dragon over 91 % of its skin, at 0.3–0.7), and dividing
+by that alpha gives the paint back (Phase 4). Glass: windows, lamps, a cup, as regions of low alpha (0 to
+0.6). Divided by its alpha, glass came out up to 4× brighter, opaque and pale: the founder's BMW had milky
+mint windows. Phase 8 measured the texture pass's raw RGBA before that division (the BMW and three more
+textures of it; Phase 2's helmet, cartoon car, bubble tea, potion and dragon; Phase 2's original dragon):
+spurious alpha sat on matte texels (roughness 0.85 or more for 93 % of them; none below 0.6 on the original
+dragon), glass on glossy ones (0.0–0.55, and 0.6–0.85 on one BMW texture's windows). Its colour came either
+way, light (the cartoon car's windows, linear 0.55 at alpha 0.2) or dark. So a texel counts as glass by its
+low alpha and its gloss, and only inside a region of such texels: the share of glass among the surface
+within 24 voxels, taken at its largest round each place, so a window's edge counts as its middle does while
+a speck or a thin part's edge doesn't. Glass gets one dark luminance (about sRGB 48) in the hue TRELLIS.2
+gave it, roughness 0.08 and no metal, so the Studio's environment reflects in it; everything else is
+divided by its alpha exactly as before. The picture's projection then paints the side it shows (a
+windscreen gets the seats the picture shows through it), and a cup, one even colour now, takes the
+picture's tea colour all round instead of blotches. Glass stays opaque: rays through the measured windows
+and the cup found nothing behind the glass's own thin slab 43–50 % of the time, so with back faces culled
+a see-through window would show the background through the car. Previews, finals and every texture option
+get it; the result's optional `glass` field is the share of the surface made glass. The potion and the
+helmet's visor have no alpha below 1 (TRELLIS.2 makes them opaque), so they come out as before.
+
 **Finals get the picture painted on** (`trellis2/forge3d_worker/projection.py`, `Preset.project_picture`).
 TRELLIS.2 bakes colour from a coarse voxel field, so painted detail (a lion on a shield, graffiti)
 comes out smeared. After `to_glb`, the worker finds the camera the picture was taken from (a search
@@ -152,9 +175,9 @@ container, so the server's contract is the same either way: it asks the `trellis
    gravity, so an object pictured from 30° above would come out leaning 30° towards the viewer. The
    mesh is turned back by the camera's elevation and roll before the projection
    (`pixal3d_worker/level.py`; tilts under 1° are left alone).
-5. **The usual export**, at the final's settings: `to_glb`, unpremultiply (texels the texture pass
-   returned darkened by a stray alpha), the picture projected onto the side it shows, smoothed
-   shading normals, gltfpack.
+5. **The usual export**, at the final's settings: `to_glb`, the alpha folded into the colour (glass made
+   dark, glossy glass; texels the texture pass returned darkened by a stray alpha divided back), the
+   picture projected onto the side it shows, smoothed shading normals, gltfpack.
 
 **With the recipe on, the final no longer strictly keeps the approved shape.** The preview is
 TRELLIS.2's and the final is Pixal3D's rebuild from the same picture and seed: the same object, but it
@@ -258,7 +281,9 @@ off, and the model comes out crumpled; `CLIPPED_EDGE` in `pipeline.py`).
 
 Finals also carry `projection`, whether the picture was painted onto the model (see above); its
 time is part of `export_s`. A preset with `drop_floaters` adds `floaters`: how many pieces the model had,
-how many were dropped, their faces and share of the surface, and the largest of them.
+how many were dropped, their faces and share of the surface, and the largest of them. Previews and finals
+carry `glass`: `{"glass": share}`, the share of the surface exported as glass (see above), or `{"error":
+...}` when telling glass apart failed and the colour was only divided by its alpha.
 
 A final made by the recipe has the same fields, with Pixal3D in its `credits`, and says what the recipe
 did. For example:
@@ -379,8 +404,9 @@ of memory again first. `"1024_cascade"` is the same as leaving it out, and anyth
 Previews and finals ignore `count` and `pipeline`. Then, for k = 1 to `count`, TRELLIS.2's texture
 flow alone samples a new texture for that shape (`Trellis2Runtime.retexture`), from the picture alone, with
 its noise drawn from seed `seed + 1000 * k` (the rolls' seeds; `TEXTURE_SEED_STEP` in
-`trellis2/forge3d_worker/settings.py`). Each texture is exported and packed as a final is (to_glb,
-unpremultiply, the picture's projection, shading normals, gltfpack) and stored beside the final's model, at
+`trellis2/forge3d_worker/settings.py`). Each texture is exported and packed as a final is (to_glb, glass
+and the alpha folded into the colour, the picture's projection, shading normals, gltfpack) and stored beside
+the final's model, at
 `ai/<request_id>/final-<seed>-texture-<k>.glb`. A second job with the same input makes the same textures
 again (give or take the GPU's own nondeterminism) and stores them under the same keys. Output:
 
@@ -415,8 +441,8 @@ again (give or take the GPU's own nondeterminism) and stores them under the same
 }
 ```
 
-- Each texture has a final's fields: `glb`, `bytes`, `raw_bytes`, `triangles` and `projection` (and
-  `floaters`, with a preset that drops them). `texture_seed` is the seed its noise came from.
+- Each texture has a final's fields: `glb`, `bytes`, `raw_bytes`, `triangles`, `projection` and `glass`
+  (and `floaters`, with a preset that drops them). `texture_seed` is the seed its noise came from.
 - `export` says how the texture's model was made. TRELLIS.2's `to_glb` does the same geometry work for
   every texture of one shape (filling holes, remeshing, unwrapping UVs, finding where each texel lies on the
   surface); only the texture changes. So the first texture runs it in full and keeps that work, the
@@ -555,8 +581,8 @@ weights are Apache-2.0, SDXL's license is CreativeML Open RAIL++-M.
 model (ig2mv, `scripts/inference_ig2mv_sdxl.py`) draw the sides the picture doesn't show: it renders
 the final's own shape as the position and normal maps ig2mv draws six views from, and bakes those
 views into the base-colour texture. Nothing in production calls it: an experiment sets
-`Trellis2Runtime.before_projection`, which runs between unpremultiplying the texture and the picture's
-projection (to_glb, unpremultiply, bake, project, shade, export).
+`Trellis2Runtime.before_projection`, which runs between folding the texture's alpha into its colour
+(glass.py) and the picture's projection (to_glb, glass, bake, project, shade, export).
 
 - **Its cameras are not the image-only model's**: six orthographic views at the same scale (768 px
   over [-0.55, 0.55]), of the front (glTF +Z), the side on its right (+X), the back, the left side, the
@@ -1021,7 +1047,10 @@ normals (on synthetic terraced, boxy and low-poly meshes), the checkpoint check,
 nvdiffrast stand-in (against a brute-force rasterizer and analytic results), the picture
 projection (synthetic models pictured from known cameras: the camera found, the colours painted,
 the fall-backs), the floater cleanup (synthetic donuts, bowls, balloons, cabins and dragons: what floats
-apart goes, what touches or is big stays, UVs and texture kept), retexturing (the texture flow alone
+apart goes, what touches or is big stays, UVs and texture kept), glass (flat squares textured like the
+texture pass: light and dark glass in a window made dark glossy glass to its border, a red lamp kept red,
+a matte dragon's spurious alpha and a glossy thin edge divided as before, the gutters, the fall-back when
+telling glass apart fails, texture options rebaked with glass as `to_glb` makes them), retexturing (the texture flow alone
 on the generation's shape, its noise drawn again bit for bit, views, the low-VRAM retry), texture options
 (the final's shape once, the rolls' seeds, the count, the keys, one texture or all of them failing, the
 refusal where the finals aren't TRELLIS.2's, the timings), the cached texture layout (TRELLIS.2's own

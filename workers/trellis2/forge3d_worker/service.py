@@ -250,12 +250,13 @@ def _failed(err: Exception) -> dict:
 
 def _export_notes(runtime: Any) -> dict:
     """
-    What the runtime's last export() reported besides the model (Trellis2Runtime keeps both): ``projection``,
-    whether the picture was painted onto the model and why not, and ``floaters``, the small pieces floating
-    apart it dropped (presets with drop_floaters). Each only when there is one.
+    What the runtime's last export() reported besides the model (Trellis2Runtime keeps them): ``projection``,
+    whether the picture was painted onto the model and why not, ``floaters``, the small pieces floating apart
+    it dropped (presets with drop_floaters), and ``glass``, how much of the surface was exported as glass.
+    Each only when there is one.
     """
     notes = {}
-    for key, attribute in (("projection", "last_projection"), ("floaters", "last_cleanup")):
+    for key, attribute in (("projection", "last_projection"), ("floaters", "last_cleanup"), ("glass", "last_glass")):
         value = getattr(runtime, attribute, None)
         if isinstance(value, dict) and value:
             notes[key] = value

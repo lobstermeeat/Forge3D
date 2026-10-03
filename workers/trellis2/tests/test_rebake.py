@@ -614,6 +614,36 @@ def test_texture_one_exports_in_full_and_keeps_the_layout_the_next_ones_rebake(p
     assert log.count('[forge3d] export: {"path": "rebake"') == 2
 
 
+class GlassShapePipeline(ShapePipeline):
+    """The same box, with glass on its half below x = 0: light grey (straight colour) at alpha 0.2, glossy."""
+
+    def decode_latent(self, shape_slat, tex_slat, resolution):
+        mesh = box_mesh(tex_slat, coords_of=self.coords_of)
+        pane = (mesh.coords[:, 0].float() + 0.5) / RESOLUTION - 0.5 < 0
+        mesh.attrs[pane, LAYOUT["base_color"]] = 0.6
+        mesh.attrs[pane, LAYOUT["roughness"]] = 0.05
+        mesh.attrs[pane, LAYOUT["alpha"]] = 0.2
+        return [mesh]
+
+
+def test_texture_options_get_glass_whether_to_glb_or_a_rebake_made_them(postprocess):
+    runtime = runtime_around(postprocess)
+    runtime.pipeline = GlassShapePipeline()
+    runtime.generate(picture(), FINAL, seed=7)
+    exports = []
+    for k in (1, 2):
+        mesh = runtime.retexture(seed=7 + 1000 * k)
+        glb, _ = runtime.export(mesh, FINAL)
+        exports.append((runtime.last_export["path"], runtime.last_glass))
+    # Texture 2 the full way: the same GLB as its rebake, glass and all; and without glass, another one
+    runtime.rebake_textures = False
+    assert runtime.export(mesh, FINAL)[0] == glb and runtime.last_glass == exports[1][1]
+    runtime.rebake_textures, runtime.glass_textures = True, False
+    assert runtime.export(mesh, FINAL)[0] != glb and runtime.last_glass is None
+    assert [path for path, _ in exports] == ["to_glb", "rebake"]
+    assert all(report["glass"] > 0.3 for _, report in exports)  # the pane: half the box
+
+
 def test_previews_and_finals_export_as_before_unwatched(postprocess, monkeypatch, capsys):
     def unexpected(*args, **kwargs):
         raise AssertionError("a final's to_glb was watched")

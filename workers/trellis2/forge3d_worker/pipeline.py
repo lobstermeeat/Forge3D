@@ -13,7 +13,8 @@ from typing import Any, Callable, Iterator, Optional, Sequence
 
 from PIL import Image
 
-from . import cleanup, multiview, normals, projection, rebake, uv_raster
+from . import cleanup, glass, multiview, normals, projection, rebake, uv_raster
+from .glass import ALPHA_FLOOR, unpremultiply  # noqa: F401 - the spurious alpha's division, as it always was here
 from .inputs import InputError, View
 from .settings import FALLBACK_PIPELINE, MULTIVIEW, MultiView, Preset
 
@@ -62,25 +63,6 @@ def verify_weights(models: dict[str, Any], model_dir: str) -> list[str]:
     if problems:
         raise WeightMismatchError("; ".join(problems))
     return notes
-
-
-# The 1024 texture pass sometimes returns colour already multiplied by a spurious alpha, on up to
-# half a model's texels. The GLB is opaque, so those texels showed up dark (a blotchy dragon's skin).
-# Dividing by alpha is capped at 1/ALPHA_FLOOR so near-transparent texels' noise isn't blown up.
-ALPHA_FLOOR = 0.25
-
-
-def unpremultiply(texture: Image.Image, floor: float = ALPHA_FLOOR) -> Image.Image:
-    """Opaque RGB: colour divided by its alpha in linear light. Fully opaque texels stay as they are."""
-    import numpy as np
-
-    rgba = np.asarray(texture.convert("RGBA"), dtype=np.float32) / 255
-    rgb, alpha = rgba[..., :3], rgba[..., 3:]
-    linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
-    linear = np.clip(linear / np.maximum(alpha, floor), 0.0, 1.0)
-    srgb = np.where(linear <= 0.0031308, linear * 12.92, 1.055 * linear ** (1 / 2.4) - 0.055)
-    out = np.where(alpha < 1.0, srgb, rgb)
-    return Image.fromarray(np.round(out * 255).astype(np.uint8), "RGB")
 
 
 def _one_line(err: BaseException) -> str:
@@ -262,6 +244,13 @@ class Trellis2Runtime:
     # when to_glb's layout was kept, "capture_error" when it couldn't be, and "fallback" saying why a kept
     # layout wasn't used
     last_export: Optional[dict] = None
+    # Glass exported as dark, glossy glass (glass.py). Experiments turn this off to compare: then the texture's
+    # alpha is only divided out of its colour, as before, and the metallic-roughness texture is left alone
+    glass_textures: bool = True
+    # How the last export() made its texture opaque: {"glass": the share of the surface made glass}, or
+    # {"error": ...} when telling glass apart failed and the colour was only divided by its alpha (None with
+    # glass_textures off, or without a texture)
+    last_glass: Optional[dict] = None
 
     def __init__(self, model_dir: str = MODEL_DIR) -> None:
         _configure_environment()
@@ -602,12 +591,14 @@ class Trellis2Runtime:
         ``last_projection`` then summarises the picture's projection, and ``last_cleanup`` what was
         dropped as floating pieces (each None when the preset has it off). ``last_export`` says how
         to_glb's mesh was made: by to_glb in full, or for a retextured shape's later textures by sampling
-        only the texture on the layout its first texture kept (see _textured).
+        only the texture on the layout its first texture kept (see _textured). ``last_glass`` says how much
+        of the surface was exported as glass (see _opaque).
         """
         self.last_projection: Optional[dict] = None
         self.last_before_projection: Any = None
         self.last_cleanup = None
         self.last_export = None
+        self.last_glass = None
         try:
             return self._export(mesh, preset)
         except Exception as err:
@@ -632,7 +623,8 @@ class Trellis2Runtime:
         material = glb.visual.material
         textured = getattr(material, "baseColorTexture", None) is not None
         if textured:
-            material.baseColorTexture = unpremultiply(material.baseColorTexture)
+            # Finals, previews and every texture option alike, whether to_glb or a rebake made the mesh
+            self.last_glass = self._opaque(glb, mesh.voxel_size)
         if preset.drop_floaters:
             # Before the projection, which then fits the picture's silhouette to the model without them
             self.last_cleanup = self._drop_floaters(glb)
@@ -713,6 +705,25 @@ class Trellis2Runtime:
         self.last_export = export
         print(f"[forge3d] export: {json.dumps(export)}")
         return glb
+
+    def _opaque(self, glb: Any, voxel_size: Any) -> Optional[dict]:
+        """
+        The texture's alpha folded into its opaque colour (glass.py): divided out where it is spurious, dark
+        glossy glass where it is glass. Never raises: if telling glass apart fails, the colour is only divided
+        by its alpha, as it was before glass was told apart. Returns the report (None with glass_textures off).
+        """
+        material = glb.visual.material
+        if not self.glass_textures:
+            material.baseColorTexture = unpremultiply(material.baseColorTexture)
+            return None
+        try:
+            report = glass.export_textures(glb, float(voxel_size))
+        except Exception as err:  # noqa: BLE001 - the model is whole without glass; it only looks as it did
+            report = {"error": f"{type(err).__name__}: {_one_line(err)}"}
+            # export_textures changes the material only once it has worked everything out
+            material.baseColorTexture = unpremultiply(material.baseColorTexture)
+        print(f"[forge3d] glass: {json.dumps(report)}")
+        return report
 
     @staticmethod
     def _drop_floaters(glb: Any) -> dict:
