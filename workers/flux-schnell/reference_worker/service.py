@@ -42,6 +42,17 @@ MERGE = 0.012
 # Smaller pieces are noise; pieces over PIECE of the largest one's area count as separate objects
 SPECK = 0.001
 PIECE = 0.05
+# The view. Seen straight on (from the front, the back, or square to a side), an object's edges mirror each
+# other about a vertical line through it, and its horizontal edges stay horizontal; turned towards a
+# three-quarter view, neither holds. MIRROR is the share of the object's edge energy that matches its mirror
+# image about the best such line within AXIS_RANGE of the object's width from its middle: up to MIRROR[0] the
+# view counts as turned, from MIRROR[1] as straight on. Phase 8 measured it on 896 labelled FLUX pictures:
+# three-quarter views had a median of 0.08, straight front views 0.31.
+MIRROR = (0.10, 0.30)
+AXIS_RANGE = 0.2
+# A picture seen straight on loses up to this share of its score: image-to-3D has to make up the sides it hides,
+# so a turned picture that frames its object nearly as well is suggested first
+STRAIGHT_PENALTY = 0.3
 
 
 class InputError(ValueError):
@@ -103,17 +114,22 @@ def score_picture(image: Any) -> dict:
       at 10% ("small in the frame" below 35%) and to 0.6 when it spans the whole picture;
     - touching the picture's edge along 1% of a side or more ("cut off at the edge") halves it;
     - more than one sizeable piece ("several separate objects") takes off 30%;
-    - an object away from the centre loses up to 30% ("off-centre" past a fifth of the picture).
+    - an object away from the centre loses up to 30% ("off-centre" past a fifth of the picture);
+    - an object seen straight on loses up to 30% ("seen straight on" past halfway; see MIRROR), so a
+      three-quarter view that frames its object about as well is suggested first.
 
-    It can't see the view (a donut from straight above scores like one from the side), see-through
-    parts, or whether the picture shows what was asked for.
+    The view check can't tell a round object (a bottle, a donut) seen from above from one seen straight
+    on: both mirror themselves. As all four pictures of such an object lose about the same, framing
+    still decides between them. Nor does it see see-through parts, or whether the picture shows what
+    was asked for.
     """
     import numpy as np
     from PIL import Image
 
     rgb = image.convert("RGB")  # a copy, so the caller's image is left alone
     rgb.thumbnail((SCORE_SIZE, SCORE_SIZE), Image.Resampling.BOX)
-    found = _object_mask(np.asarray(rgb, dtype=np.float32))
+    pixels = np.asarray(rgb, dtype=np.float32)
+    found = _object_mask(pixels)
     h, w = found.shape
 
     # Specks go by their own size; the rest are grouped into objects by MERGE
@@ -151,7 +167,51 @@ def score_picture(image: Any) -> dict:
     score *= 1 - min(0.3, max(0.0, off - 0.1))
     if off > 0.2:
         issues.append("off-centre")
+    straight = straight_on(pixels, kept)
+    score *= 1 - STRAIGHT_PENALTY * straight
+    if straight >= 0.5:
+        issues.append("seen straight on")
     return {"score": round(score, 3), "issues": issues}
+
+
+def straight_on(pixels: Any, kept: Any) -> float:
+    """
+    How squarely the object in `kept` (a mask over `pixels`, RGB) faces the camera: 0 turned, 1 straight
+    on. It is the share of the object's edge energy (luminance gradients, its outline included) that
+    matches its mirror image about the best vertical line within AXIS_RANGE of the object's middle,
+    scaled from MIRROR[0] to MIRROR[1]. A mirrored edge keeps its vertical gradient and flips its
+    horizontal one, so for every line x = k / 2 the match is the sum of gy(x) gy(k - x) - gx(x) gx(k - x)
+    over the object's rows, which one FFT along the rows gives for all lines at once.
+    """
+    import numpy as np
+
+    if not kept.any():
+        return 0.0
+    luminance = pixels @ np.array([0.299, 0.587, 0.114], np.float32)
+    p = np.pad(luminance, 1, mode="edge")  # Sobel gradients
+    gx = 2 * (p[1:-1, 2:] - p[1:-1, :-2]) + p[:-2, 2:] - p[:-2, :-2] + p[2:, 2:] - p[2:, :-2]
+    gy = 2 * (p[2:, 1:-1] - p[:-2, 1:-1]) + p[2:, :-2] - p[:-2, :-2] + p[2:, 2:] - p[:-2, 2:]
+    near = _grow(kept, 2)  # the outline's edges too
+    gx = np.where(near, gx, 0.0).astype(np.float64)
+    gy = np.where(near, gy, 0.0).astype(np.float64)
+    energy = float((gx * gx + gy * gy).sum())
+    if energy <= 0.0:
+        return 0.0
+    match = _mirror_sums(gy) - _mirror_sums(gx)
+    cols = np.flatnonzero(kept.any(axis=0))
+    middle = int(cols[0] + cols[-1])  # twice the middle's x
+    reach = max(1, round(AXIS_RANGE * (cols[-1] - cols[0] + 1)))
+    best = float(match[max(0, middle - reach) : middle + reach + 1].max()) / energy
+    return min(1.0, max(0.0, (best - MIRROR[0]) / (MIRROR[1] - MIRROR[0])))
+
+
+def _mirror_sums(values: Any) -> Any:
+    """For every k: the sum over rows and x of values[y, x] * values[y, k - x] (a self-convolution along rows)."""
+    import numpy as np
+
+    width = values.shape[1]
+    spectrum = np.fft.rfft(values, n=2 * width, axis=1)  # padded, so the convolution doesn't wrap around
+    return np.fft.irfft(spectrum * spectrum, n=2 * width, axis=1).sum(axis=0)
 
 
 def _object_mask(pixels: Any) -> Any:
