@@ -11,6 +11,8 @@ summary.json.
 
 Prompts: workers/test-sets/phase2.txt (20) and products.txt (8), numbered 1-28 in that order. Seed set s
 gives prompt k (1-28) the seeds SEED_SETS[s] + 10 k + 0..3.
+
+ops/exp_klein.py draws the same pictures with FLUX.2 [klein] 4B, for comparison.
 """
 
 from __future__ import annotations
@@ -101,6 +103,14 @@ TEMPLATES = {
         "side. A realistic studio product photo of one whole object, fully in frame, on a plain light gray "
         "background, soft even lighting, sharp focus, no text, no other objects"
     ),
+    # Round 3: v6's angle (front three-quarters, v10's "turned" drew backs) as a studio product photo (v4: kept
+    # "low poly" and drew cartoons in 3D, where v7's "realistic" lost the low poly), with v4 and v10's "one whole
+    # object" (fewer cut off at the edge)
+    "v11": (
+        "A studio product photo of {prompt}: an angled perspective shot from the front left corner, slightly "
+        "above, showing its front and its side. One whole object, fully in frame, on a plain light gray "
+        "background, soft even lighting, sharp focus, no text, no other objects"
+    ),
     # The object turned rather than the camera moved
     "v10": (
         "A studio product photo of {prompt} at a three-quarter angle, turned so its front and its left side both "
@@ -141,44 +151,48 @@ class Pictures:
 
     @modal.method()
     def draw(self, job: dict) -> dict:
-        """Four pictures of one prompt in one template, each with production's score and its seconds."""
-        import torch
-        from PIL import Image
+        return draw_with(self.generate, job, self.gpu, self.load_seconds)
 
-        from reference_worker.service import score_picture
 
-        full = job["template"].format(prompt=job["prompt"].strip().rstrip("."))
-        torch.cuda.reset_peak_memory_stats()
-        pictures = []
-        for seed in job["seeds"]:
-            clock = time.time()
-            image = self.generate(full, seed)
-            torch.cuda.synchronize()
-            seconds = time.time() - clock
-            clock = time.time()
-            framing = score_picture(image)
-            score_seconds = time.time() - clock
-            small = image.convert("RGB")
-            small.thumbnail((SCORE_SIZE, SCORE_SIZE), Image.Resampling.BOX)  # as score_picture shrinks it
-            buffer = io.BytesIO()
-            small.save(buffer, "WEBP", lossless=True, method=4)
-            pictures.append(
-                {
-                    "seed": seed,
-                    **framing,
-                    "seconds": round(seconds, 3),
-                    "score_seconds": round(score_seconds, 3),
-                    "webp": buffer.getvalue(),
-                }
-            )
-        return {
-            "prompt": full,
-            "pictures": pictures,
-            "peak_allocated_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2),
-            "peak_reserved_gb": round(torch.cuda.max_memory_reserved() / 2**30, 2),
-            "gpu": self.gpu,
-            "load_seconds": self.load_seconds,
-        }
+def draw_with(generate, job: dict, gpu: str, load_seconds: float) -> dict:
+    """Four pictures of one prompt in one template, each with production's score and its seconds."""
+    import torch
+    from PIL import Image
+
+    from reference_worker.service import score_picture
+
+    full = job["template"].format(prompt=job["prompt"].strip().rstrip("."))
+    torch.cuda.reset_peak_memory_stats()
+    pictures = []
+    for seed in job["seeds"]:
+        clock = time.time()
+        image = generate(full, seed)
+        torch.cuda.synchronize()
+        seconds = time.time() - clock
+        clock = time.time()
+        framing = score_picture(image)
+        score_seconds = time.time() - clock
+        small = image.convert("RGB")
+        small.thumbnail((SCORE_SIZE, SCORE_SIZE), Image.Resampling.BOX)  # as score_picture shrinks it
+        buffer = io.BytesIO()
+        small.save(buffer, "WEBP", lossless=True, method=4)
+        pictures.append(
+            {
+                "seed": seed,
+                **framing,
+                "seconds": round(seconds, 3),
+                "score_seconds": round(score_seconds, 3),
+                "webp": buffer.getvalue(),
+            }
+        )
+    return {
+        "prompt": full,
+        "pictures": pictures,
+        "peak_allocated_gb": round(torch.cuda.max_memory_allocated() / 2**30, 2),
+        "peak_reserved_gb": round(torch.cuda.max_memory_reserved() / 2**30, 2),
+        "gpu": gpu,
+        "load_seconds": load_seconds,
+    }
 
 
 def prompts() -> list[str]:
@@ -191,21 +205,32 @@ def prompts() -> list[str]:
 @app.local_entrypoint()
 def check(plan: str = "a=v0", only: str = "", out: str = "ops-out/private/pictures") -> None:
     """--plan "a=v0,v1;b=v0": variants v0 and v1 with seed set a, and v0 with seed set b."""
+    run_plan(plan, only, out, Pictures(), "schnell")
+
+
+def parse_plan(plan: str, model: str) -> list[tuple[str, str, str]]:
     pairs = []
     for part in filter(None, (p.strip() for p in plan.split(";"))):
         seed_set, _, listed = part.partition("=")
         for variant in filter(None, (v.strip() for v in listed.split(","))):
             if seed_set.strip() not in SEED_SETS or variant not in TEMPLATES:
                 raise SystemExit(f"[pictures] --plan: no seed set {seed_set!r} or variant {variant!r}")
-            pairs.append((seed_set.strip(), variant))
+            pairs.append((model, seed_set.strip(), variant))
+    return pairs
+
+
+def run_plan(plan: str, only: str, out: str, drawer, model: str) -> None:
+    """Draws every (seed set, variant) of `plan` for every prompt with `drawer` (Pictures() or Klein())."""
+    pairs = parse_plan(plan, model)
     texts = prompts()
     numbers = [int(n) for n in only.split(",") if n.strip()] or list(range(1, len(texts) + 1))
     jobs = []
-    for seed_set, variant in pairs:
+    for _, seed_set, variant in pairs:
         for number in numbers:
             base = SEED_SETS[seed_set] + 10 * number
             jobs.append(
                 {
+                    "model": model,
                     "set": seed_set,
                     "variant": variant,
                     "number": number,
@@ -218,14 +243,15 @@ def check(plan: str = "a=v0", only: str = "", out: str = "ops-out/private/pictur
     root = pathlib.Path(out)
     rows, failed = [], 0
     clock = time.time()
-    for job, made in zip(jobs, Pictures().draw.map(jobs, return_exceptions=True, order_outputs=True)):
-        where = f"{job['set']}/{job['variant']}/{job['number']:02d}-{prod._slug(job['prompt'])}"
+    for job, made in zip(jobs, drawer.draw.map(jobs, return_exceptions=True, order_outputs=True)):
+        prefix = "" if model == "schnell" else f"{model}/"
+        where = f"{prefix}{job['set']}/{job['variant']}/{job['number']:02d}-{prod._slug(job['prompt'])}"
         if isinstance(made, BaseException):
             failed += 1
             reason = next((line for line in str(made).splitlines() if line.strip()), "")
             print(f"[pictures] {where}: failed: {type(made).__name__}: {reason}")
             error = f"{type(made).__name__}: {reason}"
-            rows.append({**{k: job[k] for k in ("set", "variant", "number", "prompt")}, "error": error})
+            rows.append({**{k: job[k] for k in ("model", "set", "variant", "number", "prompt")}, "error": error})
             continue
         folder = root / where
         folder.mkdir(parents=True, exist_ok=True)
@@ -233,7 +259,7 @@ def check(plan: str = "a=v0", only: str = "", out: str = "ops-out/private/pictur
             (folder / f"{picture['seed']}.webp").write_bytes(picture.pop("webp"))
         rows.append(
             {
-                **{k: job[k] for k in ("set", "variant", "number", "prompt")},
+                **{k: job[k] for k in ("model", "set", "variant", "number", "prompt")},
                 "full_prompt": made["prompt"],
                 "folder": where,
                 "pictures": made["pictures"],
@@ -244,10 +270,11 @@ def check(plan: str = "a=v0", only: str = "", out: str = "ops-out/private/pictur
         seconds = sum(p["seconds"] for p in made["pictures"]) / len(made["pictures"])
         print(f"[pictures] {where}: {scores} ({seconds:.2f} s each, {made['peak_reserved_gb']} GB)")
     root.mkdir(parents=True, exist_ok=True)
-    templates = {variant: TEMPLATES[variant] for _, variant in pairs}
+    templates = {variant: TEMPLATES[variant] for _, _, variant in pairs}
     (root / "summary.json").write_text(json.dumps({"plan": plan, "templates": templates, "rows": rows}, indent=1))
-    for seed_set, variant in pairs:
-        done = [r for r in rows if r["variant"] == variant and r["set"] == seed_set and "pictures" in r]
+    for key in pairs:
+        _, seed_set, variant = key
+        done = [r for r in rows if "pictures" in r and (r["model"], r["set"], r["variant"]) == key]
         pictures = [p for r in done for p in r["pictures"]]
         if not pictures:
             continue
@@ -257,9 +284,10 @@ def check(plan: str = "a=v0", only: str = "", out: str = "ops-out/private/pictur
                 issues[issue] = issues.get(issue, 0) + 1
         mean = sum(p.get("score", 0) for p in pictures) / len(pictures)
         seconds = sorted(p["seconds"] for p in pictures)
+        memory = max(r["peak_reserved_gb"] for r in done)
         print(
-            f"[pictures] {seed_set}/{variant}: {len(pictures)} pictures, mean score {mean:.3f}, "
-            f"median {seconds[len(seconds) // 2]:.2f} s, issues {json.dumps(issues)}"
+            f"[pictures] {model}:{seed_set}/{variant}: {len(pictures)} pictures, mean score {mean:.3f}, "
+            f"median {seconds[len(seconds) // 2]:.2f} s, peak {memory} GB reserved, issues {json.dumps(issues)}"
         )
     print(f"[pictures] done in {time.time() - clock:.0f} s: {len(jobs) - failed} of {len(jobs)} prompts")
     if not jobs or failed:
