@@ -18,6 +18,13 @@ UVs, normals; npz), its RGBA base colour and metallic-roughness textures (PNG), 
 cutout the projection paints from and the voxel size, so the rest of the export can be replayed on a CPU.
 The packed GLBs are production's models as they stand ("before").
 
+verify: each object's final mesh is made once (Trellis2Runtime.generate, the final preset at its seed) and
+exported twice, as production exports and packs it: with glass off (Trellis2Runtime.glass_textures = False:
+the colour only divided by alpha, as before) into before/, and with glass (glass.py) into after/. Then --count
+textures of the same shape for the objects in --textures, each exported both ways too: texture 1 with glass
+first (to_glb in full, its layout kept), the others rebaked on that layout. Objects in --jobs also get a
+textures job through production's handle_job (after-job/), and --preview objects a preview with glass.
+
 Everything lands in --out (keep it under ops-out/private/: pictures and models stay private).
 """
 
@@ -144,6 +151,109 @@ class Glass:
         return {"summary": summary, "files": files}
 
 
+    @modal.method()
+    def verify(self, job: dict) -> dict:
+        """The final (and texture options) exported before and after glass, from the same meshes."""
+        return verify_job(self, job)
+
+
+def verify_job(worker, job: dict) -> dict:
+    """The final (and texture options) exported before and after glass, from the same meshes (Glass.verify)."""
+    import torch
+    from PIL import Image
+
+    from forge3d_worker.service import texture_seed
+    from forge3d_worker.settings import PRESETS
+
+    name, seed = job["name"], int(job["seed"])
+    runtime = worker.runtime
+    preset = PRESETS["final"]
+    picture = Image.open(io.BytesIO(base64.b64decode(job["image_base64"])))
+    picture.load()
+    files: dict[str, bytes] = {}
+    summary: dict = {"name": name, "seed": seed, "gpu": worker.gpu, "load_seconds": worker.load_seconds}
+    gpu = torch.cuda.is_available()
+    if gpu:
+        torch.cuda.reset_peak_memory_stats()
+
+    def both(mesh, label: str, glass_first: bool = False) -> dict:
+        ways = (("after", True), ("before", False)) if glass_first else (("before", False), ("after", True))
+        entry = {}
+        for way, on in ways:
+            made = export_once(worker, mesh, preset, on)
+            files[f"{name}/{way}/{label}.glb"] = made.pop("packed")
+            entry[way] = made
+        print(f"[glass] {name} {label}: {json.dumps(entry, default=str)}")
+        return entry
+
+    clock = time.time()
+    mesh = runtime.generate(picture, preset, seed)
+    summary["generate_s"] = round(time.time() - clock, 1)
+    summary["pipeline"] = runtime.pipeline_used
+    summary["final"] = both(mesh, f"final-{seed}")
+    del mesh
+    summary["textures"] = []
+    for number in range(1, int(job.get("textures") or 0) + 1):
+        texture = texture_seed(seed, number)
+        mesh = runtime.retexture(seed=texture)
+        entry = both(mesh, f"final-{seed}-texture-{texture}", glass_first=number == 1)
+        summary["textures"].append({"texture_seed": texture, **entry})
+        del mesh
+    if job.get("textures_job"):
+        # Texture options as the Studio asks for them: production's handle_job, glass and all
+        base = {"image_base64": job["image_base64"], "seed": seed, "request_id": f"p8-glass-{name}"}
+        fell_back = {"pipeline": "512"} if summary["pipeline"] == "512" else {}
+        clock = time.time()
+        request = {**base, "mode": "textures", "count": int(job["textures_job"]), **fell_back}
+        result = worker.handle({"id": f"textures-{name}", "input": request})
+        summary["textures_job_s"] = round(time.time() - clock, 1)
+        if result.get("error"):
+            summary["textures_job"] = {"error": result["error"]}
+        else:
+            summary["textures_job"] = []
+            for texture in result.get("textures", []):
+                path = f"{name}/after-job/final-{seed}-texture-{texture['texture_seed']}.glb"
+                files[path] = base64.b64decode(texture["glb"]["base64"])
+                kept = ("texture_seed", "triangles", "glass", "export", "projection")
+                summary["textures_job"].append({k: texture.get(k) for k in kept})
+            summary["texture_errors"] = result.get("texture_errors")
+        print(f"[glass] {name} textures job: {json.dumps(summary['textures_job'], default=str)}")
+    if job.get("preview"):
+        mesh = runtime.generate(picture, PRESETS["preview"], seed)
+        made = export_once(worker, mesh, PRESETS["preview"], True)
+        files[f"{name}/after/preview-{seed}.glb"] = made.pop("packed")
+        summary["preview"] = made
+        print(f"[glass] {name} preview: {json.dumps(made, default=str)}")
+        del mesh
+    if gpu:
+        summary["peak_gpu_gb"] = round(torch.cuda.max_memory_reserved() / 2**30, 1)
+    return {"summary": summary, "files": files}
+
+
+def export_once(worker, mesh, preset, glass: bool) -> dict:
+    """One export of ``mesh`` with glass on or off, packed as production packs it."""
+    from forge3d_worker.compress import pack_glb
+
+    runtime = worker.runtime
+    runtime.glass_textures = glass
+    clock = time.time()
+    try:
+        raw, triangles = runtime.export(mesh, preset)
+    finally:
+        runtime.glass_textures = True
+    export_s = round(time.time() - clock, 2)
+    packed = pack_glb(raw, preset.texture_size)
+    return {
+        "packed": packed,
+        "triangles": triangles,
+        "export_s": export_s,
+        "glass": runtime.last_glass,
+        "path": (runtime.last_export or {}).get("path"),
+        "projection": runtime.last_projection,  # already the projection's summary
+        "bytes": len(packed),
+    }
+
+
 def snapshot(glb, mesh) -> dict:
     """What to_glb returned for ``mesh``, copied (the export changes its material in place afterwards)."""
     import numpy as np
@@ -242,22 +352,29 @@ def bmw_picture() -> bytes:
     return base64.b64decode(image["base64"])
 
 
+def names(text: str) -> set[str]:
+    """'bmw, 13' -> {'bmw', '13'}"""
+    return {n.strip().lower().lstrip("0") or "0" for n in text.split(",") if n.strip()}
+
+
 @app.local_entrypoint()
 def check(
     mode: str = "measure",
     only: str = "bmw,10,13,14,15,16",
     textures: str = "bmw",
     count: int = 3,
+    jobs: str = "",
+    preview: str = "",
     out: str = "ops-out/private/glass",
 ) -> None:
-    if mode != "measure":
+    if mode not in ("measure", "verify"):
         raise SystemExit(f"[glass] unknown mode {mode!r}")
-    print(f"[glass] app {prod.APP_NAME}: {mode} {only}; textures jobs for {textures or 'none'} ({count} each)")
+    print(f"[glass] app {prod.APP_NAME}: {mode} {only}; textures for {textures or 'none'} ({count} each)")
     root = pathlib.Path(out)
     wanted = [n.strip().lower() for n in only.split(",") if n.strip()]
-    with_textures = {n.strip().lower() for n in textures.split(",") if n.strip()}
+    with_textures, with_jobs, with_preview = names(textures), names(jobs), names(preview)
     pictures = runs_by_number(prod.outputs, "phase2")
-    jobs = []
+    work = []
     for item in wanted:
         if item == "bmw":
             picture, seed, name = bmw_picture(), BMW_SEED, "bmw"
@@ -271,13 +388,16 @@ def check(
             picture, seed = read(prod.outputs, f"{name}/{state['input']}"), int(state["seed"])
         (root / name).mkdir(parents=True, exist_ok=True)
         (root / name / "picture.png").write_bytes(picture)
-        textured = item in with_textures or item.zfill(2) in with_textures
-        jobs.append({"name": name, "seed": seed, "image_base64": base64.b64encode(picture).decode(),
-                     "textures": count if textured else 0})
-    listed = ", ".join("{} (seed {})".format(job["name"], job["seed"]) for job in jobs)
-    print(f"[glass] {len(jobs)} objects: {listed}")
+        key = item.lstrip("0") or "0"
+        work.append({"name": name, "seed": seed, "image_base64": base64.b64encode(picture).decode(),
+                     "textures": count if key in with_textures else 0,
+                     "textures_job": count if key in with_jobs else 0,
+                     "preview": key in with_preview})
+    listed = ", ".join("{} (seed {})".format(job["name"], job["seed"]) for job in work)
+    print(f"[glass] {len(work)} objects: {listed}")
     summaries, failed = [], 0
-    for job, made in zip(jobs, Glass().measure.map(jobs, return_exceptions=True, order_outputs=True)):
+    method = Glass().measure if mode == "measure" else Glass().verify
+    for job, made in zip(work, method.map(work, return_exceptions=True, order_outputs=True)):
         if isinstance(made, BaseException):
             failed += 1
             reason = next((line for line in str(made).splitlines() if line.strip()), "")
@@ -291,6 +411,6 @@ def check(
         summaries.append(made["summary"])
     root.mkdir(parents=True, exist_ok=True)
     (root / "summary.json").write_text(json.dumps(summaries, indent=2, default=str))
-    print(f"[glass] done: {len(jobs) - failed} of {len(jobs)} objects")
-    if not jobs or failed:
+    print(f"[glass] done: {len(work) - failed} of {len(work)} objects")
+    if not work or failed:
         raise SystemExit(1)
