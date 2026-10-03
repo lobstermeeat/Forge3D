@@ -855,6 +855,15 @@ def test_the_phase2_set_is_valid():
     assert all(modal_app.RUN_NAME.fullmatch(name) for name in names)
 
 
+def test_the_products_set_is_valid():
+    runs = modal_app.read_set(WORKERS / "test-sets" / "products.txt")
+    assert len(runs) == 8 and all("prompt" in run for run in runs)
+    names = modal_app.set_run_names("products", runs)
+    assert names[0] == "products-01-make-a-bmw-car-m3-model-blue"
+    assert len(set(names)) == len(names)
+    assert all(modal_app.RUN_NAME.fullmatch(name) for name in names)
+
+
 def test_the_renders_set_lists_its_images():
     runs = modal_app.read_set(WORKERS / "test-sets" / "renders.txt")
     assert len(runs) == 6 and all(run["image"].is_file() for run in runs)

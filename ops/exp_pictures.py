@@ -60,7 +60,10 @@ TEMPLATES = {
         "background, soft even studio lighting, sharp focus, no text, no other objects"
     ),
     # Short
-    "v3": "{prompt}, three-quarter view from the front left, slightly above, on a plain light gray background, studio lighting",
+    "v3": (
+        "{prompt}, three-quarter view from the front left, slightly above, on a plain light gray background, "
+        "studio lighting"
+    ),
     # A realistic product photo, taken at an angle
     "v4": (
         "A realistic studio product photo of {prompt}, taken at an angle from the front left corner and "
@@ -78,6 +81,31 @@ TEMPLATES = {
         "An angled perspective shot of {prompt} from the front left, slightly above, showing the front and "
         "the side. A single object, fully in frame, on a plain light gray background, soft even studio "
         "lighting, sharp focus, no text, no other objects"
+    ),
+    # Round 2, after v6 (most three-quarter views) and v4 (kept styles such as "low poly"; cartoons in 3D).
+    # v4's opening with v6's angle
+    "v7": (
+        "A realistic studio product photo of {prompt}: an angled perspective shot from the front left corner "
+        "and slightly above, showing its front and its side. A single object, fully in frame, on a plain light "
+        "gray background, soft even studio lighting, sharp focus, no text, no other objects"
+    ),
+    # v6 from the corner, with room around the object (v6 cut a few off at the edge)
+    "v8": (
+        "An angled perspective shot of {prompt} from the front left corner, slightly above, showing its front "
+        "and its side. A single object, fully in frame with space around it, on a plain light gray background, "
+        "soft even studio lighting, sharp focus, no text, no other objects"
+    ),
+    # v6, then v4's realism
+    "v9": (
+        "An angled perspective shot of {prompt} from the front left, slightly above, showing the front and the "
+        "side. A realistic studio product photo of one whole object, fully in frame, on a plain light gray "
+        "background, soft even lighting, sharp focus, no text, no other objects"
+    ),
+    # The object turned rather than the camera moved
+    "v10": (
+        "A studio product photo of {prompt} at a three-quarter angle, turned so its front and its left side both "
+        "face the camera, seen from slightly above. One whole object, fully in frame, on a plain light gray "
+        "background, soft even lighting, sharp focus, no text, no other objects"
     ),
 }
 
@@ -196,7 +224,8 @@ def check(plan: str = "a=v0", only: str = "", out: str = "ops-out/private/pictur
             failed += 1
             reason = next((line for line in str(made).splitlines() if line.strip()), "")
             print(f"[pictures] {where}: failed: {type(made).__name__}: {reason}")
-            rows.append({**{k: job[k] for k in ("set", "variant", "number", "prompt")}, "error": f"{type(made).__name__}: {reason}"})
+            error = f"{type(made).__name__}: {reason}"
+            rows.append({**{k: job[k] for k in ("set", "variant", "number", "prompt")}, "error": error})
             continue
         folder = root / where
         folder.mkdir(parents=True, exist_ok=True)
