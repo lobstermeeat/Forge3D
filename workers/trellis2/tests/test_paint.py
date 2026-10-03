@@ -258,6 +258,57 @@ def test_gains_bring_a_view_to_the_established_colours():
     assert P.gains(view, established, torch.cat([torch.ones(100), torch.zeros(1900)])) is None
 
 
+def test_novelty_counts_only_what_the_render_does_not_have():
+    image, disc = scene(h=128, w=128, centre=(64, 64), radius=40)
+    darker = image.clone()
+    darker[disc] = darker[disc] * 0.6  # another colour, the same structure
+    assert P.novelty(image, darker, disc) < 0.05
+    # The same disc with a bar across it: a new edge
+    barred = image.clone()
+    barred[56:72, 30:98] = torch.tensor([0.05, 0.05, 0.05])
+    assert P.novelty(image, barred, disc) > 0.5
+    # A bar the render has too isn't new
+    assert P.novelty(barred, barred.clone(), disc) < 0.05
+
+
+def test_describe_names_the_side_from_the_pictures_camera():
+    geom = P.geometry(box(), "cpu")
+    names = {}
+    for camera in P.ring(geom.verts, 30.0, around=8, **small()):
+        names[camera.name] = P.describe(camera, 30.0, 10.0)
+    assert names["a000"] == "from the front"
+    assert names["a045"] == names["a315"] == "from the front, turned to one side"
+    assert names["a090"] == names["a270"] == "from the side"
+    assert names["a135"] == names["a225"] == "from behind, turned to one side"
+    assert names["a180"] == "from directly behind, showing its back"
+    assert names["top"] == "from directly above" and names["bottom"] == "from directly below, showing its underside"
+
+
+def test_main_colours_names_what_covers_the_object():
+    cutout = np.zeros((100, 100, 4), np.uint8)
+    cutout[..., :3] = (255, 255, 255)  # the background, outside the alpha
+    cutout[10:90, 10:90, 3] = 255
+    cutout[10:70, 10:90, :3] = (72, 122, 178)  # 75 %: steel blue
+    cutout[70:90, 10:90, :3] = (18, 18, 20)  # 25 %: black
+    assert P.main_colours(Image.fromarray(cutout, "RGBA")) == ["steel blue", "black"]
+    cutout[..., 3] = 0
+    assert P.main_colours(Image.fromarray(cutout, "RGBA")) == []
+
+
+def test_robust_colour_leaves_out_what_one_view_alone_drew():
+    n = 4
+    base = torch.tensor([0.2, 0.3, 0.5])
+    views = [P.Samples(weight=torch.ones(n), colour=base.expand(n, 3).clone()) for _ in range(3)]
+    views[1].colour[0] = torch.tensor([0.9, 0.9, 0.9])  # a highlight in one view at texel 0
+    plain = sum(v.weight[:, None] * v.colour for v in views) / 3
+    robust = P.robust_colour(views)
+    torch.testing.assert_close(robust[0], base)
+    assert float(plain[0, 0]) > 0.4
+    # One view alone at a texel: its colour
+    lonely = [P.Samples(weight=torch.tensor([1.0, 0.0]), colour=torch.tensor([[0.1, 0.2, 0.3], [0.9, 0.9, 0.9]]))]
+    torch.testing.assert_close(P.robust_colour(lonely)[0], torch.tensor([0.1, 0.2, 0.3]))
+
+
 # --- Bake ---------------------------------------------------------------------------------------------
 
 
@@ -348,8 +399,10 @@ def flat_painter(colour=(40, 160, 220), shift=(0, 0)):
     """An editing model that paints the render's object one colour, shifted by ``shift`` pixels."""
     calls = []
 
-    def paint(render, picture, neighbour, seed):
-        calls.append({"size": render.size, "neighbour": neighbour is not None, "seed": seed, "picture": picture.size})
+    def paint(render, picture, neighbour, seed, view):
+        calls.append(
+            {"size": render.size, "neighbour": neighbour is not None, "seed": seed, "picture": picture.size, "view": view}
+        )
         array = np.asarray(render).astype(int)
         background = np.round(np.asarray(P.BACKGROUND) * 255).astype(int)
         mask = np.abs(array - background).max(-1) > 6
@@ -373,6 +426,20 @@ def test_paint_views_repaints_what_the_views_see():
     assert all(view.accepted and view.attempts[0]["iou"] > 0.95 for view in result.views)
     # The first view painted has no neighbour; every later one gets the nearest painted view
     assert [call["neighbour"] for call in calls] == [False] + [True] * 5
+    # Each is told which side it shows (the picture's camera, at azimuth 0 here, is the front)
+    sides = {call["view"]["name"]: call["view"]["side"] for call in calls}
+    assert sides == {
+        "a000": "from the front",
+        "a090": "from the side",
+        "a270": "from the side",
+        "a180": "from directly behind, showing its back",
+        "top": "from directly above",
+        "bottom": "from directly below, showing its underside",
+    }
+    # With one colour everywhere the robust blend is the same
+    robust = np.asarray(result.robust.convert("RGB"))
+    for k in range(6):
+        assert np.abs(cell(robust, k, inset=INNER // 4) - (40, 160, 220)).max() <= 4, k
     # Every side of the box is seen square on by one view: all of it takes the painted colour
     out = np.asarray(result.texture.convert("RGB"))
     for k in range(6):
@@ -389,7 +456,7 @@ def test_paint_views_leaves_out_a_view_that_moved_and_retries_it():
     mesh = box()
     seeds = []
 
-    def paint(render, picture, neighbour, seed):
+    def paint(render, picture, neighbour, seed, view):
         seeds.append(seed)
         array = np.asarray(render)
         return Image.fromarray(np.roll(array, shift=40, axis=1))  # far off every time
@@ -402,16 +469,38 @@ def test_paint_views_leaves_out_a_view_that_moved_and_retries_it():
     np.testing.assert_array_equal(np.asarray(result.texture.convert("RGB")), np.asarray(mesh.visual.material.baseColorTexture.convert("RGB")))
 
 
+def test_paint_views_leaves_out_a_view_that_draws_what_the_render_does_not_have():
+    mesh = box()
+
+    def paint(render, picture, neighbour, seed, view):
+        array = np.asarray(render).astype(int)
+        background = np.round(np.asarray(P.BACKGROUND) * 255).astype(int)
+        mask = np.abs(array - background).max(-1) > 6
+        out = np.empty_like(array)
+        out[:] = background
+        out[mask] = (200, 60, 50)
+        if view["name"] == "a180":  # the back: stripes the render doesn't have
+            stripes = np.zeros(mask.shape, bool)
+            stripes[:, ::6] = True
+            out[mask & stripes] = (20, 20, 20)
+        return Image.fromarray(out.astype(np.uint8), "RGB")
+
+    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=4, top=False, bottom=False, log=lambda _: None, **small())
+    by_name = {view.camera.name: view for view in result.views}
+    assert not by_name["a180"].accepted and by_name["a180"].attempts[0]["novelty"] > P.MAX_NOVELTY
+    assert all(by_name[name].accepted and by_name[name].attempts[0]["novelty"] < 0.05 for name in ("a000", "a090", "a270"))
+
+
 def test_paint_views_scales_later_views_to_the_first():
     mesh = box()
     colours = iter([(40, 160, 220)] + [(20, 80, 110)] * 10)  # later views darker
     calls = []
 
-    def paint(render, picture, neighbour, seed):
+    def paint(render, picture, neighbour, seed, view):
         calls.append(seed)
         colour = next(colours)
         painter, _ = flat_painter(colour)
-        return painter(render, picture, neighbour, seed)
+        return painter(render, picture, neighbour, seed, view)
 
     result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=8, top=False, bottom=False, log=lambda _: None, **small())
     gains = {view.camera.name: view.gains for view in result.views}
