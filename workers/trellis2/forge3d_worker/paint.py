@@ -1,0 +1,1111 @@
+"""
+The multi-view painter (Phase 8): photo-real views of the model, painted by an image-editing model over
+renders of its own texture, baked back into the texture.
+
+TRELLIS.2 gets the shape right but its texture is soft and blotchy, copies the picture's reflections and
+shadows, and makes up the sides the picture doesn't show. An image-editing model can turn a render of the
+model into a clean product photo of the pictured object without moving anything: the render fixes the
+outline and where each part is, the picture says what the object looks like. This module is everything
+around that model, on the mesh as ``to_glb`` makes it (after ``unpremultiply``, before the picture's
+projection, which production then runs on top as always):
+
+1. The picture's camera, from the projection run on a stand-in for the mesh (``projection.project_picture``
+   never touches the mesh itself here). The picture painted on that stand-in is what the renders show, so
+   every view starts from the picture where it reaches; the projection's weights say where that is.
+2. Cameras round the object (``ring``): ``around`` of them at ``elevation``, the first at the picture's
+   azimuth, then a top and a bottom view. Each is a perspective camera framed tight on the object
+   (``frame``): about a megapixel, sides a multiple of 16, the shape the editing model takes.
+3. View by view, nearest the picture first (``paint_views``): the current texture is rendered (``render``:
+   base colour lit from the camera, on a plain light grey); the editing model paints it, with the picture
+   and the painted view nearest to it as references; the painted object's outline is checked against the
+   render's (``object_mask``, then ``align``: the best small shift and scale, and the silhouette IoU after
+   it; a view under ``min_iou`` is painted again with another seed, then left out); its colour is scaled
+   to what the picture and the views before it already say where they overlap (``gains``); and it is
+   baked (``view_samples``: depth-tested visibility, a power of the cosine, fades at silhouettes and depth
+   edges), so the next render shows it.
+4. The views blended by weight into the original texture (``compose``), the change carried into the
+   gutters. The caller exports from there as production does: the picture's projection, smoothed
+   normals, gltfpack.
+
+The editing model is the caller's: ``paint(render, picture, neighbour, seed) -> image``. The module runs
+on the CPU as well as the GPU (the tests use a fake painter).
+"""
+
+from __future__ import annotations
+
+import io
+import math
+import time
+from dataclasses import dataclass, field
+from types import SimpleNamespace
+from typing import Any, Callable, Optional, Sequence
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+from PIL import Image
+
+from . import projection, uv_raster
+from .mvtexture import _fade, _into_gutters
+from .projection import rasterize_depth, rasterize_faces
+
+# --- Cameras ------------------------------------------------------------------------------------------
+# Perspective strength (projection's: 1 / the camera's distance in bounding radii): 0.3 is about 35
+# degrees across the bounding sphere, a product photographer's longish lens
+PERSPECTIVE = 0.3
+ELEVATION = 15.0  # degrees above the horizon, for the cameras round the object
+AROUND = 8
+TOP_ELEVATION = 89.0  # the top and bottom views (exactly 90 works too; this keeps the azimuth meaningful)
+# Space round the object in a view, each side, as a share of its larger extent there
+MARGIN = 0.08
+# A view's area in pixels at most, its sides multiples of MULTIPLE (FLUX.2's latent patches are 16 pixels;
+# its references are resized to a megapixel at most), and its aspect within MAX_ASPECT either way
+PIXELS = 1024 * 1024
+MULTIPLE = 16
+MAX_ASPECT = 2.5
+# The plain background of renders and references (sRGB)
+BACKGROUND = (0.92, 0.92, 0.92)
+
+# --- Renders ------------------------------------------------------------------------------------------
+# Light from the camera: ambient + (1 - ambient) * cos(normal, view). Shape shows; colours stay readable
+AMBIENT = 0.55
+SUPERSAMPLE = 2  # renders are drawn this many times larger each way and averaged down (smooth outlines)
+# The picture as a reference: its object cut out on the background, cropped with this margin, at most
+# this many pixels
+REFERENCE_MARGIN = 0.1
+REFERENCE_PIXELS = 768 * 768
+
+# --- Checks -------------------------------------------------------------------------------------------
+# A painted view is used when its object's outline, after the best small shift and scale, overlaps the
+# render's by at least MIN_IOU (intersection over union). Shifts up to MAX_SHIFT of the view's longer side
+# and scales up to exp(MAX_LOG_SCALE) either way are tried
+MIN_IOU = 0.9
+MAX_SHIFT = 0.04
+MAX_LOG_SCALE = 0.08
+ALIGN_SIZE = 256  # the outlines are compared at this size (longer side)
+# The painted object: everything not reached from the image's border through background-coloured pixels
+# (within BACKGROUND_TOLERANCE per sRGB channel of the border's median), nor, outside the render's object,
+# through shadow-coloured ones (grey: channels within SHADOW_CHROMA of each other; at least SHADOW_LUMA of
+# the background's brightness), so a soft shadow on the floor isn't counted as the object
+BACKGROUND_TOLERANCE = 0.07
+SHADOW_CHROMA = 0.05
+SHADOW_LUMA = 0.45
+
+# --- Bake ---------------------------------------------------------------------------------------------
+# As mvtexture.bake_views: a view's weight at a texel is cos ** COS_POWER (fading to nothing between
+# MIN_COS and MIN_COS + 0.1), times fades over FEATHER pixels from its usable pixels' edge and from depth
+# edges (EDGE_JUMP pixels' worth of depth); a texel is visible when within DEPTH_BIAS pixels' worth of
+# depth of the nearest surface (more on slopes). A higher power than mvtexture's 3: each texel mostly
+# takes one view, so a detail two views put a pixel apart isn't drawn twice
+COS_POWER = 4.0
+MIN_COS = 0.25
+FEATHER = 6.0
+EDGE_JUMP = 8.0
+DEPTH_BIAS = 2.0
+# Views whose weights add up to this replace a texel's colour in full; below it the old colour shows through
+FULL_WEIGHT = 0.25
+# Renders keep the picture's paint where the projection used the picture this much (its detail weight):
+# fully above the upper end, not at all below the lower
+PROTECT = (0.3, 0.7)
+# Colour match: a view's colour is scaled per channel (linear light) by the weighted median ratio of what
+# is already established (the picture's paint, earlier views) to it, where both see the surface and the
+# established colour is CONFIDENT; at most MAX_GAIN either way, from at least GAIN_TEXELS texels
+MAX_GAIN = 1.4
+GAIN_TEXELS = 500
+CONFIDENT = 0.5
+GAIN_SAMPLES = 400_000
+
+
+def _device(device: Optional[Any]) -> torch.device:
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    return torch.device(device)
+
+
+# --- Cameras ------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Camera:
+    """
+    A perspective camera on the normalised model (bounding sphere of radius 1 round its box's centre), in
+    projection's terms: ``azimuth`` turns about +Y (0 looks at the model's +Z side, 90 at +X),
+    ``elevation`` is above the horizon, no roll. Its image shows the window of half sizes ``half`` round
+    ``centre`` in the picture plane through the origin, ``size`` (width, height) pixels.
+    """
+
+    name: str
+    azimuth: float
+    elevation: float
+    perspective: float
+    centre: tuple[float, float]
+    half: tuple[float, float]
+    size: tuple[int, int]
+
+    @property
+    def width(self) -> int:
+        return self.size[0]
+
+    @property
+    def height(self) -> int:
+        return self.size[1]
+
+    def params(self, device: Any = None) -> torch.Tensor:
+        """projection's (1, 7) view parameters."""
+        return torch.tensor(
+            [[self.azimuth, self.elevation, 0.0, self.perspective, 0.0, 0.0, 0.0]], dtype=torch.float32, device=device
+        )
+
+    def direction(self) -> np.ndarray:
+        """Unit vector from the model's centre towards the camera."""
+        return view_direction(self.azimuth, self.elevation)
+
+    def pixel(self) -> float:
+        """Normalised model units per pixel in the window's plane."""
+        return 2 * self.half[0] / self.width
+
+    def project(self, points: torch.Tensor, scale: int = 1):
+        """
+        Points (N, 3) as the camera sees them: pixel coordinates (N, 2) (x right, y down; pixel (r, c)
+        centred at (c + 0.5, r + 0.5)) in an image ``scale`` times the camera's size, depth (N,; larger is
+        farther) and the perspective factor (N,) that rasterize_depth interpolates with.
+        """
+        x, y, depth, s = projection.project(points, self.params(points.device))
+        col = ((x[0] - self.centre[0]) / self.half[0] + 1) * (self.width / 2) * scale
+        row = ((self.centre[1] - y[0]) / self.half[1] + 1) * (self.height / 2) * scale
+        return torch.stack([col, row], -1), depth[0], s[0]
+
+    def as_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "azimuth": round(self.azimuth % 360, 1),
+            "elevation": round(self.elevation, 1),
+            "size": list(self.size),
+        }
+
+
+def view_direction(azimuth: float, elevation: float) -> np.ndarray:
+    a, e = math.radians(azimuth), math.radians(elevation)
+    return np.array([math.sin(a) * math.cos(e), math.sin(e), math.cos(a) * math.cos(e)])
+
+
+def frame(
+    verts: torch.Tensor,
+    name: str,
+    azimuth: float,
+    elevation: float,
+    *,
+    perspective: float = PERSPECTIVE,
+    margin: float = MARGIN,
+    pixels: int = PIXELS,
+    multiple: int = MULTIPLE,
+    max_aspect: float = MAX_ASPECT,
+) -> Camera:
+    """
+    A camera looking from ``azimuth`` and ``elevation`` with the normalised mesh ``verts`` framed tight:
+    ``margin`` of its larger extent on each side, the window widened to an aspect within ``max_aspect``,
+    sides multiples of ``multiple`` and at most ``pixels`` in all, square pixels.
+    """
+    params = torch.tensor([[azimuth, elevation, 0.0, perspective, 0.0, 0.0, 0.0]], dtype=torch.float32, device=verts.device)
+    x, y, _, _ = projection.project(verts, params)
+    xlo, xhi, ylo, yhi = (float(v) for v in (x.min(), x.max(), y.min(), y.max()))
+    extent = max(xhi - xlo, yhi - ylo, 1e-6)
+    hx = (xhi - xlo) / 2 + margin * extent
+    hy = (yhi - ylo) / 2 + margin * extent
+    if hx / hy > max_aspect:
+        hy = hx / max_aspect
+    elif hy / hx > max_aspect:
+        hx = hy / max_aspect
+    aspect = hx / hy
+    width = max(multiple, int(math.sqrt(pixels * aspect) // multiple) * multiple)
+    height = max(multiple, int(math.sqrt(pixels / aspect) // multiple) * multiple)
+    # Square pixels: the window widened to the image's aspect
+    if width / height > hx / hy:
+        hx = hy * width / height
+    else:
+        hy = hx * height / width
+    return Camera(
+        name=name,
+        azimuth=float(azimuth) % 360,
+        elevation=float(elevation),
+        perspective=float(perspective),
+        centre=((xlo + xhi) / 2, (ylo + yhi) / 2),
+        half=(hx, hy),
+        size=(width, height),
+    )
+
+
+def ring(
+    verts: torch.Tensor,
+    azimuth: float = 0.0,
+    *,
+    elevation: float = ELEVATION,
+    around: int = AROUND,
+    top: bool = True,
+    bottom: bool = True,
+    **framing: Any,
+) -> list[Camera]:
+    """
+    ``around`` cameras evenly round the object at ``elevation``, the first at ``azimuth``, then a top and
+    a bottom view (facing the same way as the first), each framed by ``frame``. Named by their azimuth
+    from the first ("a000", "a045", ...), "top" and "bottom".
+    """
+    cameras = []
+    for k in range(around):
+        offset = k * 360.0 / around
+        cameras.append(frame(verts, f"a{round(offset):03d}", azimuth + offset, elevation, **framing))
+    if top:
+        cameras.append(frame(verts, "top", azimuth, TOP_ELEVATION, **framing))
+    if bottom:
+        cameras.append(frame(verts, "bottom", azimuth, -TOP_ELEVATION, **framing))
+    return cameras
+
+
+def angle_between(a: np.ndarray, b: np.ndarray) -> float:
+    """Degrees between two directions."""
+    cos = float(np.dot(a, b) / max(1e-12, np.linalg.norm(a) * np.linalg.norm(b)))
+    return math.degrees(math.acos(max(-1.0, min(1.0, cos))))
+
+
+def by_angle(cameras: Sequence[Camera], azimuth: float, elevation: float) -> list[Camera]:
+    """The cameras nearest the direction (azimuth, elevation) first; ties keep their order."""
+    target = view_direction(azimuth, elevation)
+    return sorted(cameras, key=lambda camera: round(angle_between(camera.direction(), target), 6))
+
+
+# --- The mesh -----------------------------------------------------------------------------------------
+
+
+@dataclass
+class Geometry:
+    """The mesh normalised as projection normalises it, on one device."""
+
+    verts: torch.Tensor  # (V, 3): bounding sphere of radius 1 round the box's centre
+    faces: torch.Tensor  # (F, 3) long
+    uv: torch.Tensor  # (V, 2), trimesh's convention (v up)
+    normals: torch.Tensor  # (V, 3) unit, welded across UV seams, facing out
+    face_normals: torch.Tensor  # (F, 3) unit, facing out
+    flipped: bool = False  # the triangles wind inwards, so the normals were turned round
+
+
+def geometry(mesh: Any, device: Optional[Any] = None) -> Geometry:
+    """``mesh`` (to_glb's trimesh: vertices, faces, visual.uv) normalised, with smooth and face normals."""
+    device = _device(device)
+    verts = np.asarray(mesh.vertices, dtype=np.float64)
+    faces = np.asarray(mesh.faces, dtype=np.int64)
+    uv = getattr(getattr(mesh, "visual", None), "uv", None)
+    if verts.ndim != 2 or verts.shape[1] != 3 or len(verts) < 3 or not np.isfinite(verts).all():
+        raise ValueError("the mesh has no usable vertices")
+    if faces.ndim != 2 or faces.shape[1] != 3 or len(faces) == 0 or faces.min() < 0 or faces.max() >= len(verts):
+        raise ValueError("the mesh's faces don't match its vertices")
+    if uv is None or np.asarray(uv).shape != (len(verts), 2) or not np.isfinite(np.asarray(uv, dtype=np.float64)).all():
+        raise ValueError("the mesh has no UVs matching its vertices")
+    centre = (verts.min(0) + verts.max(0)) / 2
+    radius = float(np.linalg.norm(verts - centre, axis=1).max())
+    if radius <= 0:
+        raise ValueError("the mesh is a point")
+    v = torch.tensor((verts - centre) / radius, dtype=torch.float32, device=device)
+    f = torch.tensor(faces, dtype=torch.long, device=device)
+    a, b, c = (v[f[:, i]] for i in range(3))
+    face_normals = torch.cross(b - a, c - a, dim=-1)
+    face_normals = face_normals / face_normals.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+    geom = Geometry(
+        verts=v,
+        faces=f,
+        uv=torch.tensor(np.asarray(uv, dtype=np.float64), dtype=torch.float32, device=device),
+        normals=projection._welded_normals(v, f),
+        face_normals=face_normals,
+    )
+    _orient(geom)
+    return geom
+
+
+def _orient(geom: Geometry, size: int = 96) -> None:
+    """
+    Turns the normals round when the surface six cameras see (front, back, sides, top, bottom) mostly
+    faces away from them: a mesh whose triangles wind inwards.
+    """
+    facing = []
+    for azimuth, elevation in ((0, 0), (90, 0), (180, 0), (270, 0), (0, 89), (0, -89)):
+        params = torch.tensor([[azimuth, elevation, 0.0, 0.0, 0, 0, 0]], dtype=torch.float32, device=geom.verts.device)
+        x, y, depth, s = projection.project(geom.verts, params)
+        xy = torch.stack([(x[0] + 1.05) / 2.1 * size, (1.05 - y[0]) / 2.1 * size], -1)
+        zbuf = rasterize_depth(xy, depth[0], s[0], geom.faces, size, size)
+        face, _ = rasterize_faces(xy, depth[0], s[0], geom.faces, zbuf)
+        _, _, back = projection.view_axes(params)
+        facing.append(geom.face_normals[face[face >= 0]] @ back[0])
+    facing = torch.cat(facing)
+    if facing.numel() and float(facing.median()) < 0:
+        geom.normals = -geom.normals
+        geom.face_normals = -geom.face_normals
+        geom.flipped = True
+
+
+@dataclass
+class Texels:
+    """The texels the mesh covers, with the surface point and normals each one paints."""
+
+    flat: torch.Tensor  # (N,) long: index into the texture, row-major, row 0 at the top (v = 1)
+    covered: torch.Tensor  # (H, W) bool
+    points: torch.Tensor  # (N, 3) normalised
+    normals: torch.Tensor  # (N, 3) unit, smooth
+    face_normals: torch.Tensor  # (N, 3) unit: the texel's triangle's
+    size: tuple[int, int]  # (H, W)
+
+
+def texels(geom: Geometry, size: tuple[int, int]) -> Texels:
+    """Every covered texel of an (H, W) texture: the mesh rasterised in UV space, as mvtexture does."""
+    tex_h, tex_w = size
+    uv_clip = torch.cat([geom.uv * 2 - 1, torch.zeros_like(geom.uv[:, :1]), torch.ones_like(geom.uv[:, :1])], -1)
+    rast, _ = uv_raster.rasterize(None, uv_clip[None], geom.faces.int(), resolution=[tex_h, tex_w])
+    rast = rast.flip(1)  # uv_raster works bottom-up, the image top-down
+    covered = rast[0, ..., 3] > 0
+    flat = torch.nonzero(covered.flatten()).flatten()
+    if flat.numel() == 0:
+        raise ValueError("the texture has no covered texels")
+    attrs = torch.cat([geom.verts, geom.normals], -1)
+    texel = uv_raster.interpolate(attrs[None], rast, geom.faces.int())[0][0].view(-1, 6)[flat]
+    face = rast[0, ..., 3].flatten()[flat].round().long() - 1
+    del rast
+    normals = texel[:, 3:] / texel[:, 3:].norm(dim=-1, keepdim=True).clamp_min(1e-9)
+    return Texels(
+        flat=flat, covered=covered, points=texel[:, :3], normals=normals, face_normals=geom.face_normals[face], size=(tex_h, tex_w)
+    )
+
+
+def texture_of(mesh: Any, device: Optional[Any] = None) -> tuple[torch.Tensor, Optional[np.ndarray]]:
+    """The base colour texture as (H, W, 3) sRGB in [0, 1] (row 0 at v = 1), and its alpha (as it was)."""
+    material = getattr(getattr(mesh, "visual", None), "material", None)
+    image = getattr(material, "baseColorTexture", None)
+    if image is None:
+        raise ValueError("the mesh has no base colour texture")
+    image = image if isinstance(image, Image.Image) else Image.fromarray(np.asarray(image))
+    alpha = np.asarray(image.getchannel("A")).copy() if image.mode in ("RGBA", "LA") else None
+    rgb = torch.tensor(np.asarray(image.convert("RGB"), dtype=np.float32) / 255, device=_device(device))
+    return rgb, alpha
+
+
+def as_image(rgb: torch.Tensor, alpha: Optional[np.ndarray] = None) -> Image.Image:
+    """(H, W, 3) sRGB in [0, 1] as a PIL image, with ``alpha`` put back when there was one."""
+    image = Image.fromarray((rgb.clamp(0, 1).cpu().numpy() * 255 + 0.5).astype(np.uint8), "RGB")
+    if alpha is not None:
+        image.putalpha(Image.fromarray(alpha))
+    return image
+
+
+def as_tensor(image: Image.Image, device: Optional[Any] = None) -> torch.Tensor:
+    """A PIL image as (H, W, 3) sRGB in [0, 1]."""
+    return torch.tensor(np.asarray(image.convert("RGB"), dtype=np.float32) / 255, device=_device(device))
+
+
+# --- Renders ------------------------------------------------------------------------------------------
+
+
+@dataclass
+class Render:
+    image: torch.Tensor  # (H, W, 3) sRGB in [0, 1]
+    mask: torch.Tensor  # (H, W) bool: the object covers at least half the pixel
+    coverage: torch.Tensor  # (H, W) float: how much of the pixel it covers
+
+
+def render(
+    geom: Geometry,
+    texture: torch.Tensor,
+    camera: Camera,
+    *,
+    ambient: float = AMBIENT,
+    supersample: int = SUPERSAMPLE,
+    background: Sequence[float] = BACKGROUND,
+) -> Render:
+    """
+    ``texture`` (H, W, 3 sRGB) on the mesh as ``camera`` sees it, lit from the camera (``ambient`` +
+    the rest times the cosine between the smooth normal and the view), on ``background``. Drawn
+    ``supersample`` times larger each way and averaged down in linear light.
+    """
+    device = geom.verts.device
+    scale = max(1, int(supersample))
+    height, width = camera.height * scale, camera.width * scale
+    xy, depth, s = camera.project(geom.verts, scale)
+    zbuf = rasterize_depth(xy, depth, s, geom.faces, height, width)
+    face, bary = rasterize_faces(xy, depth, s, geom.faces, zbuf)
+    del zbuf
+    hit = face >= 0
+    corners = geom.faces[face.clamp_min(0)]  # (h, w, 3)
+    uv = (bary[..., None] * geom.uv[corners]).sum(-2)
+    grid = torch.stack([uv[..., 0] * 2 - 1, (1 - uv[..., 1]) * 2 - 1], -1)[None]
+    albedo = F.grid_sample(texture.permute(2, 0, 1)[None], grid, mode="bilinear", padding_mode="border", align_corners=False)
+    albedo = albedo[0].permute(1, 2, 0)
+    del uv, grid
+    normal = (bary[..., None] * geom.normals[corners]).sum(-2)
+    normal = normal / normal.norm(dim=-1, keepdim=True).clamp_min(1e-9)
+    point = (bary[..., None] * geom.verts[corners]).sum(-2)
+    del bary, corners
+    towards = projection.view_dirs(point.view(-1, 3), camera.params(device)).view(height, width, 3)
+    light = ambient + (1 - ambient) * (normal * towards).sum(-1).clamp(0, 1)
+    del normal, point, towards
+    sky = projection._srgb_to_linear(torch.tensor(background, dtype=torch.float32, device=device))
+    linear = torch.where(hit[..., None], projection._srgb_to_linear(albedo) * light[..., None], sky)
+    del albedo, light
+    linear = F.avg_pool2d(linear.permute(2, 0, 1)[None], scale)[0].permute(1, 2, 0)
+    coverage = F.avg_pool2d(hit.float()[None, None], scale)[0, 0]
+    return Render(image=projection._linear_to_srgb(linear), mask=coverage >= 0.5, coverage=coverage)
+
+
+def picture_reference(
+    cutout: Image.Image,
+    *,
+    background: Sequence[float] = BACKGROUND,
+    margin: float = REFERENCE_MARGIN,
+    pixels: int = REFERENCE_PIXELS,
+    multiple: int = MULTIPLE,
+) -> Image.Image:
+    """
+    The picture as the editing model's reference: its object (the cutout's alpha) on ``background``,
+    cropped to its bounding box with ``margin`` of its larger side round it, at most ``pixels`` in all,
+    sides multiples of ``multiple``.
+    """
+    rgba = np.asarray(cutout.convert("RGBA"), dtype=np.float32) / 255
+    alpha = rgba[..., 3:]
+    rgb = rgba[..., :3] * alpha + np.asarray(background, dtype=np.float32) * (1 - alpha)
+    rows = np.nonzero((alpha[..., 0] > 0.5).any(1))[0]
+    cols = np.nonzero((alpha[..., 0] > 0.5).any(0))[0]
+    if rows.size == 0:
+        raise ValueError("no object in the cutout")
+    top, bottom, left, right = int(rows[0]), int(rows[-1]) + 1, int(cols[0]), int(cols[-1]) + 1
+    pad = int(round(margin * max(bottom - top, right - left)))
+    canvas = np.empty((bottom - top + 2 * pad, right - left + 2 * pad, 3), np.float32)
+    canvas[:] = np.asarray(background, dtype=np.float32)
+    y0, x0 = top - pad, left - pad
+    sy0, sx0 = max(0, y0), max(0, x0)
+    sy1, sx1 = min(rgb.shape[0], bottom + pad), min(rgb.shape[1], right + pad)
+    canvas[sy0 - y0 : sy1 - y0, sx0 - x0 : sx1 - x0] = rgb[sy0:sy1, sx0:sx1]
+    image = Image.fromarray((canvas * 255 + 0.5).astype(np.uint8), "RGB")
+    h, w = canvas.shape[:2]
+    scale = min(1.0, math.sqrt(pixels / (h * w)))
+    width = max(multiple, int(w * scale) // multiple * multiple)
+    height = max(multiple, int(h * scale) // multiple * multiple)
+    return image.resize((width, height), Image.Resampling.LANCZOS)
+
+
+# --- Checks -------------------------------------------------------------------------------------------
+
+
+def _flood(passable: torch.Tensor, seeds: torch.Tensor, check_every: int = 16) -> torch.Tensor:
+    """The pixels (H, W bool) reached from ``seeds`` through ``passable`` ones, 8-connected."""
+    reach = (seeds & passable).float()[None, None]
+    allowed = passable.float()[None, None]
+    limit = 4 * (passable.shape[0] + passable.shape[1])
+    for step in range(limit):
+        grown = F.max_pool2d(reach, 3, 1, 1) * allowed
+        if step % check_every == check_every - 1 and torch.equal(grown, reach):
+            break
+        reach = grown
+    return reach[0, 0] > 0
+
+
+def object_mask(
+    image: torch.Tensor,
+    expected: Optional[torch.Tensor] = None,
+    *,
+    tolerance: float = BACKGROUND_TOLERANCE,
+    border: int = 4,
+) -> torch.Tensor:
+    """
+    Where a painted view (H, W, 3 sRGB) shows its object: every pixel not reached from the image's border
+    through background-coloured pixels (within ``tolerance`` of the border's median colour). With
+    ``expected`` (the render's mask), grey pixels darker than the background but not black (a soft shadow)
+    are background too outside it. The background's colour inside the object (a white car's paint against
+    white) is the object's when walled off by its outline.
+    """
+    h, w = image.shape[:2]
+    edge = torch.zeros((h, w), dtype=torch.bool, device=image.device)
+    edge[:border] = True
+    edge[-border:] = True
+    edge[:, :border] = True
+    edge[:, -border:] = True
+    colour = image[edge].median(0).values
+    passable = (image - colour).abs().amax(-1) <= tolerance
+    if expected is not None:
+        luma = projection._luma(image)
+        chroma = image.amax(-1) - image.amin(-1)
+        shadow = (chroma <= SHADOW_CHROMA) & (luma >= SHADOW_LUMA * projection._luma(colour)) & (luma <= float(colour.max()) + tolerance)
+        outside = ~(projection._dilate(expected.float()[None, None], 1)[0, 0] > 0)
+        passable = passable | (shadow & outside)
+    return ~_flood(passable, edge)
+
+
+def iou(a: torch.Tensor, b: torch.Tensor) -> float:
+    """Intersection over union of two masks (bool, or float coverages: min over max)."""
+    a, b = a.float(), b.float()
+    union = float(torch.maximum(a, b).sum())
+    return float(torch.minimum(a, b).sum()) / union if union > 0 else 0.0
+
+
+@dataclass(frozen=True)
+class Alignment:
+    """
+    Where a painted view's object sits against the render's: render pixel p shows what the painted image
+    has at ``centre + (p - centre) * exp(log_scale) + shift`` (pixels).
+    """
+
+    shift: tuple[float, float]
+    log_scale: float
+    centre: tuple[float, float]
+    iou_before: float
+    iou: float
+
+    def as_dict(self) -> dict:
+        return {
+            "iou_before": round(self.iou_before, 4),
+            "iou": round(self.iou, 4),
+            "shift": [round(self.shift[0], 2), round(self.shift[1], 2)],
+            "scale": round(math.exp(self.log_scale), 4),
+        }
+
+
+def _sample_grid(height: int, width: int, shift, log_scale, centre, device) -> torch.Tensor:
+    """grid_sample's grid (1, H, W, 2) for an Alignment's mapping, in an H x W image."""
+    cols = torch.arange(width, device=device, dtype=torch.float32) + 0.5
+    rows = torch.arange(height, device=device, dtype=torch.float32) + 0.5
+    k = math.exp(log_scale)
+    sx = centre[0] + (cols - centre[0]) * k + shift[0]
+    sy = centre[1] + (rows - centre[1]) * k + shift[1]
+    gx = sx / width * 2 - 1
+    gy = sy / height * 2 - 1
+    return torch.stack(torch.broadcast_tensors(gx[None, :], gy[:, None]), -1)[None]
+
+
+def align(
+    painted: torch.Tensor,
+    rendered: torch.Tensor,
+    *,
+    max_shift: float = MAX_SHIFT,
+    max_log_scale: float = MAX_LOG_SCALE,
+    size: int = ALIGN_SIZE,
+    rounds: int = 24,
+) -> Alignment:
+    """
+    The small shift and scale (about the render's object's centre) that best lays the painted object's
+    mask on the render's (both (H, W) bool), by pattern search on the masks at ``size`` pixels: shifts up
+    to ``max_shift`` of the longer side, scales up to exp(``max_log_scale``) either way.
+    """
+    h, w = rendered.shape
+    device = rendered.device
+    factor = max(1, math.ceil(max(h, w) / size))
+    small_painted = F.avg_pool2d(painted.float()[None, None], factor, ceil_mode=True)
+    small_rendered = F.avg_pool2d(rendered.float()[None, None], factor, ceil_mode=True)[0, 0]
+    hs, ws = small_rendered.shape
+    total = float(small_rendered.sum())
+    if total <= 0:
+        return Alignment((0.0, 0.0), 0.0, (w / 2, h / 2), 0.0, 0.0)
+    rows = torch.arange(hs, device=device, dtype=torch.float32) + 0.5
+    cols = torch.arange(ws, device=device, dtype=torch.float32) + 0.5
+    centre_small = (float((small_rendered.sum(0) * cols).sum()) / total, float((small_rendered.sum(1) * rows).sum()) / total)
+    limit = (max_shift * max(hs, ws), max_shift * max(hs, ws), max_log_scale)
+
+    def score(trial: tuple[float, float, float]) -> float:
+        grid = _sample_grid(hs, ws, trial[:2], trial[2], centre_small, device)
+        warped = F.grid_sample(small_painted, grid, mode="bilinear", padding_mode="zeros", align_corners=False)[0, 0]
+        return iou(warped, small_rendered)
+
+    current = (0.0, 0.0, 0.0)
+    best = before = score(current)
+    steps = [1.0, 1.0, 0.01]
+    for _ in range(rounds):
+        improved = False
+        for dim in range(3):
+            for sign in (-1.0, 1.0):
+                trial = list(current)
+                trial[dim] = max(-limit[dim], min(limit[dim], trial[dim] + sign * steps[dim]))
+                trial = tuple(trial)
+                value = score(trial)
+                if value > best + 1e-6:
+                    current, best, improved = trial, value, True
+        if not improved:
+            steps = [step / 2 for step in steps]
+            if steps[0] < 0.05:
+                break
+    shift = (current[0] * factor, current[1] * factor)
+    centre = (centre_small[0] * factor, centre_small[1] * factor)
+    # The IoU at full size, which the gate reads
+    full = warp(painted.float()[..., None], Alignment(shift, current[2], centre, 0.0, 0.0))[..., 0] > 0.5
+    return Alignment(shift=shift, log_scale=current[2], centre=centre, iou_before=iou(painted, rendered), iou=iou(full, rendered))
+
+
+def warp(image: torch.Tensor, alignment: Alignment) -> torch.Tensor:
+    """A painted view (H, W, C) resampled so that its object lies on the render's (bilinear)."""
+    h, w = image.shape[:2]
+    grid = _sample_grid(h, w, alignment.shift, alignment.log_scale, alignment.centre, image.device)
+    out = F.grid_sample(image.permute(2, 0, 1)[None].float(), grid, mode="bilinear", padding_mode="border", align_corners=False)
+    return out[0].permute(1, 2, 0)
+
+
+# --- Bake ---------------------------------------------------------------------------------------------
+
+
+@dataclass
+class Samples:
+    """What one view says about each covered texel."""
+
+    weight: torch.Tensor  # (N,)
+    colour: torch.Tensor  # (N, 3) linear light
+
+
+def view_samples(
+    geom: Geometry,
+    tex: Texels,
+    camera: Camera,
+    image: torch.Tensor,
+    usable: torch.Tensor,
+    *,
+    cos_power: float = COS_POWER,
+    min_cos: float = MIN_COS,
+    feather: float = FEATHER,
+    edge_jump: float = EDGE_JUMP,
+    depth_bias: float = DEPTH_BIAS,
+) -> Samples:
+    """
+    A view's colour (``image``, (H, W, 3) sRGB, the camera's size) and weight at every covered texel: the
+    texel must be visible (depth-tested against the view's own depth map) and land on a ``usable`` pixel
+    (H, W bool); its weight is cos ** ``cos_power`` of the angle between its normal and the view, fading
+    out between ``min_cos`` and ``min_cos`` + 0.1, and near the usable pixels' edge and depth edges
+    (``feather`` pixels; ``edge_jump`` pixels' worth of depth make an edge), as mvtexture.bake_views does.
+    """
+    h, w = image.shape[:2]
+    if (w, h) != camera.size or tuple(usable.shape) != (h, w):
+        raise ValueError(f"the view is {w} x {h} and its mask {tuple(usable.shape)}, the camera {camera.size}")
+    device = geom.verts.device
+    pixel = camera.pixel()
+    vxy, vdepth, vs = camera.project(geom.verts)
+    zbuf = rasterize_depth(vxy, vdepth, vs, geom.faces, h, w)
+    usable = usable & torch.isfinite(zbuf)
+    fade = _fade(zbuf, usable, feather, edge_jump * pixel)
+
+    xy, depth, _ = camera.project(tex.points)
+    inside = (xy[:, 0] >= 0) & (xy[:, 0] < w) & (xy[:, 1] >= 0) & (xy[:, 1] < h)
+    at = xy[:, 1].long().clamp(0, h - 1) * w + xy[:, 0].long().clamp(0, w - 1)
+    towards = projection.view_dirs(tex.points, camera.params(device))
+    cos = (tex.normals * towards).sum(-1)
+    cos_face = (tex.face_normals * towards).sum(-1)
+    slope = (1 - cos_face.square()).clamp_min(0).sqrt() / cos_face.abs().clamp_min(0.05)
+    slack = pixel * (depth_bias + 0.75 * slope.clamp(max=20.0))
+    visible = inside & (depth <= zbuf.flatten()[at] + slack)
+    del towards, slope, slack, at, zbuf
+
+    grid = torch.stack([xy[:, 0] / w * 2 - 1, xy[:, 1] / h * 2 - 1], -1)[None, None]
+    usable_f = usable.float()[None]
+    linear = projection._srgb_to_linear(image.clamp(0, 1)).permute(2, 0, 1) * usable_f
+    sampled = F.grid_sample(
+        torch.cat([linear, usable_f, fade[None]])[None], grid, mode="bilinear", padding_mode="zeros", align_corners=False
+    )[0, :, 0].T  # (N, 5)
+    colour = (sampled[:, :3] / sampled[:, 3:4].clamp_min(1e-6)).clamp(0, 1)
+    weight = (
+        visible.float()
+        * cos.clamp_min(0) ** cos_power
+        * projection._smoothstep(min_cos, min_cos + 0.1, cos)
+        * projection._smoothstep(0.0, 0.1, cos_face)
+        * sampled[:, 4]
+        * (sampled[:, 3] > 1e-3)
+    )
+    return Samples(weight=weight, colour=colour)
+
+
+def gains(
+    colour: torch.Tensor,
+    established: torch.Tensor,
+    weight: torch.Tensor,
+    *,
+    max_gain: float = MAX_GAIN,
+    min_texels: int = GAIN_TEXELS,
+) -> Optional[torch.Tensor]:
+    """
+    Per-channel gains (3,) that bring a view's colours (N, 3, linear) to the established ones: the
+    weighted median of their ratios over the texels with ``weight`` > 0 (the view's weight times how sure
+    the established colour is), neither near black, at most ``max_gain`` either way. None from fewer than
+    ``min_texels`` texels.
+    """
+    use = (weight > 0) & (projection._luma(colour) > 0.004) & (projection._luma(established) > 0.004)
+    if int(use.sum()) < min_texels:
+        return None
+    ratio = torch.log((established[use] + 1e-4) / (colour[use] + 1e-4))
+    w = weight[use]
+    if ratio.shape[0] > GAIN_SAMPLES:
+        keep = torch.linspace(0, ratio.shape[0] - 1, GAIN_SAMPLES, device=ratio.device).long()
+        ratio, w = ratio[keep], w[keep]
+    median = torch.stack([projection._wquantile(ratio[:, c], w, 0.5) for c in range(3)])
+    return torch.exp(median).clamp(1 / max_gain, max_gain)
+
+
+class Blend:
+    """The views' colours at the covered texels, summed by weight in linear light."""
+
+    def __init__(self, count: int, device: Any) -> None:
+        self.mixed = torch.zeros((count, 3), device=device)
+        self.total = torch.zeros(count, device=device)
+
+    def add(self, samples: Samples) -> None:
+        self.mixed += samples.weight[:, None] * samples.colour
+        self.total += samples.weight
+
+    def colour(self) -> torch.Tensor:
+        return self.mixed / self.total.clamp_min(1e-9)[:, None]
+
+    def amount(self, full_weight: float = FULL_WEIGHT) -> torch.Tensor:
+        """How much of the views' colour each texel takes: in full where their weights add up to ``full_weight``."""
+        if full_weight <= 0:
+            return (self.total > 0).float()
+        return projection._smoothstep(0.0, full_weight, self.total)
+
+
+def compose(texture: torch.Tensor, tex: Texels, colour: torch.Tensor, amount: torch.Tensor) -> torch.Tensor:
+    """
+    ``texture`` (H, W, 3 sRGB) with the covered texels moved ``amount`` (N,) of the way to ``colour`` (N, 3,
+    linear) in linear light, the change carried on into the gutters (so filtering at chart edges doesn't
+    bring the old colours back).
+    """
+    tex_h, tex_w = tex.size
+    old = projection._srgb_to_linear(texture.reshape(-1, 3)[tex.flat])
+    new = old + amount[:, None] * (colour - old)
+    out = texture.clone().reshape(-1, 3)
+    touched = amount > 0
+    out[tex.flat[touched]] = projection._linear_to_srgb(new[touched])
+    out = out.view(tex_h, tex_w, 3)
+    filled = _into_gutters((out - texture).permute(2, 0, 1), tex.covered)
+    return torch.where(tex.covered[..., None], out, (texture + filled.permute(1, 2, 0)).clamp(0, 1))
+
+
+# --- The picture --------------------------------------------------------------------------------------
+
+
+@dataclass
+class Picture:
+    """The picture's projection onto a stand-in of the mesh: the texture it made, and where it used the picture."""
+
+    texture: torch.Tensor  # (H, W, 3) sRGB: the picture painted on the side it shows (the original if not applied)
+    weight: torch.Tensor  # (N,) per covered texel: the projection's detail weight (0 where not applied)
+    azimuth: float  # the picture's camera (0 and ELEVATION when the projection didn't find it)
+    elevation: float
+    report: dict
+
+
+def project_picture(mesh: Any, cutout: Any, tex: Texels, texture: torch.Tensor, device: Any) -> Picture:
+    """
+    The production projection run on a stand-in for ``mesh`` (its vertices, faces, UVs and material
+    textures; the mesh itself is untouched), to find the picture's camera and paint the picture where it
+    reaches, with the weight it gave each texel.
+    """
+    material = getattr(mesh.visual, "material", None)
+    stand_in = SimpleNamespace(
+        vertices=mesh.vertices,
+        faces=mesh.faces,
+        visual=SimpleNamespace(
+            uv=mesh.visual.uv,
+            material=SimpleNamespace(
+                baseColorTexture=material.baseColorTexture,
+                metallicRoughnessTexture=getattr(material, "metallicRoughnessTexture", None),
+                roughnessFactor=getattr(material, "roughnessFactor", None),
+                metallicFactor=getattr(material, "metallicFactor", None),
+            ),
+        ),
+    )
+    debug: dict = {}
+    _, report = projection.project_picture(stand_in, cutout, device=device, debug=debug)
+    weight = torch.zeros(tex.flat.numel(), device=device)
+    azimuth, elevation = 0.0, ELEVATION
+    painted = texture
+    if report.get("applied"):
+        painted = as_tensor(stand_in.visual.material.baseColorTexture, device)
+        if tuple(painted.shape[:2]) != tex.size:
+            raise ValueError("the projection changed the texture's size")
+        full = torch.zeros(tex.size[0] * tex.size[1], device=device)
+        full[debug["flat"].to(device)] = debug["weight"].to(device).float()
+        weight = full[tex.flat]
+        params = debug["params"][0]
+        azimuth, elevation = float(params[0]) % 360, float(params[1])
+    elif debug.get("params") is not None:
+        # Found but not applied (too little fits, or an ambiguous camera): its direction still orders the views
+        params = debug["params"][0]
+        azimuth, elevation = float(params[0]) % 360, float(params[1])
+    summary = projection.summary(report)
+    return Picture(texture=painted, weight=weight, azimuth=azimuth, elevation=elevation, report=summary)
+
+
+# --- The painter --------------------------------------------------------------------------------------
+
+# paint(render, picture, neighbour, seed) -> painted view: the editing model. ``render`` is the view to
+# repaint (its size is the camera's), ``picture`` the picture as a reference, ``neighbour`` the painted view
+# nearest to this one (None for the first)
+Painter = Callable[[Image.Image, Image.Image, Optional[Image.Image], int], Image.Image]
+
+
+@dataclass
+class View:
+    """One camera's turn: its render, what the editing model painted, and whether it went in."""
+
+    camera: Camera
+    render: Image.Image
+    painted: Optional[Image.Image] = None  # the last attempt, as drawn
+    aligned: Optional[Image.Image] = None  # the accepted attempt, laid on the render
+    accepted: bool = False
+    attempts: list = field(default_factory=list)
+    gains: Optional[list] = None
+    texels: int = 0  # covered texels it set more than half of, when it went in
+    seconds: dict = field(default_factory=dict)
+
+    def as_dict(self) -> dict:
+        return {
+            **self.camera.as_dict(),
+            "accepted": self.accepted,
+            "attempts": self.attempts,
+            "gains": self.gains,
+            "texels": self.texels,
+            "seconds": self.seconds,
+        }
+
+
+@dataclass
+class Result:
+    texture: Image.Image  # the new base colour texture (before the picture's projection, which goes on top)
+    views: list  # View, in the order they were painted
+    report: dict
+
+
+def _sync(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+
+def paint_views(
+    mesh: Any,
+    cutout: Any,
+    paint: Painter,
+    *,
+    cameras: Optional[Sequence[Camera]] = None,
+    seed: int = 0,
+    attempts: int = 2,
+    min_iou: float = MIN_IOU,
+    full_weight: float = FULL_WEIGHT,
+    match_colour: bool = True,
+    device: Optional[Any] = None,
+    log: Callable[[str], None] = print,
+    **camera_options: Any,
+) -> Result:
+    """
+    Paints ``mesh`` (to_glb's trimesh, unpremultiplied, before the picture's projection) from views round
+    it with ``paint``, and returns its new base colour texture with what happened. ``cutout`` is the
+    picture with its background removed (RGBA, full frame; the projection paints from it and the editing
+    model sees it). ``cameras`` defaults to ``ring`` round the picture's camera (``camera_options`` go to
+    ``ring``: elevation, around, top, bottom, perspective, margin, pixels); they are painted nearest the
+    picture first. Each view gets ``attempts`` tries (seeds ``seed + 100 * view + attempt``) to reach
+    ``min_iou``. ``match_colour`` scales each view to the colours already established. The mesh isn't
+    changed.
+    """
+    device = _device(device)
+    started = time.perf_counter()
+    timings: dict = {}
+    last = [started]
+
+    def clock(name: str) -> None:
+        _sync(device)
+        now = time.perf_counter()
+        timings[name] = round(timings.get(name, 0.0) + now - last[0], 3)
+        last[0] = now
+
+    with torch.no_grad():
+        geom = geometry(mesh, device)
+        texture, alpha = texture_of(mesh, device)
+        tex = texels(geom, tuple(texture.shape[:2]))
+        clock("setup_s")
+        picture = project_picture(mesh, cutout, tex, texture, device)
+        clock("projection_s")
+        log(f"[paint] picture: {picture.report}")
+        reference = picture_reference(cutout)
+        if cameras is None:
+            cameras = ring(geom.verts, picture.azimuth, **camera_options)
+        ordered = by_angle(cameras, picture.azimuth, picture.elevation)
+
+        protect = projection._smoothstep(PROTECT[0], PROTECT[1], picture.weight)
+        anchor = picture.texture
+        current = anchor
+        established = projection._srgb_to_linear(anchor.reshape(-1, 3)[tex.flat])
+        confidence = protect.clone()
+        blend = Blend(tex.flat.numel(), device)
+        views: list[View] = []
+        weights: list = []  # (view, its weight at each texel), for the shares at the end
+        for number, camera in enumerate(ordered):
+            view_started = time.perf_counter()
+            shot = render(geom, current, camera)
+            view = View(camera=camera, render=as_image(shot.image))
+            view.seconds["render_s"] = round(time.perf_counter() - view_started, 3)
+            accepted = [v for v in views if v.accepted]
+            neighbour = None
+            if accepted:
+                nearest = min(accepted, key=lambda v: angle_between(v.camera.direction(), camera.direction()))
+                neighbour = nearest.aligned
+            chosen = None
+            for attempt in range(max(1, attempts)):
+                attempt_seed = seed + 100 * number + attempt
+                clock_paint = time.perf_counter()
+                painted = paint(view.render, reference, neighbour, attempt_seed)
+                paint_s = round(time.perf_counter() - clock_paint, 3)
+                if painted.size != camera.size:
+                    painted = painted.convert("RGB").resize(camera.size, Image.Resampling.LANCZOS)
+                view.painted = painted.convert("RGB")
+                image = as_tensor(view.painted, device)
+                mask = object_mask(image, shot.mask)
+                fit = align(mask, shot.mask)
+                view.attempts.append({"seed": attempt_seed, "paint_s": paint_s, **fit.as_dict()})
+                log(f"[paint] {camera.name}: attempt {attempt + 1}, {fit.as_dict()}, {paint_s} s")
+                if fit.iou >= min_iou:
+                    chosen = (image, mask, fit)
+                    break
+            if chosen is None:
+                log(f"[paint] {camera.name}: left out (IoU under {min_iou})")
+                views.append(view)
+                clock("views_s")
+                continue
+            bake_started = time.perf_counter()
+            image, mask, fit = chosen
+            aligned = warp(image, fit).clamp(0, 1)
+            aligned_mask = warp(mask.float()[..., None], fit)[..., 0] > 0.5
+            view.aligned = as_image(aligned)
+            view.accepted = True
+            samples = view_samples(geom, tex, camera, aligned, shot.mask & aligned_mask)
+            if match_colour:
+                found = gains(samples.colour, established, samples.weight * (confidence >= CONFIDENT).float() * confidence)
+                if found is not None:
+                    samples.colour = (samples.colour * found).clamp(0, 1)
+                    view.gains = [round(float(g), 3) for g in found]
+            blend.add(samples)
+            weights.append((view, samples.weight))
+            # The next render shows the views over the picture's paint (kept where the picture was used)
+            amount = blend.amount(full_weight) * (1 - protect)
+            current = compose(anchor, tex, blend.colour(), amount)
+            established = projection._srgb_to_linear(current.reshape(-1, 3)[tex.flat])
+            confidence = torch.maximum(protect, blend.amount(full_weight))
+            view.seconds["bake_s"] = round(time.perf_counter() - bake_started, 3)
+            views.append(view)
+            clock("views_s")
+
+        # The views over the original texture: the picture's projection goes on top afterwards
+        amount = blend.amount(full_weight)
+        final = compose(texture, tex, blend.colour(), amount)
+        for view, weight in weights:
+            view.texels = int((amount * weight / blend.total.clamp_min(1e-9) > 0.5).sum())
+        del weights
+        clock("compose_s")
+
+    report = {
+        "picture": picture.report,
+        "picture_camera": {"azimuth": round(picture.azimuth, 1), "elevation": round(picture.elevation, 1)},
+        "views": [view.as_dict() for view in views],
+        "accepted": sum(view.accepted for view in views),
+        "texels": int(tex.flat.numel()),
+        "changed": int((amount > 0.5).sum()),
+        "changed_share": round(float((amount > 0.5).float().mean()), 4),
+        "flipped": geom.flipped,
+        "timings": {**timings, "total_s": round(time.perf_counter() - started, 3)},
+    }
+    return Result(texture=as_image(final, alpha), views=views, report=report)
+
+
+# --- Review sheets ------------------------------------------------------------------------------------
+
+
+def sheet(views: Sequence[View], height: int = 256) -> Image.Image:
+    """Each view on a row: its render, what was painted, and the painted view laid on the render (if used)."""
+    rows = []
+    for view in views:
+        row = []
+        for image in (view.render, view.painted, view.aligned):
+            if image is None:
+                image = Image.new("RGB", view.render.size, (40, 40, 40))
+            scale = height / image.height
+            row.append(image.convert("RGB").resize((max(1, round(image.width * scale)), height), Image.Resampling.LANCZOS))
+        rows.append(row)
+    width = max(sum(image.width for image in row) for row in rows) if rows else 1
+    out = Image.new("RGB", (width, height * max(1, len(rows))), (24, 24, 28))
+    for r, row in enumerate(rows):
+        x = 0
+        for image in row:
+            out.paste(image, (x, r * height))
+            x += image.width
+    return out
+
+
+# --- Moving a mesh between containers -----------------------------------------------------------------
+
+
+def pack_mesh(mesh: Any) -> bytes:
+    """
+    to_glb's textured trimesh as bytes (numpy's npz: arrays as they are, textures as PNG), so another
+    container can rebuild it exactly (``unpack_mesh``): vertices, faces, UVs and the PBR material's
+    textures, factors, alpha mode and sidedness. Not its vertex normals: nothing after to_glb reads them
+    (the export's shading normals are made afresh).
+    """
+    material = mesh.visual.material
+
+    def png(image: Any) -> np.ndarray:
+        if image is None:
+            return np.zeros(0, np.uint8)
+        image = image if isinstance(image, Image.Image) else Image.fromarray(np.asarray(image))
+        buffer = io.BytesIO()
+        image.save(buffer, "PNG")
+        return np.frombuffer(buffer.getvalue(), np.uint8)
+
+    def factor(value: Any) -> np.ndarray:
+        return np.asarray([] if value is None else value, dtype=np.float64).reshape(-1)
+
+    arrays = {
+        "vertices": np.asarray(mesh.vertices),
+        "faces": np.asarray(mesh.faces),
+        "uv": np.asarray(mesh.visual.uv),
+        "base_color": png(getattr(material, "baseColorTexture", None)),
+        "metallic_roughness": png(getattr(material, "metallicRoughnessTexture", None)),
+        "base_color_factor": factor(getattr(material, "baseColorFactor", None)),
+        "metallic_factor": factor(getattr(material, "metallicFactor", None)),
+        "roughness_factor": factor(getattr(material, "roughnessFactor", None)),
+        "alpha_mode": np.asarray(str(getattr(material, "alphaMode", None) or "")),
+        "double_sided": np.asarray(bool(getattr(material, "doubleSided", False))),
+    }
+    buffer = io.BytesIO()
+    np.savez(buffer, **arrays)
+    return buffer.getvalue()
+
+
+def unpack_mesh(data: bytes) -> Any:
+    """The trimesh ``pack_mesh`` packed: the same vertices, faces and UVs in the same order, the same material."""
+    import trimesh
+
+    arrays = np.load(io.BytesIO(data), allow_pickle=False)
+
+    def image(name: str) -> Optional[Image.Image]:
+        raw = arrays[name]
+        if raw.size == 0:
+            return None
+        loaded = Image.open(io.BytesIO(raw.tobytes()))
+        loaded.load()
+        return loaded
+
+    def factor(name: str) -> Any:
+        value = arrays[name]
+        if value.size == 0:
+            return None
+        return float(value[0]) if value.size == 1 else value
+
+    base_color_factor = factor("base_color_factor")
+    material = trimesh.visual.material.PBRMaterial(
+        baseColorTexture=image("base_color"),
+        baseColorFactor=None if base_color_factor is None else np.asarray(base_color_factor).astype(np.uint8),
+        metallicRoughnessTexture=image("metallic_roughness"),
+        metallicFactor=factor("metallic_factor"),
+        roughnessFactor=factor("roughness_factor"),
+        alphaMode=str(arrays["alpha_mode"]) or None,
+        doubleSided=bool(arrays["double_sided"]),
+    )
+    return trimesh.Trimesh(
+        vertices=arrays["vertices"],
+        faces=arrays["faces"],
+        process=False,
+        visual=trimesh.visual.TextureVisuals(uv=arrays["uv"], material=material),
+    )
