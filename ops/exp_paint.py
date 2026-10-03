@@ -54,9 +54,10 @@ CACHE_DIR = "p8-paint"
 BMW = {"name": "bmw", "prompt": "make a bmw car m3 model blue", "picture_seed": 1627471494, "seed": 663008479}
 TEXTURE_SIZE = 2048  # the final preset's
 
-# The editing model's instructions. Image 1 is the render to repaint, image 2 the picture, image 3 (when there
-# is one) the painted view nearest to this one
-PROMPT = (
+# The editing model's instructions. Run 1 (render, picture and the nearest painted view as three references, the
+# PROMPT_V1 below) kept the picture's viewpoint instead of the render's in 9 views of 10, so these keep the
+# picture out, make it small, or start from the render's own latent (img2img)
+PROMPT_V1 = (
     "Repaint image 1 as a clean, photorealistic studio product photo of the {subject} shown in image 2, seen "
     "from exactly the same viewpoint as image 1. Keep the outline, size, position and proportions of every part "
     "exactly as they are in image 1: do not move, add, remove or reshape anything, and keep the background where "
@@ -65,6 +66,56 @@ PROMPT = (
     "with no cast shadows, no strong reflections and no bright highlights. Plain light grey background."
 )
 NEIGHBOUR = " Image 3 shows the same {subject} already repainted from another angle: match its colours and finish exactly."
+EDIT = (
+    "Turn this rough 3D render of a {subject} into a clean, photorealistic studio product photo of the same "
+    "{subject}. Keep exactly the same camera angle, framing, outline, proportions and position of every part: do "
+    "not move, add, remove or reshape anything. Replace the blotchy, smeared surface with clean, crisp, realistic "
+    "materials and fine details in the same colours. Soft, even, diffused studio lighting from all around, with no "
+    "cast shadows and no strong reflections. Plain light grey background."
+)
+EDIT_REF = (
+    "Turn image 1, a rough 3D render of a {subject}, into a clean, photorealistic studio product photo of it, "
+    "keeping exactly the camera angle, framing, outline and position of every part of image 1: do not move, add, "
+    "remove or reshape anything. Image 2 is a photo of the same {subject} from a different angle: use it only for "
+    "the true colours, materials and fine details, never for the viewpoint or the layout. Replace the blotchy, "
+    "smeared surface with clean, crisp, realistic materials. Soft, even, diffused studio lighting from all around, "
+    "with no cast shadows and no strong reflections. Plain light grey background."
+)
+# How each variant asks klein: "base" is Flux2KleinPipeline with the listed references (the render first);
+# "img2img" is Flux2KleinInpaintPipeline with the whole frame as the mask, which starts from the render's latent
+# noised to ``start`` (the render is also its first reference) with the picture as ``image_reference``. klein's
+# own 4-step schedule at a megapixel runs 1.0, 0.97, 0.91, 0.77: ``start`` 0.91 is its last two steps; 0.8 is an
+# own three-step schedule (0.8, 0.6, 0.35), shifted back through the scheduler's exponential time shift
+STRATEGIES = {
+    "v1": {"pipeline": "base", "picture": 768 * 768, "neighbour": True, "prompt": PROMPT_V1},
+    "edit": {"pipeline": "base", "picture": 0, "prompt": EDIT},
+    "edit-ref": {"pipeline": "base", "picture": 384 * 384, "prompt": EDIT_REF},
+    "i2i-ref-91": {"pipeline": "img2img", "picture": 512 * 512, "start": 0.91, "prompt": EDIT_REF},
+    "i2i-ref-80": {"pipeline": "img2img", "picture": 512 * 512, "start": 0.8, "prompt": EDIT_REF},
+    "i2i-80": {"pipeline": "img2img", "picture": 0, "start": 0.8, "prompt": EDIT},
+}
+# klein's shifted 4-step schedule (1 MP), and the schedules the "start" values ask for
+SCHEDULES = {0.91: None, 0.8: (1.0, 0.8, 0.6, 0.35)}
+
+
+def unshifted(sigmas, mu: float) -> list:
+    """The sigmas to give the scheduler so that its exponential time shift by ``mu`` turns them into ``sigmas``."""
+    import math
+
+    return [1.0 if s >= 1 else 1.0 / (1.0 + math.exp(mu) * (1.0 / s - 1.0)) for s in sigmas]
+
+
+def shrink(image, pixels: int, multiple: int = 16):
+    """``image`` scaled down to at most ``pixels`` in all, sides multiples of ``multiple``."""
+    import math
+
+    from PIL import Image
+
+    scale = min(1.0, math.sqrt(pixels / (image.width * image.height)))
+    width = max(multiple, int(image.width * scale) // multiple * multiple)
+    height = max(multiple, int(image.height * scale) // multiple * multiple)
+    return image if (width, height) == image.size else image.resize((width, height), Image.Resampling.LANCZOS)
+
 
 painter_image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -105,8 +156,10 @@ def subject_of(prompt: str) -> str:
     return text or "object"
 
 
-def prompt_for(subject: str, neighbour: bool) -> str:
-    return PROMPT.format(subject=subject) + (NEIGHBOUR.format(subject=subject) if neighbour else "")
+def prompt_for(strategy: str, subject: str, neighbour: bool) -> str:
+    spec = STRATEGIES[strategy]
+    extra = NEIGHBOUR.format(subject=subject) if neighbour and spec.get("neighbour") else ""
+    return spec["prompt"].format(subject=subject) + extra
 
 
 def _jpeg(image, quality: int = 92) -> bytes:
@@ -301,25 +354,54 @@ class Painter:
         started = time.time()
         self.pipe = Flux2KleinPipeline.from_pretrained(KLEIN_DIR, torch_dtype=torch.bfloat16).to("cuda")
         self.pipe.set_progress_bar_config(disable=True)
+        # img2img through the inpainting pipeline, on the same weights
+        from diffusers import Flux2KleinInpaintPipeline
+
+        self.inpaint = Flux2KleinInpaintPipeline.from_pipe(self.pipe)
+        self.inpaint.set_progress_bar_config(disable=True)
         self.load_seconds = round(time.time() - started, 1)
         self.gpu = torch.cuda.get_device_name()
         self.calls = 0
         print(f"[painter] klein on {self.gpu} in {self.load_seconds} s")
 
-    def _editor(self, subject: str, steps: int):
+    def _editor(self, subject: str, strategy: str, steps: int):
         import torch
+        from diffusers.pipelines.flux2.pipeline_flux2_klein_inpaint import compute_empirical_mu
+        from PIL import Image
+
+        spec = STRATEGIES[strategy]
 
         def paint(render, picture, neighbour, seed):
-            images = [render, picture] + ([neighbour] if neighbour is not None else [])
             generator = torch.Generator("cuda").manual_seed(int(seed))
-            return self.pipe(
-                image=images,
-                prompt=prompt_for(subject, neighbour is not None),
-                height=render.height,
-                width=render.width,
-                num_inference_steps=steps,
+            reference = shrink(picture, spec["picture"]) if spec.get("picture") else None
+            use_neighbour = bool(spec.get("neighbour")) and neighbour is not None
+            prompt = prompt_for(strategy, subject, use_neighbour)
+            if spec["pipeline"] == "base":
+                images = [render] + ([reference] if reference is not None else []) + ([neighbour] if use_neighbour else [])
+                return self.pipe(
+                    image=images,
+                    prompt=prompt,
+                    height=render.height,
+                    width=render.width,
+                    num_inference_steps=steps,
+                    guidance_scale=1.0,
+                    generator=generator,
+                ).images[0]
+            # img2img: the whole frame repainted, from the render's latent noised to the start
+            schedule = SCHEDULES[spec["start"]]
+            options = {"num_inference_steps": 4, "strength": 0.5}
+            if schedule is not None:
+                mu = compute_empirical_mu((render.height // 16) * (render.width // 16), len(schedule))
+                options = {"num_inference_steps": len(schedule), "strength": (len(schedule) - 1) / len(schedule),
+                           "sigmas": unshifted(schedule, mu)}
+            return self.inpaint(
+                prompt=prompt,
+                image=render,
+                image_reference=reference,
+                mask_image=Image.new("L", render.size, 255),
                 guidance_scale=1.0,
                 generator=generator,
+                **options,
             ).images[0]
 
         return paint
@@ -333,7 +415,7 @@ class Painter:
         from forge3d_worker.compress import pack_glb
         from forge3d_worker.pipeline import shade
 
-        name = job["name"]
+        name, variant = job["name"], job.get("variant", "edit")
         self.calls += 1
         prod.outputs.reload()
         folder = pathlib.Path(prod.OUTPUTS) / CACHE_DIR / name
@@ -346,7 +428,7 @@ class Painter:
         steps = int(options.pop("steps", 4))
         torch.cuda.reset_peak_memory_stats()
         clock = time.time()
-        result = paint.paint_views(mesh, cutout, self._editor(subject, steps), device="cuda", **options)
+        result = paint.paint_views(mesh, cutout, self._editor(subject, variant, steps), device="cuda", **options)
         paint_s = round(time.time() - clock, 1)
 
         # Production's export from here: the picture's projection on top, smoothed normals, gltfpack
@@ -359,20 +441,24 @@ class Painter:
         packed = pack_glb(raw, TEXTURE_SIZE)
         export_s = round(time.time() - clock, 1)
 
+        out = f"{name}/{variant}"
         files = {
-            f"{name}/painted.glb": packed,
-            f"{name}/sheet.jpg": _jpeg(paint.sheet(result.views, 320), 88),
-            f"{name}/texture-painted.jpg": _jpeg(result.texture, 90),
-            f"{name}/texture-final.jpg": _jpeg(mesh.visual.material.baseColorTexture, 90),
+            f"{out}/painted.glb": packed,
+            f"{out}/sheet.jpg": _jpeg(paint.sheet(result.views, 320), 88),
+            f"{out}/texture-painted.jpg": _jpeg(result.texture, 90),
+            f"{out}/texture-final.jpg": _jpeg(mesh.visual.material.baseColorTexture, 90),
             f"{name}/reference.jpg": _jpeg(paint.picture_reference(cutout), 92),
         }
         for number, view in enumerate(result.views):
-            stem = f"{name}/views/{number:02d}-{view.camera.name}"
+            stem = f"{out}/views/{number:02d}-{view.camera.name}"
             files[f"{stem}-render.jpg"] = _jpeg(view.render)
             if view.painted is not None:
                 files[f"{stem}-painted.jpg"] = _jpeg(view.painted)
         summary = {
             "name": name,
+            "variant": variant,
+            "strategy": {k: v for k, v in STRATEGIES[variant].items() if k != "prompt"},
+            "prompt": prompt_for(variant, subject, False),
             "subject": subject,
             "options": {**options, "steps": steps},
             "paint": result.report,
@@ -387,7 +473,7 @@ class Painter:
             "container_s": round(time.time() - STARTED, 1),
             "shape": meta,
         }
-        print(f"[painter] {name}: {json.dumps({k: summary[k] for k in ('seconds', 'peak_gpu_gb', 'call')})}")
+        print(f"[painter] {name} {variant}: {json.dumps({k: summary[k] for k in ('seconds', 'peak_gpu_gb', 'call')})}")
         return {"summary": summary, "files": files}
 
 
@@ -418,6 +504,8 @@ def _write(root: pathlib.Path, name: str, data: bytes) -> None:
 @app.local_entrypoint()
 def check(
     only: str = "bmw",
+    paint: str = "",
+    variants: str = "edit",
     out: str = "ops-out/private/paint",
     fresh: bool = False,
     around: int = 8,
@@ -427,9 +515,17 @@ def check(
     steps: int = 4,
     bottom: bool = True,
 ) -> None:
+    """
+    Makes (or reuses) the shapes of ``only`` (bmw and Phase 2 numbers), then paints those in ``paint`` (all of
+    ``only`` when empty) once per variant in ``variants`` (STRATEGIES).
+    """
     root = pathlib.Path(out)
     root.mkdir(parents=True, exist_ok=True)
-    print(f"[paint] app {prod.APP_NAME}: {only}")
+    chosen = [v.strip() for v in variants.split(",") if v.strip()]
+    unknown = [v for v in chosen if v not in STRATEGIES]
+    if unknown or not chosen:
+        raise SystemExit(f"[paint] variants must be among {', '.join(STRATEGIES)}, not {unknown or variants!r}")
+    print(f"[paint] app {prod.APP_NAME}: shapes {only}; paint {paint or only}; variants {chosen}")
     weights = fetch_weights.spawn()
     names = [n.strip().lower() for n in only.split(",") if n.strip()]
     pictures = runs_by_number(prod.outputs, "phase2")
@@ -494,26 +590,32 @@ def check(
         for file in ("today.glb", "picture.png"):
             _write(root, f"{job['name']}/{file}", _read(prod.outputs, f"{CACHE_DIR}/{job['name']}/{file}"))
     options = {"around": around, "elevation": elevation, "attempts": attempts, "min_iou": min_iou, "steps": steps, "bottom": bottom}
-    paint_jobs = [{"name": job["name"], "options": options} for job in ready]
+    wanted = {n.strip().lower().zfill(2) if n.strip().lower() != "bmw" else "bmw" for n in (paint or only).split(",") if n.strip()}
+    paint_jobs = [
+        {"name": job["name"], "variant": variant, "options": options}
+        for job in ready
+        if job["name"] in wanted
+        for variant in chosen
+    ]
     print(f"[paint] painting {len(paint_jobs)}: {json.dumps(options)}")
     failed = 0
     for job, made in zip(paint_jobs, Painter().paint.map(paint_jobs, return_exceptions=True, order_outputs=True)):
-        entry = report["objects"].setdefault(job["name"], {})
+        entry = report["objects"].setdefault(job["name"], {}).setdefault("paint", {})
         if isinstance(made, BaseException):
             failed += 1
             reason = next((line for line in str(made).splitlines() if line.strip()), "")
-            entry["error"] = f"paint: {type(made).__name__}: {reason}"
-            print(f"[paint] {job['name']}: failed: {entry['error']}")
+            entry[job["variant"]] = {"error": f"{type(made).__name__}: {reason}"}
+            print(f"[paint] {job['name']} {job['variant']}: failed: {entry[job['variant']]['error']}")
             continue
         for name, data in made["files"].items():
             _write(root, name, data)
-        entry["paint"] = made["summary"]
+        entry[job["variant"]] = made["summary"]
         views = made["summary"]["paint"]["views"]
         print(
-            f"[paint] {job['name']}: {made['summary']['paint']['accepted']} of {len(views)} views in, "
+            f"[paint] {job['name']} {job['variant']}: {made['summary']['paint']['accepted']} of {len(views)} views in, "
             f"IoU {[v['attempts'][-1]['iou'] for v in views]}, {made['summary']['seconds']}"
         )
     (root / "summary.json").write_text(json.dumps(report, indent=2, default=str))
-    print(f"[paint] done: {len(paint_jobs) - failed} of {len(jobs)} objects painted")
+    print(f"[paint] done: {len(paint_jobs) - failed} of {len(paint_jobs)} paintings")
     if not paint_jobs or failed:
         raise SystemExit(1)
