@@ -482,7 +482,7 @@ def test_export_paints_the_picture_on_finals(mode, projects, monkeypatch, capsys
         assert calls == [(glb, mesh.forge3d_cutout, "RGB")]
         summary = {"applied": True, "reason": "applied", "iou": 0.97, "pose": {"azimuth": 10.0}, "seconds": 1.5}
         assert runtime.last_projection == summary
-        assert capsys.readouterr().out.startswith("[forge3d] projection: {")
+        assert "\n[forge3d] projection: {" in "\n" + capsys.readouterr().out  # after the glass line
     else:
         assert calls == [] and runtime.last_projection is None
 
