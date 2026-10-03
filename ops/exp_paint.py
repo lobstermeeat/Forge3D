@@ -81,6 +81,18 @@ EDIT_REF = (
     "smeared surface with clean, crisp, realistic materials. Soft, even, diffused studio lighting from all around, "
     "with no cast shadows and no strong reflections. Plain light grey background."
 )
+# Run 2's "edit" held every outline and drew clean, photo-real views, but invented a screen and a door on the
+# arcade machine's plain back. This one says which side the view shows (taking the picture as the front) and
+# the picture's main colours, and asks to keep plain surfaces plain
+EDIT_VIEW = (
+    "Turn this rough 3D render of a {subject}, seen {side}, into a clean, photorealistic studio product photo of "
+    "the same {subject} from exactly the same viewpoint. Keep the camera angle, framing, outline, proportions and "
+    "position of every part exactly as they are: do not move, add, remove or reshape anything. Replace the "
+    "blotchy, smeared surface with clean, crisp, realistic materials and fine details in the same colours{colours}. "
+    "Where the render shows a plain surface, keep it plain: do not invent screens, buttons, doors, handles, text, "
+    "logos or patterns that the render doesn't show. Soft, even, diffused studio lighting from all around, with "
+    "no cast shadows and no strong reflections. Plain light grey background."
+)
 # How each variant asks klein: "base" is Flux2KleinPipeline with the listed references (the render first);
 # "img2img" is Flux2KleinInpaintPipeline with the whole frame as the mask, which starts from the render's latent
 # noised to ``start`` (the render is also its first reference) with the picture as ``image_reference``. klein's
@@ -89,6 +101,7 @@ EDIT_REF = (
 STRATEGIES = {
     "v1": {"pipeline": "base", "picture": 768 * 768, "neighbour": True, "prompt": PROMPT_V1},
     "edit": {"pipeline": "base", "picture": 0, "prompt": EDIT},
+    "edit-view": {"pipeline": "base", "picture": 0, "prompt": EDIT_VIEW},
     "edit-ref": {"pipeline": "base", "picture": 384 * 384, "prompt": EDIT_REF},
     "i2i-ref-91": {"pipeline": "img2img", "picture": 512 * 512, "start": 0.91, "prompt": EDIT_REF},
     "i2i-ref-80": {"pipeline": "img2img", "picture": 512 * 512, "start": 0.8, "prompt": EDIT_REF},
@@ -156,10 +169,17 @@ def subject_of(prompt: str) -> str:
     return text or "object"
 
 
-def prompt_for(strategy: str, subject: str, neighbour: bool) -> str:
+def prompt_for(strategy: str, subject: str, neighbour: bool, view: dict | None = None) -> str:
     spec = STRATEGIES[strategy]
+    view = view or {}
+    names = list(view.get("colours") or [])
+    colours = ""
+    if names:
+        listed = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+        colours = f" (its main colours are {listed})"
     extra = NEIGHBOUR.format(subject=subject) if neighbour and spec.get("neighbour") else ""
-    return spec["prompt"].format(subject=subject) + extra
+    text = spec["prompt"].format(subject=subject, side=view.get("side") or "from the front", colours=colours)
+    return text + extra
 
 
 def _jpeg(image, quality: int = 92) -> bytes:
@@ -354,15 +374,21 @@ class Painter:
         started = time.time()
         self.pipe = Flux2KleinPipeline.from_pretrained(KLEIN_DIR, torch_dtype=torch.bfloat16).to("cuda")
         self.pipe.set_progress_bar_config(disable=True)
-        # img2img through the inpainting pipeline, on the same weights
-        from diffusers import Flux2KleinInpaintPipeline
-
-        self.inpaint = Flux2KleinInpaintPipeline.from_pipe(self.pipe)
-        self.inpaint.set_progress_bar_config(disable=True)
+        self._inpaint = None
         self.load_seconds = round(time.time() - started, 1)
         self.gpu = torch.cuda.get_device_name()
         self.calls = 0
         print(f"[painter] klein on {self.gpu} in {self.load_seconds} s")
+
+    @property
+    def inpaint(self):
+        """img2img through klein's inpainting pipeline on the same weights, made when a variant first needs it."""
+        if self._inpaint is None:
+            from diffusers import Flux2KleinInpaintPipeline
+
+            self._inpaint = Flux2KleinInpaintPipeline.from_pipe(self.pipe)
+            self._inpaint.set_progress_bar_config(disable=True)
+        return self._inpaint
 
     def _editor(self, subject: str, strategy: str, steps: int):
         import torch
@@ -371,11 +397,12 @@ class Painter:
 
         spec = STRATEGIES[strategy]
 
-        def paint(render, picture, neighbour, seed):
+        def paint(render, picture, neighbour, seed, view):
             generator = torch.Generator("cuda").manual_seed(int(seed))
             reference = shrink(picture, spec["picture"]) if spec.get("picture") else None
             use_neighbour = bool(spec.get("neighbour")) and neighbour is not None
-            prompt = prompt_for(strategy, subject, use_neighbour)
+            prompt = prompt_for(strategy, subject, use_neighbour, view)
+            self.prompts.append({"view": view.get("name"), "seed": int(seed), "prompt": prompt})
             if spec["pipeline"] == "base":
                 images = [render] + ([reference] if reference is not None else []) + ([neighbour] if use_neighbour else [])
                 return self.pipe(
@@ -427,26 +454,37 @@ class Painter:
         options = dict(job.get("options") or {})
         steps = int(options.pop("steps", 4))
         torch.cuda.reset_peak_memory_stats()
+        self.prompts = []
         clock = time.time()
         result = paint.paint_views(mesh, cutout, self._editor(subject, variant, steps), device="cuda", **options)
         paint_s = round(time.time() - clock, 1)
 
-        # Production's export from here: the picture's projection on top, smoothed normals, gltfpack
-        clock = time.time()
-        mesh.visual.material.baseColorTexture = result.texture
-        _, report = projection.project_picture(mesh, cutout)
-        torch.cuda.empty_cache()
-        glb = shade(mesh, meta["voxel_size"])
-        raw = glb.export(file_type="glb")
-        packed = pack_glb(raw, TEXTURE_SIZE)
-        export_s = round(time.time() - clock, 1)
+        def export(texture, project: bool):
+            """Production's export from the painted texture: the picture's projection on top, smoothed normals, gltfpack."""
+            started = time.time()
+            copy = paint.unpack_mesh((folder / "mesh.npz").read_bytes())
+            copy.visual.material.baseColorTexture = texture
+            report = None
+            if project:
+                _, report = projection.project_picture(copy, cutout)
+                torch.cuda.empty_cache()
+            glb = shade(copy, meta["voxel_size"])
+            packed = pack_glb(glb.export(file_type="glb"), TEXTURE_SIZE)
+            return packed, report, copy.visual.material.baseColorTexture, round(time.time() - started, 1)
+
+        packed, report, final_texture, export_s = export(result.texture, True)
+        robust, robust_report, _, _ = export(result.robust or result.texture, True)
+        unprojected, _, _, _ = export(result.texture, False)
 
         out = f"{name}/{variant}"
         files = {
             f"{out}/painted.glb": packed,
+            f"{out}/robust.glb": robust,
+            f"{out}/views-only.glb": unprojected,
             f"{out}/sheet.jpg": _jpeg(paint.sheet(result.views, 320), 88),
             f"{out}/texture-painted.jpg": _jpeg(result.texture, 90),
-            f"{out}/texture-final.jpg": _jpeg(mesh.visual.material.baseColorTexture, 90),
+            f"{out}/texture-final.jpg": _jpeg(final_texture, 90),
+            f"{out}/prompts.json": json.dumps(self.prompts, indent=1).encode(),
             f"{name}/reference.jpg": _jpeg(paint.picture_reference(cutout), 92),
         }
         for number, view in enumerate(result.views):
@@ -458,11 +496,12 @@ class Painter:
             "name": name,
             "variant": variant,
             "strategy": {k: v for k, v in STRATEGIES[variant].items() if k != "prompt"},
-            "prompt": prompt_for(variant, subject, False),
+            "prompt": prompt_for(variant, subject, False, {"side": "<side>", "colours": result.report.get("colours")}),
             "subject": subject,
             "options": {**options, "steps": steps},
             "paint": result.report,
             "projection": projection.summary(report),
+            "projection_robust": projection.summary(robust_report),
             "projection_today": meta.get("projection"),
             "seconds": {"paint_views": paint_s, "export": export_s, **result.report.get("timings", {})},
             "peak_gpu_gb": round(torch.cuda.max_memory_reserved() / 2**30, 1),
@@ -512,6 +551,7 @@ def check(
     elevation: float = 15.0,
     attempts: int = 2,
     min_iou: float = 0.9,
+    max_novelty: float = 0.2,
     steps: int = 4,
     bottom: bool = True,
 ) -> None:
@@ -589,7 +629,10 @@ def check(
     for job in ready:
         for file in ("today.glb", "picture.png"):
             _write(root, f"{job['name']}/{file}", _read(prod.outputs, f"{CACHE_DIR}/{job['name']}/{file}"))
-    options = {"around": around, "elevation": elevation, "attempts": attempts, "min_iou": min_iou, "steps": steps, "bottom": bottom}
+    options = {
+        "around": around, "elevation": elevation, "attempts": attempts, "min_iou": min_iou, "max_novelty": max_novelty,
+        "steps": steps, "bottom": bottom,
+    }
     wanted = {n.strip().lower().zfill(2) if n.strip().lower() != "bmw" else "bmw" for n in (paint or only).split(",") if n.strip()}
     paint_jobs = [
         {"name": job["name"], "variant": variant, "options": options}

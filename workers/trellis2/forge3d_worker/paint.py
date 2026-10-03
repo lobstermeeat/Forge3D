@@ -19,15 +19,19 @@ projection, which production then runs on top as always):
    base colour lit from the camera, on a plain light grey); the editing model paints it, with the picture
    and the painted view nearest to it as references; the painted object's outline is checked against the
    render's (``object_mask``, then ``align``: the best small shift and scale, and the silhouette IoU after
-   it; a view under ``min_iou`` is painted again with another seed, then left out); its colour is scaled
+   it) and so are its edges (``novelty``: what it drew that the render doesn't have, such as a second front
+   on a plain back); a view under ``min_iou`` or over ``max_novelty`` is painted again with another seed,
+   then left out. Its colour is scaled
    to what the picture and the views before it already say where they overlap (``gains``); and it is
    baked (``view_samples``: depth-tested visibility, a power of the cosine, fades at silhouettes and depth
    edges), so the next render shows it.
 4. The views blended by weight into the original texture (``compose``), the change carried into the
-   gutters. The caller exports from there as production does: the picture's projection, smoothed
-   normals, gltfpack.
+   gutters; also robustly (``robust_colour``: only the views near the weighted median luminance count at a
+   texel, so a highlight or a ghost one view drew is left out). The caller exports from there as production
+   does: the picture's projection, smoothed normals, gltfpack.
 
-The editing model is the caller's: ``paint(render, picture, neighbour, seed) -> image``. The module runs
+The editing model is the caller's: ``paint(render, picture, neighbour, seed, view) -> image``, where
+``view`` says which side it shows (``describe``) and the picture's main colours (``main_colours``). The module runs
 on the CPU as well as the GPU (the tests use a fake painter).
 """
 
@@ -91,6 +95,19 @@ BACKGROUND_TOLERANCE = 0.07
 SHADOW_CHROMA = 0.05
 SHADOW_LUMA = 0.45
 
+# What the painted view adds: the share of its edge energy (the Sobel magnitude of log luminance above EDGE,
+# at NOVELTY_SIZE pixels on the longer side) that lies more than EDGE_REACH pixels from any edge of the
+# render. A view over MAX_NOVELTY drew something the render doesn't have (run 2: the arcade machine's plain
+# back painted as a second front with a screen and a door, 0.43; the top of a car painted on its underside,
+# 0.68; good views 0.00-0.08)
+NOVELTY_SIZE = 256
+EDGE = 0.5
+EDGE_REACH = 2
+MAX_NOVELTY = 0.2
+# Robust blend: where views disagree, only those within ROBUST_TOLERANCE (log luminance, about 30%) of the
+# weighted median count (a highlight or a ghost in one view doesn't go in)
+ROBUST_TOLERANCE = 0.25
+
 # --- Bake ---------------------------------------------------------------------------------------------
 # As mvtexture.bake_views: a view's weight at a texel is cos ** COS_POWER (fading to nothing between
 # MIN_COS and MIN_COS + 0.1), times fades over FEATHER pixels from its usable pixels' edge and from depth
@@ -109,8 +126,9 @@ FULL_WEIGHT = 0.25
 PROTECT = (0.3, 0.7)
 # Colour match: a view's colour is scaled per channel (linear light) by the weighted median ratio of what
 # is already established (the picture's paint, earlier views) to it, where both see the surface and the
-# established colour is CONFIDENT; at most MAX_GAIN either way, from at least GAIN_TEXELS texels
-MAX_GAIN = 1.4
+# established colour is CONFIDENT; at most MAX_GAIN either way, from at least GAIN_TEXELS texels. Run 2: the
+# editing model painted the BMW a brighter blue than the picture's, by more than 1.4 in red and green
+MAX_GAIN = 2.0
 GAIN_TEXELS = 500
 CONFIDENT = 0.5
 GAIN_SAMPLES = 400_000
@@ -640,6 +658,118 @@ def warp(image: torch.Tensor, alignment: Alignment) -> torch.Tensor:
     return out[0].permute(1, 2, 0)
 
 
+def _log_luma(image: torch.Tensor) -> torch.Tensor:
+    return torch.log(projection._luma(projection._srgb_to_linear(image.clamp(0, 1))) + 0.02)
+
+
+def _sobel(x: torch.Tensor) -> torch.Tensor:
+    kx = torch.tensor([[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]], device=x.device)[None, None]
+    gx = F.conv2d(x[None, None], kx, padding=1)[0, 0]
+    gy = F.conv2d(x[None, None], kx.transpose(2, 3), padding=1)[0, 0]
+    return (gx.square() + gy.square()).sqrt()
+
+
+def novelty(rendered: torch.Tensor, painted: torch.Tensor, mask: torch.Tensor, *, size: int = NOVELTY_SIZE) -> float:
+    """
+    How much of a painted view's structure (H, W, 3, laid on the render) the render (H, W, 3) doesn't have,
+    inside the render's ``mask``: the share of the painted view's strong edge energy (EDGE) more than
+    EDGE_REACH pixels from the render's edges, at ``size`` pixels on the longer side. Edges are taken on
+    log luminance, so a change of colour or exposure isn't structure. 0 when the painted view has almost no
+    edges.
+    """
+    h, w = mask.shape
+    factor = max(1, math.ceil(max(h, w) / size))
+
+    def pooled(x: torch.Tensor) -> torch.Tensor:
+        return F.avg_pool2d(x[None, None], factor, ceil_mode=True)[0, 0]
+
+    inside = projection._erode((pooled(mask.float()) > 0.99).float()[None, None], 1)[0, 0] > 0
+    edges_r = _sobel(pooled(_log_luma(rendered)))
+    edges_p = _sobel(pooled(_log_luma(painted)))
+    near = projection._dilate((edges_r > EDGE).float()[None, None], EDGE_REACH)[0, 0] > 0
+    strong = (edges_p > EDGE) & inside
+    total = float((edges_p * strong).sum())
+    floor = 0.01 * EDGE * float(inside.sum())  # a few edges on a plain surface aren't a new structure
+    return float((edges_p * (strong & ~near)).sum()) / max(total, floor, 1e-9)
+
+
+def describe(camera: Camera, azimuth: float, elevation: float) -> str:
+    """
+    Where ``camera`` sees the object from, for the editing model, taking the picture's camera (``azimuth``,
+    ``elevation``) as its front: "from the front", "from the side", "from directly behind, showing its back",
+    "from directly above", ...
+    """
+    if camera.elevation >= 60:
+        return "from directly above"
+    if camera.elevation <= -60:
+        return "from directly below, showing its underside"
+    offset = abs((camera.azimuth - azimuth + 180) % 360 - 180)
+    if offset <= 22.5:
+        return "from the front"
+    if offset <= 67.5:
+        return "from the front, turned to one side"
+    if offset <= 112.5:
+        return "from the side"
+    if offset <= 157.5:
+        return "from behind, turned to one side"
+    return "from directly behind, showing its back"
+
+
+# Plain colour names (sRGB) for telling the editing model the picture's main colours
+COLOUR_NAMES = {
+    "black": (20, 20, 22),
+    "charcoal grey": (55, 60, 66),
+    "dark grey": (95, 95, 95),
+    "grey": (135, 135, 135),
+    "silver": (190, 192, 196),
+    "white": (245, 245, 245),
+    "dark red": (120, 20, 25),
+    "red": (200, 35, 35),
+    "coral red": (235, 95, 85),
+    "pink": (240, 150, 180),
+    "orange": (240, 130, 30),
+    "brown": (115, 70, 40),
+    "tan": (195, 155, 110),
+    "beige": (225, 205, 170),
+    "gold": (205, 165, 60),
+    "yellow": (240, 210, 40),
+    "olive green": (110, 120, 45),
+    "green": (40, 150, 60),
+    "dark green": (25, 80, 40),
+    "teal": (0, 125, 125),
+    "turquoise": (60, 200, 200),
+    "light blue": (155, 195, 230),
+    "steel blue": (75, 125, 180),
+    "blue": (30, 80, 200),
+    "navy blue": (20, 30, 90),
+    "purple": (110, 50, 150),
+    "lavender": (180, 160, 220),
+    "magenta": (200, 40, 160),
+}
+
+
+def main_colours(cutout: Image.Image, *, count: int = 3, min_share: float = 0.1) -> list:
+    """
+    The picture's main colours by name (COLOUR_NAMES, nearest in CIELAB), most of the object first: those
+    covering at least ``min_share`` of the object (the cutout's alpha), at most ``count``.
+    """
+    rgba = np.asarray(cutout.convert("RGBA"), dtype=np.float32) / 255
+    inside = rgba[..., 3] > 0.5
+    if not inside.any():
+        return []
+    pixels = torch.tensor(rgba[..., :3][inside])
+    if pixels.shape[0] > 200_000:
+        pixels = pixels[torch.linspace(0, pixels.shape[0] - 1, 200_000).long()]
+    names = list(COLOUR_NAMES)
+    swatches = torch.tensor([COLOUR_NAMES[n] for n in names], dtype=torch.float32) / 255
+    lab = projection._lab(projection._srgb_to_linear(pixels))
+    lab_swatches = projection._lab(projection._srgb_to_linear(swatches))
+    nearest = torch.cdist(lab, lab_swatches).argmin(1)
+    shares = torch.bincount(nearest, minlength=len(names)).float() / nearest.numel()
+    order = torch.argsort(shares, descending=True).tolist()
+    return [names[i] for i in order if float(shares[i]) >= min_share][:count]
+
+
 # --- Bake ---------------------------------------------------------------------------------------------
 
 
@@ -757,6 +887,28 @@ class Blend:
         return projection._smoothstep(0.0, full_weight, self.total)
 
 
+def robust_colour(samples: Sequence[Samples], tolerance: float = ROBUST_TOLERANCE) -> torch.Tensor:
+    """
+    The views' colour at each texel (N, 3, linear), blended by weight over the views whose luminance lies
+    within ``tolerance`` (log) of the weighted median of all of them: a highlight or a ghost that only one
+    view drew doesn't go in. Where one view has all the weight, it is that view's colour.
+    """
+    weight = torch.stack([s.weight for s in samples])  # (K, N)
+    colour = torch.stack([s.colour for s in samples])  # (K, N, 3)
+    luma = torch.log(projection._luma(colour) + 1e-3)
+    order = torch.argsort(luma, dim=0)
+    sorted_luma = torch.gather(luma, 0, order)
+    cumulative = torch.cumsum(torch.gather(weight, 0, order), 0)
+    half = 0.5 * cumulative[-1:]
+    index = (cumulative < half).sum(0, keepdim=True).clamp(max=len(samples) - 1)
+    median = torch.gather(sorted_luma, 0, index)  # (1, N)
+    keep = weight * ((luma - median).abs() <= tolerance).float()
+    total = keep.sum(0)
+    robust = (keep[..., None] * colour).sum(0) / total.clamp_min(1e-9)[:, None]
+    plain = (weight[..., None] * colour).sum(0) / weight.sum(0).clamp_min(1e-9)[:, None]
+    return torch.where((total > 0)[:, None], robust, plain)
+
+
 def compose(texture: torch.Tensor, tex: Texels, colour: torch.Tensor, amount: torch.Tensor) -> torch.Tensor:
     """
     ``texture`` (H, W, 3 sRGB) with the covered texels moved ``amount`` (N,) of the way to ``colour`` (N, 3,
@@ -832,10 +984,11 @@ def project_picture(mesh: Any, cutout: Any, tex: Texels, texture: torch.Tensor, 
 
 # --- The painter --------------------------------------------------------------------------------------
 
-# paint(render, picture, neighbour, seed) -> painted view: the editing model. ``render`` is the view to
+# paint(render, picture, neighbour, seed, view) -> painted view: the editing model. ``render`` is the view to
 # repaint (its size is the camera's), ``picture`` the picture as a reference, ``neighbour`` the painted view
-# nearest to this one (None for the first)
-Painter = Callable[[Image.Image, Image.Image, Optional[Image.Image], int], Image.Image]
+# nearest to this one (None for the first), ``view`` what the view is: {"name", "side" (describe's words),
+# "colours" (main_colours of the picture)}
+Painter = Callable[[Image.Image, Image.Image, Optional[Image.Image], int, dict], Image.Image]
 
 
 @dataclass
@@ -868,6 +1021,7 @@ class Result:
     texture: Image.Image  # the new base colour texture (before the picture's projection, which goes on top)
     views: list  # View, in the order they were painted
     report: dict
+    robust: Optional[Image.Image] = None  # the same views blended robustly (robust_colour)
 
 
 def _sync(device: torch.device) -> None:
@@ -884,6 +1038,7 @@ def paint_views(
     seed: int = 0,
     attempts: int = 2,
     min_iou: float = MIN_IOU,
+    max_novelty: float = MAX_NOVELTY,
     full_weight: float = FULL_WEIGHT,
     match_colour: bool = True,
     device: Optional[Any] = None,
@@ -897,8 +1052,9 @@ def paint_views(
     model sees it). ``cameras`` defaults to ``ring`` round the picture's camera (``camera_options`` go to
     ``ring``: elevation, around, top, bottom, perspective, margin, pixels); they are painted nearest the
     picture first. Each view gets ``attempts`` tries (seeds ``seed + 100 * view + attempt``) to reach
-    ``min_iou``. ``match_colour`` scales each view to the colours already established. The mesh isn't
-    changed.
+    ``min_iou`` with no more than ``max_novelty``. ``match_colour`` scales each view to the colours already
+    established. The mesh isn't changed. The result has the views blended by weight (``texture``) and
+    robustly (``robust``).
     """
     device = _device(device)
     started = time.perf_counter()
@@ -920,6 +1076,7 @@ def paint_views(
         clock("projection_s")
         log(f"[paint] picture: {picture.report}")
         reference = picture_reference(cutout)
+        colours = main_colours(cutout)
         if cameras is None:
             cameras = ring(geom.verts, picture.azimuth, **camera_options)
         ordered = by_angle(cameras, picture.azimuth, picture.elevation)
@@ -932,6 +1089,7 @@ def paint_views(
         blend = Blend(tex.flat.numel(), device)
         views: list[View] = []
         weights: list = []  # (view, its weight at each texel), for the shares at the end
+        kept: list = []  # every accepted view's samples, for the robust blend
         for number, camera in enumerate(ordered):
             view_started = time.perf_counter()
             shot = render(geom, current, camera)
@@ -942,11 +1100,12 @@ def paint_views(
             if accepted:
                 nearest = min(accepted, key=lambda v: angle_between(v.camera.direction(), camera.direction()))
                 neighbour = nearest.aligned
+            about = {"name": camera.name, "side": describe(camera, picture.azimuth, picture.elevation), "colours": colours}
             chosen = None
             for attempt in range(max(1, attempts)):
                 attempt_seed = seed + 100 * number + attempt
                 clock_paint = time.perf_counter()
-                painted = paint(view.render, reference, neighbour, attempt_seed)
+                painted = paint(view.render, reference, neighbour, attempt_seed, about)
                 paint_s = round(time.perf_counter() - clock_paint, 3)
                 if painted.size != camera.size:
                     painted = painted.convert("RGB").resize(camera.size, Image.Resampling.LANCZOS)
@@ -954,13 +1113,17 @@ def paint_views(
                 image = as_tensor(view.painted, device)
                 mask = object_mask(image, shot.mask)
                 fit = align(mask, shot.mask)
-                view.attempts.append({"seed": attempt_seed, "paint_s": paint_s, **fit.as_dict()})
-                log(f"[paint] {camera.name}: attempt {attempt + 1}, {fit.as_dict()}, {paint_s} s")
-                if fit.iou >= min_iou:
+                new = novelty(shot.image, warp(image, fit), shot.mask) if fit.iou >= min_iou else None
+                entry = {"seed": attempt_seed, "paint_s": paint_s, **fit.as_dict()}
+                if new is not None:
+                    entry["novelty"] = round(new, 3)
+                view.attempts.append(entry)
+                log(f"[paint] {camera.name}: attempt {attempt + 1}, {entry}")
+                if fit.iou >= min_iou and new is not None and new <= max_novelty:
                     chosen = (image, mask, fit)
                     break
             if chosen is None:
-                log(f"[paint] {camera.name}: left out (IoU under {min_iou})")
+                log(f"[paint] {camera.name}: left out (IoU under {min_iou} or novelty over {max_novelty})")
                 views.append(view)
                 clock("views_s")
                 continue
@@ -978,6 +1141,7 @@ def paint_views(
                     view.gains = [round(float(g), 3) for g in found]
             blend.add(samples)
             weights.append((view, samples.weight))
+            kept.append(samples)
             # The next render shows the views over the picture's paint (kept where the picture was used)
             amount = blend.amount(full_weight) * (1 - protect)
             current = compose(anchor, tex, blend.colour(), amount)
@@ -990,6 +1154,8 @@ def paint_views(
         # The views over the original texture: the picture's projection goes on top afterwards
         amount = blend.amount(full_weight)
         final = compose(texture, tex, blend.colour(), amount)
+        robust = compose(texture, tex, robust_colour(kept), amount) if kept else final
+        del kept
         for view, weight in weights:
             view.texels = int((amount * weight / blend.total.clamp_min(1e-9) > 0.5).sum())
         del weights
@@ -998,6 +1164,7 @@ def paint_views(
     report = {
         "picture": picture.report,
         "picture_camera": {"azimuth": round(picture.azimuth, 1), "elevation": round(picture.elevation, 1)},
+        "colours": colours,
         "views": [view.as_dict() for view in views],
         "accepted": sum(view.accepted for view in views),
         "texels": int(tex.flat.numel()),
@@ -1006,7 +1173,7 @@ def paint_views(
         "flipped": geom.flipped,
         "timings": {**timings, "total_s": round(time.perf_counter() - started, 3)},
     }
-    return Result(texture=as_image(final, alpha), views=views, report=report)
+    return Result(texture=as_image(final, alpha), views=views, report=report, robust=as_image(robust, alpha))
 
 
 # --- Review sheets ------------------------------------------------------------------------------------
