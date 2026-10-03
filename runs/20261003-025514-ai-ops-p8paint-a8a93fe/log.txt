@@ -1,0 +1,766 @@
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+✓ Initialized. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-FryEWEhPtLy2ClkfFzZNG1
+✓ Created objects.
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/modal_app.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/ops/exp_paint.py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/pixal3d/scripts/download_weights.p
+│   y
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/job_api.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/pixal3d/pixal3d_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/reference_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/scripts/download_weights
+│   .py
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/multiview/multiview_worker
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/flux-schnell/scripts/download_weig
+│   hts.py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/multiview/mvadapter
+├── ✓ Uploaded 
+│   /home/runner/work/Forge3D/Forge3D/workers/trellis2/scripts/download_weights.
+│   py
+├── ✓ Uploaded /home/runner/work/Forge3D/Forge3D/workers/trellis2/forge3d_worker
+├── ✓ Created Function make_model.
+├── ✓ Created Function api
+│   └── https://lobstermeeat--orainge-p8-paint-api-dev.modal.run 
+│       (unauthenticated)
+├── ✓ Created Function FluxSchnell.*.
+├── ✓ Created Function download_models.
+├── ✓ Created Function MultiView.*.
+├── ✓ Created Function GeometryViews.*.
+├── ✓ Created Function Trellis2.*.
+├── ✓ Created Function Shapes.*.
+├── ✓ Created Function fetch_weights.
+└── ✓ Created Function Painter.*.
+[paint] app orainge-p8-paint: shapes bmw,04,06,08,12,13; paint bmw,04; variants ['edit', 'edit-ref', 'i2i-ref-91', 'i2i-ref-80', 'i2i-80']
+[paint] making 5 shapes: 04, 06, 08, 12, 13
+[SPARSE] Conv backend: flex_gemm; Attention backend: flash_attn
+[ATTENTION] Using backend: flash_attn
+[SPARSE] Conv backend: flex_gemm; Attention backend: flash_attn
+[ATTENTION] Using backend: flash_attn
+[SPARSE] Conv backend: flex_gemm; Attention backend: flash_attn
+[ATTENTION] Using backend: flash_attn
+[shapes] TRELLIS.2 on NVIDIA L40S in 90.9 s
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:02,  4.51it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:02,  4.88it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  4.98it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  5.05it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  5.07it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  5.09it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:00,  5.09it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  5.11it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  5.11it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:01<00:00,  5.11it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.69it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.53it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:02,  4.85it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  5.39it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  5.57it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  5.71it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:01,  5.78it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  5.82it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:00,  5.84it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  5.86it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  5.87it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00,  7.73it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  6.60it/s]
+[shapes] TRELLIS.2 on NVIDIA L40S in 91.1 s
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:10,  1.09it/s]
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:02,  4.35it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:02,  4.76it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  4.91it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.97it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:01<00:09,  1.09it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  5.00it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  5.01it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:00,  5.03it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  5.06it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:02<00:08,  1.09it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  5.05it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  5.08it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.62it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.45it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:02,  4.85it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  5.31it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:03<00:07,  1.09it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  5.47it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  5.55it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:01,  5.58it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  5.63it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:00,  5.66it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:04<00:06,  1.09it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  5.70it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  5.68it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00,  7.48it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  6.41it/s]
+
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:05<00:05,  1.09it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:06<00:04,  1.09it/s]
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:05,  1.97it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:07<00:03,  1.08it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:01<00:05,  1.97it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:01<00:04,  1.97it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:08<00:02,  1.08it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:02<00:04,  1.96it/s]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:08<00:01,  1.28it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:02<00:03,  1.96it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:09<00:00,  1.47it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:03<00:03,  1.96it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:09<00:00,  1.63it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:09<00:00,  1.24it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:03<00:02,  1.96it/s]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:00<00:05,  2.16it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:04<00:02,  1.96it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:04,  2.14it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:04<00:01,  1.95it/s]
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:01<00:04,  2.15it/s]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:04<00:00,  2.31it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:01<00:03,  2.15it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:05<00:00,  2.65it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:05<00:00,  2.93it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:05<00:00,  2.24it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:02<00:03,  2.15it/s]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:00<00:02,  3.98it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:02,  3.95it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:02<00:02,  2.15it/s]
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:00<00:02,  3.93it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:01<00:02,  3.92it/s]
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:03<00:02,  2.16it/s]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:01<00:01,  3.92it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:01<00:01,  3.92it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:03<00:01,  2.16it/s]
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:01<00:01,  3.92it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:02<00:01,  3.92it/s]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:04<00:01,  2.16it/s]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:02<00:00,  3.92it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:04<00:00,  2.16it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:02<00:00,  3.93it/s]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:02<00:00,  3.92it/s]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:05<00:00,  2.16it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:03<00:00,  3.92it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:03<00:00,  3.92it/s]
+
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:05<00:00,  2.16it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:05<00:00,  2.15it/s]
+/usr/local/lib/python3.10/site-packages/cumesh/remeshing.py:220: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:62.)
+  normals0 = torch.cross(mesh_vertices[atempt_triangles_0[:, 1]] - mesh_vertices[atempt_triangles_0[:, 0]], mesh_vertices[atempt_triangles_0[:, 2]] - mesh_vertices[atempt_triangles_0[:, 0]])
+/usr/local/lib/python3.10/site-packages/cumesh/remeshing.py:220: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:62.)
+  normals0 = torch.cross(mesh_vertices[atempt_triangles_0[:, 1]] - mesh_vertices[atempt_triangles_0[:, 0]], mesh_vertices[atempt_triangles_0[:, 2]] - mesh_vertices[atempt_triangles_0[:, 0]])
+[shapes] TRELLIS.2 on NVIDIA L40S in 91.2 s
+
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:02,  4.63it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:02,  4.87it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  4.96it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  4.98it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:01<00:01,  4.99it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  5.00it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:00,  5.01it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  5.02it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  5.02it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:02<00:00,  5.04it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.93it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.45it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:02,  4.28it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:02,  4.63it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  4.78it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  4.82it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:01<00:01,  4.83it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  4.85it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:01,  4.88it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  4.86it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  4.87it/s]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:01<00:00,  5.75it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:02<00:00,  6.56it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  7.29it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  5.51it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9914, "colour": 0.5118, "coverage": 0.1452, "pose": {"azimuth": 347.5, "elevation": -5.0, "roll": 0.0, "fov": 0.0, "scale": 1.009, "shift": [-0.0003, 0.0034]}, "mode": "detail only", "decals": 2224, "seconds": 1.206}
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9846, "colour": 0.5542, "coverage": 0.14, "pose": {"azimuth": 338.1, "elevation": 2.5, "roll": 0.0, "fov": 18.7, "scale": 1.0, "shift": [0.0006, -0.0044]}, "mode": "recolour and detail", "recoloured": [{"from": "#6f1e22", "to": "#a98086", "share": 0.015}], "decals": 51, "seconds": 1.235}
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:01<00:15,  1.45s/it]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:02<00:14,  1.44s/it]
+[shapes] 06: {"name": "06", "seed": 1654818878, "prompt": "a wooden shield with a lion painted on it", "source": "phase2-06-wooden-shield-with-a-lion", "voxel_size": 0.0009765625, "triangles": 98913, "pipeline": "1024_cascade", "timings": {"generate_s": 15.7, "export_s": 19.654, "compress_s": 1.24, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9914, "colour": 0.5118, "coverage": 0.1452, "pose": {"azimuth": 347.5, "elevation": -5.0, "roll": 0.0, "fov": 0.0, "scale": 1.009, "shift": [-0.0003, 0.0034]}, "mode": "detail only", "decals": 2224, "seconds": 1.206}, "seconds": 36.6, "keep_s": 2.4, "peak_gpu_gb": 20.3, "gpu": "NVIDIA L40S", "load_s": 91.1, "call": 1}
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:04<00:13,  1.44s/it]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:05<00:11,  1.44s/it]
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.47it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.53it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  5.28it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  5.18it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:00<00:01,  5.12it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:07<00:10,  1.44s/it]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  5.07it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:00,  5.03it/s]
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  5.04it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  5.05it/s]
+[shapes] 04: {"name": "04", "seed": 949054593, "prompt": "a retro arcade machine", "source": "phase2-04-retro-arcade-machine", "voxel_size": 0.0009765625, "triangles": 98029, "pipeline": "1024_cascade", "timings": {"generate_s": 21.635, "export_s": 21.376, "compress_s": 1.029, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9846, "colour": 0.5542, "coverage": 0.14, "pose": {"azimuth": 338.1, "elevation": 2.5, "roll": 0.0, "fov": 18.7, "scale": 1.0, "shift": [0.0006, -0.0044]}, "mode": "recolour and detail", "recoloured": [{"from": "#6f1e22", "to": "#a98086", "share": 0.015}], "decals": 51, "seconds": 1.235}, "seconds": 44.1, "keep_s": 1.8, "peak_gpu_gb": 22.2, "gpu": "NVIDIA L40S", "load_s": 90.9, "call": 1}
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:01<00:00,  5.05it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  6.59it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.59it/s]
+
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:08<00:08,  1.45s/it]
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:01,  5.73it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:01,  5.65it/s]
+[1ASampling sparse structure:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  5.65it/s]
+[1ASampling sparse structure:   8%|▊         | 1/12 [00:00<00:01,  6.52it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  5.64it/s]
+[1ASampling sparse structure:  17%|█▋        | 2/12 [00:00<00:01,  5.54it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:00<00:01,  5.64it/s]
+[1ASampling sparse structure:  25%|██▌       | 3/12 [00:00<00:01,  5.33it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  5.67it/s]
+[1ASampling sparse structure:  33%|███▎      | 4/12 [00:00<00:01,  5.20it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:00,  5.69it/s]
+[1ASampling sparse structure:  42%|████▏     | 5/12 [00:00<00:01,  5.13it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  5.71it/s]
+[1ASampling sparse structure:  50%|█████     | 6/12 [00:01<00:01,  5.07it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  5.73it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:10<00:07,  1.45s/it]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:01<00:00,  7.46it/s]
+[1ASampling sparse structure:  58%|█████▊    | 7/12 [00:01<00:00,  5.06it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:01<00:00,  6.50it/s]
+
+[1ASampling sparse structure:  67%|██████▋   | 8/12 [00:01<00:00,  5.02it/s]
+[1ASampling sparse structure:  75%|███████▌  | 9/12 [00:01<00:00,  5.03it/s]
+[1ASampling sparse structure:  83%|████████▎ | 10/12 [00:01<00:00,  5.04it/s]
+[1ASampling sparse structure:  92%|█████████▏| 11/12 [00:02<00:00,  5.93it/s]
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling sparse structure: 100%|██████████| 12/12 [00:02<00:00,  5.59it/s]
+
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:02,  4.45it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:00<00:02,  4.75it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:02,  4.41it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:00<00:02,  4.84it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:11<00:05,  1.45s/it]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:02,  4.40it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:00<00:01,  4.84it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  4.40it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:00<00:01,  4.84it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:01<00:01,  4.84it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:01<00:01,  4.40it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  4.83it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:01<00:01,  4.39it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:01,  4.83it/s]
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:01<00:01,  4.41it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  4.82it/s]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:01<00:00,  4.40it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:01<00:00,  4.83it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:02<00:00,  4.41it/s]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:01<00:00,  5.70it/s]
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:13<00:04,  1.45s/it]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:02<00:00,  5.21it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:02<00:00,  6.50it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  7.22it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:02<00:00,  5.92it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  5.51it/s]
+
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  6.57it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:02<00:00,  5.02it/s]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:00<00:01,  8.69it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:00<00:01,  8.70it/s]
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:00<00:01,  8.71it/s]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:13<00:02,  1.22s/it]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:00<00:00,  8.71it/s]
+[1ASampling shape SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:00<00:00,  8.71it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:00<00:00,  8.72it/s]
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:00<00:00,  8.73it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:00<00:00,  8.74it/s]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:01<00:00,  8.76it/s]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:14<00:01,  1.07s/it]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:01<00:00,  8.75it/s]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:01<00:00,  8.76it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:01<00:00,  8.73it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:01<00:00,  8.73it/s]
+
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:15<00:00,  1.04it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:15<00:00,  1.26s/it]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling shape SLat:   8%|▊         | 1/12 [00:01<00:15,  1.45s/it]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:00<00:07,  1.39it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:01<00:07,  1.38it/s]
+[1ASampling shape SLat:  17%|█▋        | 2/12 [00:02<00:14,  1.45s/it]
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:02<00:06,  1.38it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:02<00:05,  1.38it/s]
+[1ASampling shape SLat:  25%|██▌       | 3/12 [00:04<00:13,  1.45s/it]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:03<00:05,  1.38it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:04<00:04,  1.38it/s]
+[1ASampling shape SLat:  33%|███▎      | 4/12 [00:05<00:11,  1.45s/it]
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:05<00:03,  1.38it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:05<00:02,  1.37it/s]
+[1ASampling shape SLat:  42%|████▏     | 5/12 [00:07<00:10,  1.45s/it]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:06<00:02,  1.37it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:07<00:01,  1.37it/s]
+[1ASampling shape SLat:  50%|█████     | 6/12 [00:08<00:08,  1.46s/it]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:07<00:00,  1.38it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:08<00:00,  1.37it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:08<00:00,  1.38it/s]
+
+[1ASampling shape SLat:  58%|█████▊    | 7/12 [00:10<00:07,  1.46s/it]
+[1ASampling shape SLat:  67%|██████▋   | 8/12 [00:11<00:05,  1.46s/it]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9502, "colour": 0.082, "coverage": 0.1618, "pose": {"azimuth": 0.0, "elevation": 48.1, "roll": 0.0, "fov": 15.8, "scale": 1.004, "shift": [0.0019, -0.0012]}, "mode": "detail only", "decals": 429, "seconds": 0.378}
+[1ASampling shape SLat:  75%|███████▌  | 9/12 [00:13<00:04,  1.46s/it]
+[1ASampling shape SLat:  83%|████████▎ | 10/12 [00:13<00:02,  1.23s/it]
+[1ASampling shape SLat:  92%|█████████▏| 11/12 [00:14<00:01,  1.08s/it]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:15<00:00,  1.03it/s]
+[1ASampling shape SLat: 100%|██████████| 12/12 [00:15<00:00,  1.28s/it]
+
+[1ASampling texture SLat:   0%|          | 0/12 [00:00<?, ?it/s]
+[1ASampling texture SLat:   8%|▊         | 1/12 [00:00<00:08,  1.37it/s]
+[1ASampling texture SLat:  17%|█▋        | 2/12 [00:01<00:07,  1.37it/s]/usr/local/lib/python3.10/site-packages/cumesh/remeshing.py:220: UserWarning: Using torch.cross without specifying the dim arg is deprecated.
+Please either pass the dim explicitly or simply use torch.linalg.cross.
+The default value of dim will change to agree with that of linalg.cross in a future release. (Triggered internally at /pytorch/aten/src/ATen/native/Cross.cpp:62.)
+  normals0 = torch.cross(mesh_vertices[atempt_triangles_0[:, 1]] - mesh_vertices[atempt_triangles_0[:, 0]], mesh_vertices[atempt_triangles_0[:, 2]] - mesh_vertices[atempt_triangles_0[:, 0]])
+
+[1ASampling texture SLat:  25%|██▌       | 3/12 [00:02<00:06,  1.37it/s]
+[1ASampling texture SLat:  33%|███▎      | 4/12 [00:02<00:05,  1.37it/s]
+[1ASampling texture SLat:  42%|████▏     | 5/12 [00:03<00:05,  1.36it/s]
+[1ASampling texture SLat:  50%|█████     | 6/12 [00:04<00:04,  1.37it/s]
+[shapes] 12: {"name": "12", "seed": 821889765, "prompt": "a skateboard with graffiti art", "source": "phase2-12-skateboard-with-graffiti-art", "voxel_size": 0.0009765625, "triangles": 96715, "pipeline": "1024_cascade", "timings": {"generate_s": 9.168, "export_s": 15.906, "compress_s": 1.237, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9502, "colour": 0.082, "coverage": 0.1618, "pose": {"azimuth": 0.0, "elevation": 48.1, "roll": 0.0, "fov": 15.8, "scale": 1.004, "shift": [0.0019, -0.0012]}, "mode": "detail only", "decals": 429, "seconds": 0.378}, "seconds": 26.3, "keep_s": 2.68, "peak_gpu_gb": 18.5, "gpu": "NVIDIA L40S", "load_s": 91.1, "call": 2}
+[1ASampling texture SLat:  58%|█████▊    | 7/12 [00:05<00:03,  1.37it/s]
+[1ASampling texture SLat:  67%|██████▋   | 8/12 [00:05<00:02,  1.36it/s]
+[1ASampling texture SLat:  75%|███████▌  | 9/12 [00:06<00:02,  1.36it/s]
+[1ASampling texture SLat:  83%|████████▎ | 10/12 [00:07<00:01,  1.37it/s]
+[1ASampling texture SLat:  92%|█████████▏| 11/12 [00:08<00:00,  1.36it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:08<00:00,  1.36it/s]
+[1ASampling texture SLat: 100%|██████████| 12/12 [00:08<00:00,  1.36it/s]
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9547, "colour": 0.7011, "coverage": 0.0647, "pose": {"azimuth": 0.0, "elevation": 6.2, "roll": 0.0, "fov": 18.7, "scale": 0.968, "shift": [0.0069, -0.0019]}, "mode": "detail only", "decals": 143, "seconds": 1.162}
+[shapes] 08: {"name": "08", "seed": 849334850, "prompt": "a vintage film camera", "source": "phase2-08-vintage-film-camera", "voxel_size": 0.0009765625, "triangles": 93995, "pipeline": "1024_cascade", "timings": {"generate_s": 31.228, "export_s": 23.445, "compress_s": 1.262, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9547, "colour": 0.7011, "coverage": 0.0647, "pose": {"azimuth": 0.0, "elevation": 6.2, "roll": 0.0, "fov": 18.7, "scale": 0.968, "shift": [0.0069, -0.0019]}, "mode": "detail only", "decals": 143, "seconds": 1.162}, "seconds": 56.0, "keep_s": 2.84, "peak_gpu_gb": 23.5, "gpu": "NVIDIA L40S", "load_s": 91.2, "call": 1}
+[forge3d] projection: {"applied": true, "reason": "applied", "iou": 0.9844, "colour": 0.5639, "coverage": 0.0785, "pose": {"azimuth": 34.4, "elevation": 11.2, "roll": -1.0, "fov": 27.5, "scale": 1.001, "shift": [0.0016, -0.0019]}, "mode": "detail only", "decals": 459, "seconds": 0.842}
+an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7efdcbc27ba0>
+asyncgen: <async_generator object Synchronizer._run_generator_async at 0x7efdcbc27ba0>
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_utils/async_utils.py", line 856, in __iter__
+    yield from run_async_gen(runner, self._async_iterable)
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7efdcbcbb9c0>
+asyncgen: <async_generator object async_merge at 0x7efdcbcbb9c0>
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_utils/async_utils.py", line 856, in __iter__
+    yield from run_async_gen(runner, self._async_iterable)
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object _Function._map at 0x7efdcba63de0>
+asyncgen: <async_generator object _Function._map at 0x7efdcba63de0>
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_utils/async_utils.py", line 856, in __iter__
+    yield from run_async_gen(runner, self._async_iterable)
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+RuntimeError: aclose(): asynchronous generator is already running
+[paint] weights: {"repo": "black-forest-labs/FLUX.2-klein-4B", "revision": "e7b7dc27f91deacad38e78976d1f2b499d76a294", "bytes": 15980152900, "files": 21, "license_md_head": "Apache License Version 2.0, January 2004 http://www.apache.org/licenses/ TERMS AND CONDITIONS FOR USE,", "readme_license": ["license: apache-2.0", "5. Open weights available for commercial use under the [Apache 2.0 license](https://www.apache.org/licenses/LICENSE-2.0).", "Nothing contained in this Model Card should be interpreted as or deemed a restriction or modification to the license the model is released under.", "4. Release decision. After safety fine-tuning and prior to release, we conducted a final third-party evaluation of the proposed release checkpoints, focused on T2I and I2I generation of synthetic CSAM and NCII, including a comparison with other open-weight T2I and I2I models. The final FLUX.2 [klein] checkpoints demonstrated high resilience against violative inputs in complex generation and editing tasks, and demonstrated higher resilience than leading open-weight models across these risk categories. Based on these findings, we approved the release of the open-weight FLUX.2 [klein] 4B models under an Apache 2.0 license and the release of the FLUX.2 [klein] 9B models under a non-commercial license to support third-party research and development.", "5. Inference filters. The repository for the FLUX.2 [klein] models includes filters for NSFW and protected content in inputs and outputs. Filters or manual review must be used with the FLUX.2 [klein] 9B models under the terms of the FLUX Non-Commercial License, and we encourage deployers to implement these mitigations when using the FLUX.2 [klein] 4B models. Where we implement these features on our own hosted services, we may apply multiple filters to intercept text prompts, uploaded images, and output images. We utilize both in-house and third-party filters to mitigate against harmful outputs, such as CSAM and NCII outputs, including filters provided by https://thehive.ai/ and https://www.microsoft.com/.", "7. Policies. Acceptable use of our models and access to our API are governed by policies set out in applicable documentation, including FLUX Non-Commercial License (for our non-commercial open-weight users); Developer Terms of Service, Self-Hosted Commercial License Terms, and Usage Policy (for our commercial open-weight model users); and Developer Terms of Service, FLUX API Service Terms, and Usage Policy (for our API users). These prohibit the generation of unlawful content or the use of generated content for unlawful, defamatory, or abusive purposes.", "License", "This model is licensed under the https://www.apache.org/licenses/LICENSE-2.0."], "seconds": 42.7, "cached": true}
+[shapes] 13: {"name": "13", "seed": 207648777, "prompt": "a cute cartoon car, bright blue", "source": "phase2-13-cute-cartoon-car-bright-blue", "voxel_size": 0.0009765625, "triangles": 95790, "pipeline": "1024_cascade", "timings": {"generate_s": 30.588, "export_s": 22.085, "compress_s": 1.209, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9844, "colour": 0.5639, "coverage": 0.0785, "pose": {"azimuth": 34.4, "elevation": 11.2, "roll": -1.0, "fov": 27.5, "scale": 1.001, "shift": [0.0016, -0.0019]}, "mode": "detail only", "decals": 459, "seconds": 0.842}, "seconds": 53.9, "keep_s": 2.57, "peak_gpu_gb": 23.4, "gpu": "NVIDIA L40S", "load_s": 90.9, "call": 2}
+[paint] painting 10: {"around": 8, "elevation": 15.0, "attempts": 2, "min_iou": 0.9, "steps": 4, "bottom": true}
+/usr/local/lib/python3.11/site-packages/diffusers/utils/deprecation_utils.py:23: FutureWarning: `torch_dtype` is deprecated and will be removed in version 1.0.0. Please use `dtype` instead.
+  deprecate("torch_dtype", "1.0.0", _TORCH_DTYPE_DEPRECATION_MESSAGE)
+
+[1ALoading pipeline components...:   0%|          | 0/5 [00:00<?, ?it/s]/usr/local/lib/python3.11/site-packages/diffusers/utils/deprecation_utils.py:23: FutureWarning: `torch_dtype` is deprecated and will be removed in version 1.0.0. Please use `dtype` instead.
+  deprecate("torch_dtype", "1.0.0", _TORCH_DTYPE_DEPRECATION_MESSAGE)
+
+[1ALoading pipeline components...:  20%|██        | 1/5 [00:01<00:04,  1.19s/it]
+
+[1A
+[1ALoading weights:   0%|          | 0/398 [00:00<?, ?it/s][A
+
+[1A
+[1ALoading weights:   3%|▎         | 13/398 [00:00<00:03, 125.97it/s][A
+
+[1A
+[1ALoading weights:   7%|▋         | 26/398 [00:00<00:03, 114.81it/s][A
+
+[1A
+[1ALoading weights:  10%|▉         | 38/398 [00:00<00:03, 94.09it/s] [A
+
+[1A
+[1ALoading weights:  12%|█▏        | 49/398 [00:00<00:03, 96.67it/s][A
+
+[1A
+[1ALoading weights:  15%|█▍        | 59/398 [00:00<00:03, 97.36it/s][A
+
+[1A
+[1ALoading weights:  17%|█▋        | 69/398 [00:00<00:03, 97.00it/s][A
+
+[1A
+[1ALoading weights:  20%|█▉        | 79/398 [00:00<00:03, 84.52it/s][A
+
+[1A
+[1ALoading weights:  22%|██▏       | 88/398 [00:00<00:03, 81.10it/s][A
+
+[1A
+[1ALoading weights:  24%|██▍       | 97/398 [00:01<00:03, 81.59it/s][A
+
+[1A
+[1ALoading weights:  27%|██▋       | 106/398 [00:01<00:03, 75.97it/s][A
+
+[1A
+[1ALoading weights:  29%|██▊       | 114/398 [00:01<00:03, 74.62it/s][A
+
+[1A
+[1ALoading weights:  31%|███       | 123/398 [00:01<00:03, 76.50it/s][A
+
+[1A
+[1ALoading weights:  33%|███▎      | 131/398 [00:01<00:03, 73.29it/s][A
+[1ALoading pipeline components...:   0%|          | 0/5 [00:00<?, ?it/s]
+
+[1A
+[1ALoading weights:   0%|          | 0/398 [00:00<?, ?it/s][A
+
+[1A
+[1ALoading weights:   3%|▎         | 11/398 [00:00<00:03, 100.34it/s][A
+
+[1A
+[1ALoading weights:   6%|▌         | 22/398 [00:00<00:03, 98.22it/s] [A
+
+[1A
+[1ALoading weights:   8%|▊         | 32/398 [00:00<00:04, 85.49it/s][A
+
+[1A
+[1ALoading weights:  10%|█         | 41/398 [00:00<00:04, 76.78it/s][A
+
+[1A
+[1ALoading weights:  12%|█▏        | 49/398 [00:00<00:04, 77.08it/s][A
+
+[1A
+[1ALoading weights:  14%|█▍        | 57/398 [00:00<00:04, 72.31it/s][A
+
+[1A
+[1ALoading weights:  16%|█▋        | 65/398 [00:00<00:04, 72.56it/s][A
+
+[1A
+[1ALoading weights:  19%|█▉        | 76/398 [00:00<00:03, 81.65it/s][A
+
+[1A
+[1ALoading weights:  21%|██▏       | 85/398 [00:01<00:04, 76.03it/s][A
+
+[1A
+[1ALoading weights:  24%|██▍       | 95/398 [00:01<00:04, 74.83it/s][A
+
+[1A
+[1ALoading weights:  27%|██▋       | 108/398 [00:01<00:03, 84.67it/s][A
+
+[1A
+[1ALoading weights:  29%|██▉       | 117/398 [00:01<00:03, 72.62it/s][A
+
+[1A
+[1ALoading weights:  32%|███▏      | 126/398 [00:01<00:03, 73.14it/s][A
+
+[1A
+[1ALoading weights:  34%|███▎      | 134/398 [00:01<00:03, 66.26it/s][A
+
+[1A
+[1ALoading weights:  35%|███▍      | 139/398 [00:01<00:03, 74.24it/s][A
+
+[1A
+[1ALoading weights:  37%|███▋      | 148/398 [00:01<00:03, 71.76it/s][A
+
+
+[1A
+[1ALoading weights:  36%|███▌      | 142/398 [00:01<00:03, 67.39it/s][A
+
+[1A
+[1ALoading weights:  37%|███▋      | 149/398 [00:02<00:03, 65.26it/s][A
+[1ALoading weights: 100%|██████████| 398/398 [00:02<00:00, 190.51it/s]
+
+[1ALoading pipeline components...:  20%|██        | 1/5 [00:02<00:09,  2.36s/it]
+[1A
+[1ALoading weights:  39%|███▉      | 156/398 [00:01<00:03, 71.76it/s][A
+[1ALoading weights: 100%|██████████| 398/398 [00:01<00:00, 201.83it/s]
+
+[1ALoading pipeline components...:  60%|██████    | 3/5 [00:03<00:02,  1.15s/it]
+[1ALoading pipeline components...:  80%|████████  | 4/5 [00:03<00:00,  1.26it/s]
+[1ALoading pipeline components...: 100%|██████████| 5/5 [00:04<00:00,  1.28it/s]
+[1ALoading pipeline components...: 100%|██████████| 5/5 [00:04<00:00,  1.15it/s]
+
+[1ALoading pipeline components...:  40%|████      | 2/5 [00:03<00:04,  1.41s/it]
+[1ALoading pipeline components...:  80%|████████  | 4/5 [00:03<00:00,  1.79it/s]
+[1ALoading pipeline components...: 100%|██████████| 5/5 [00:05<00:00,  1.08s/it]
+[1ALoading pipeline components...: 100%|██████████| 5/5 [00:05<00:00,  1.09s/it]
+/usr/local/lib/python3.11/site-packages/diffusers/utils/deprecation_utils.py:23: FutureWarning: `torch_dtype` is deprecated and will be removed in version 1.0.0. Please use `dtype` instead.
+  deprecate("torch_dtype", "1.0.0", _TORCH_DTYPE_DEPRECATION_MESSAGE)
+
+[1ALoading pipeline components...:   0%|          | 0/5 [00:00<?, ?it/s]
+
+[1A
+[1ALoading weights:   0%|          | 0/398 [00:00<?, ?it/s][A
+
+[1A
+[1ALoading weights:   2%|▏         | 7/398 [00:00<00:05, 65.65it/s][A
+
+[1A
+[1ALoading weights:   4%|▎         | 14/398 [00:00<00:06, 59.06it/s][A
+
+[1A
+[1ALoading weights:   7%|▋         | 26/398 [00:00<00:04, 83.28it/s][A
+
+[1A
+[1ALoading weights:   9%|▉         | 36/398 [00:00<00:04, 80.96it/s][A
+
+[1A
+[1ALoading weights:  12%|█▏        | 46/398 [00:00<00:04, 84.02it/s][A
+
+[1A
+[1ALoading weights:  14%|█▍        | 56/398 [00:00<00:04, 84.79it/s][AThere are modules in Flux2Transformer2DModel that should be kept in float32: []. Casting directly with `to()` can lead to inconsistent results; set `torch_dtype` in `from_pretrained()` instead to keep these modules in float32.
+
+
+[1A
+[1ALoading weights:  16%|█▋        | 65/398 [00:00<00:03, 83.75it/s][A
+
+[1A
+[1ALoading weights:  19%|█▉        | 77/398 [00:00<00:03, 92.46it/s][AThere are modules in AutoencoderKLFlux2 that should be kept in float32: []. Casting directly with `to()` can lead to inconsistent results; set `torch_dtype` in `from_pretrained()` instead to keep these modules in float32.
+[painter] klein on NVIDIA L40S in 10.4 s
+
+
+[1A
+[1ALoading weights:  22%|██▏       | 87/398 [00:01<00:03, 90.75it/s][A
+
+[1A
+[1ALoading weights:  25%|██▍       | 98/398 [00:01<00:03, 94.92it/s][A
+
+[1A
+[1ALoading weights:  27%|██▋       | 108/398 [00:01<00:03, 94.71it/s][A
+
+[1A
+[1ALoading weights:  30%|███       | 120/398 [00:01<00:02, 99.10it/s][A
+
+[1A
+[1ALoading weights:  33%|███▎      | 133/398 [00:01<00:02, 107.59it/s][A
+
+[1A
+[1ALoading weights:  36%|███▋      | 145/398 [00:01<00:02, 108.43it/s][A
+
+[1A
+[1ALoading weights:  39%|███▉      | 156/398 [00:01<00:02, 102.16it/s][A
+
+[1A
+[1ALoading weights:  42%|████▏     | 167/398 [00:01<00:02, 90.57it/s] [A
+
+[1A
+[1ALoading weights:  44%|████▍     | 177/398 [00:01<00:02, 86.89it/s][A
+[1ALoading weights: 100%|██████████| 398/398 [00:01<00:00, 200.55it/s]
+
+[1ALoading pipeline components...:  20%|██        | 1/5 [00:02<00:08,  2.21s/it]There are modules in Flux2Transformer2DModel that should be kept in float32: []. Casting directly with `to()` can lead to inconsistent results; set `torch_dtype` in `from_pretrained()` instead to keep these modules in float32.
+
+[1ALoading pipeline components...:  40%|████      | 2/5 [00:02<00:04,  1.37s/it]There are modules in AutoencoderKLFlux2 that should be kept in float32: []. Casting directly with `to()` can lead to inconsistent results; set `torch_dtype` in `from_pretrained()` instead to keep these modules in float32.
+[painter] klein on NVIDIA L40S in 11.0 s
+
+[1ALoading pipeline components...:  60%|██████    | 3/5 [00:03<00:02,  1.02s/it]
+[1ALoading pipeline components...: 100%|██████████| 5/5 [00:03<00:00,  1.35it/s]
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9744, 'colour': 0.5055, 'coverage': 0.0533, 'pose': {'azimuth': 33.8, 'elevation': 1.2, 'roll': -1.0, 'fov': 29.0, 'scale': 0.999, 'shift': [0.0019, 0.0]}, 'mode': 'detail only', 'decals': 391, 'seconds': 1.924}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9744, 'colour': 0.5055, 'coverage': 0.0533, 'pose': {'azimuth': 33.8, 'elevation': 1.2, 'roll': -1.0, 'fov': 29.0, 'scale': 0.999, 'shift': [0.0019, 0.0]}, 'mode': 'detail only', 'decals': 391, 'seconds': 1.652}
+There are modules in Flux2Transformer2DModel that should be kept in float32: []. Casting directly with `to()` can lead to inconsistent results; set `torch_dtype` in `from_pretrained()` instead to keep these modules in float32.
+There are modules in AutoencoderKLFlux2 that should be kept in float32: []. Casting directly with `to()` can lead to inconsistent results; set `torch_dtype` in `from_pretrained()` instead to keep these modules in float32.
+[painter] klein on NVIDIA L40S in 8.9 s
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9744, 'colour': 0.5055, 'coverage': 0.0533, 'pose': {'azimuth': 33.8, 'elevation': 1.2, 'roll': -1.0, 'fov': 29.0, 'scale': 0.999, 'shift': [0.0019, 0.0]}, 'mode': 'detail only', 'decals': 391, 'seconds': 1.645}
+[paint] a000: attempt 1, {'iou_before': 0.9632, 'iou': 0.9708, 'shift': [-2.81, 5.94], 'scale': 1.0177}, 10.319 s
+[paint] a000: attempt 1, {'iou_before': 0.9596, 'iou': 0.9715, 'shift': [-5.0, 7.19], 'scale': 1.0215}, 11.508 s
+[paint] a000: attempt 1, {'iou_before': 0.998, 'iou': 0.998, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.446 s
+[paint] a045: attempt 1, {'iou_before': 0.9968, 'iou': 0.9968, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.414 s
+[paint] a045: attempt 1, {'iou_before': 0.9277, 'iou': 0.9365, 'shift': [0.0, 6.0], 'scale': 1.0151}, 10.431 s
+[paint] a045: attempt 1, {'iou_before': 0.9161, 'iou': 0.9303, 'shift': [0.0, 7.5], 'scale': 1.0202}, 11.504 s
+[paint] a315: attempt 1, {'iou_before': 0.9989, 'iou': 0.9989, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.408 s
+[paint] a315: attempt 1, {'iou_before': 0.9734, 'iou': 0.9766, 'shift': [0.62, 2.81], 'scale': 1.0063}, 10.499 s
+[paint] top: attempt 1, {'iou_before': 0.9982, 'iou': 0.9982, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.433 s
+[paint] a315: attempt 1, {'iou_before': 0.9673, 'iou': 0.9694, 'shift': [0.62, 0.62], 'scale': 1.0038}, 11.608 s
+[paint] a090: attempt 1, {'iou_before': 0.998, 'iou': 0.998, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.475 s
+[paint] top: attempt 1, {'iou_before': 0.9918, 'iou': 0.9944, 'shift': [0.0, 0.31], 'scale': 1.0019}, 10.542 s
+[paint] a270: attempt 1, {'iou_before': 0.9958, 'iou': 0.9958, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.527 s
+[paint] top: attempt 1, {'iou_before': 0.8069, 'iou': 0.8166, 'shift': [15.31, -16.25], 'scale': 0.9704}, 11.405 s
+[paint] a090: attempt 1, {'iou_before': 0.9283, 'iou': 0.9343, 'shift': [-2.25, 3.75], 'scale': 1.0164}, 10.64 s
+[paint] bottom: attempt 1, {'iou_before': 0.9974, 'iou': 0.9974, 'shift': [0.0, 0.0], 'scale': 1.0006}, 6.535 s
+[paint] top: attempt 2, {'iou_before': 0.9671, 'iou': 0.9748, 'shift': [1.56, -1.25], 'scale': 1.0082}, 11.542 s
+[paint] a135: attempt 1, {'iou_before': 0.9983, 'iou': 0.9983, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.624 s
+[paint] a270: attempt 1, {'iou_before': 0.9413, 'iou': 0.951, 'shift': [1.5, 3.38], 'scale': 1.0088}, 10.698 s
+[paint] a225: attempt 1, {'iou_before': 0.9978, 'iou': 0.9978, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.659 s
+[paint] a090: attempt 1, {'iou_before': 0.797, 'iou': 0.8445, 'shift': [-21.0, 41.25], 'scale': 1.0598}, 11.793 s
+[paint] a180: attempt 1, {'iou_before': 0.9983, 'iou': 0.9983, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.663 s
+[paint] bottom: attempt 1, {'iou_before': 0.9247, 'iou': 0.9466, 'shift': [-6.88, -11.56], 'scale': 1.0317}, 10.906 s
+[painter] bmw i2i-ref-91: {"seconds": {"paint_views": 69.8, "export": 4.3, "setup_s": 0.752, "projection_s": 1.69, "views_s": 67.247, "compose_s": 0.01, "total_s": 69.7}, "peak_gpu_gb": 35.3, "call": 1}
+[paint] a090: attempt 2, {'iou_before': 0.7817, 'iou': 0.8519, 'shift': [-16.88, 36.75], 'scale': 1.0539}, 11.753 s[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9744, 'colour': 0.5055, 'coverage': 0.0533, 'pose': {'azimuth': 33.8, 'elevation': 1.2, 'roll': -1.0, 'fov': 29.0, 'scale': 0.999, 'shift': [0.0019, 0.0]}, 'mode': 'detail only', 'decals': 391, 'seconds': 0.327}
+
+[paint] a090: left out (IoU under 0.9)
+[paint] a135: attempt 1, {'iou_before': 0.9373, 'iou': 0.9427, 'shift': [0.31, 4.06], 'scale': 1.0101}, 11.224 s
+[paint] a000: attempt 1, {'iou_before': 0.998, 'iou': 0.998, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.454 s
+[paint] a270: attempt 1, {'iou_before': 0.5962, 'iou': 0.6149, 'shift': [50.76, 53.76], 'scale': 1.0189}, 11.777 s
+[paint] a225: attempt 1, {'iou_before': 0.8979, 'iou': 0.9118, 'shift': [7.12, 10.5], 'scale': 1.0272}, 10.987 s
+[paint] a045: attempt 1, {'iou_before': 0.9969, 'iou': 0.9969, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.613 s
+[paint] a270: attempt 2, {'iou_before': 0.9461, 'iou': 0.9566, 'shift': [2.62, 3.75], 'scale': 1.0126}, 11.816 s
+[paint] a180: attempt 1, {'iou_before': 0.9401, 'iou': 0.9487, 'shift': [-1.12, 4.5], 'scale': 1.0138}, 10.901 s
+[paint] a315: attempt 1, {'iou_before': 0.9989, 'iou': 0.9989, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.569 s
+[painter] bmw edit: {"seconds": {"paint_views": 112.5, "export": 3.9, "setup_s": 1.016, "projection_s": 1.96, "views_s": 109.313, "compose_s": 0.011, "total_s": 112.299}, "peak_gpu_gb": 35.3, "call": 1}
+[paint] bmw edit: 10 of 10 views in, IoU [0.9708, 0.9365, 0.9766, 0.9944, 0.9343, 0.951, 0.9466, 0.9427, 0.9118, 0.9487], {'paint_views': 112.5, 'export': 3.9, 'setup_s': 1.016, 'projection_s': 1.96, 'views_s': 109.313, 'compose_s': 0.011, 'total_s': 112.299}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9744, 'colour': 0.5055, 'coverage': 0.0533, 'pose': {'azimuth': 33.8, 'elevation': 1.2, 'roll': -1.0, 'fov': 29.0, 'scale': 0.999, 'shift': [0.0019, 0.0]}, 'mode': 'detail only', 'decals': 391, 'seconds': 0.415}
+[paint] bottom: attempt 1, {'iou_before': 0.8808, 'iou': 0.9264, 'shift': [-15.94, -14.06], 'scale': 1.0539}, 11.631 s
+[paint] top: attempt 1, {'iou_before': 0.9981, 'iou': 0.9981, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.583 s
+[paint] a000: attempt 1, {'iou_before': 0.9981, 'iou': 0.9981, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.123 s
+[paint] a135: attempt 1, {'iou_before': 0.9644, 'iou': 0.9694, 'shift': [-0.62, 2.81], 'scale': 1.0075}, 11.936 s
+[paint] a045: attempt 1, {'iou_before': 0.997, 'iou': 0.997, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.137 s
+[paint] a090: attempt 1, {'iou_before': 0.9985, 'iou': 0.9985, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.664 s
+[paint] a315: attempt 1, {'iou_before': 0.9989, 'iou': 0.9989, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.13 s
+[paint] a270: attempt 1, {'iou_before': 0.9967, 'iou': 0.9967, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.683 s
+[paint] a225: attempt 1, {'iou_before': 0.7652, 'iou': 0.8146, 'shift': [18.38, 48.0], 'scale': 1.0}, 11.92 s
+[paint] top: attempt 1, {'iou_before': 0.9982, 'iou': 0.9982, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.143 s
+[paint] bottom: attempt 1, {'iou_before': 0.9977, 'iou': 0.9977, 'shift': [0.0, 0.0], 'scale': 1.0006}, 9.686 s
+[paint] a225: attempt 2, {'iou_before': 0.912, 'iou': 0.9234, 'shift': [5.25, 7.5], 'scale': 1.0151}, 11.852 s
+[paint] a090: attempt 1, {'iou_before': 0.9986, 'iou': 0.9986, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.313 s
+[paint] a135: attempt 1, {'iou_before': 0.9987, 'iou': 0.9987, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.813 s
+[paint] a270: attempt 1, {'iou_before': 0.9967, 'iou': 0.9967, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.271 s
+[paint] a180: attempt 1, {'iou_before': 0.9325, 'iou': 0.9432, 'shift': [-3.75, 7.5], 'scale': 1.0119}, 11.889 s
+[paint] a225: attempt 1, {'iou_before': 0.9981, 'iou': 0.9981, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.839 s
+[painter] bmw edit-ref: {"seconds": {"paint_views": 168.6, "export": 4.3, "setup_s": 0.762, "projection_s": 1.697, "views_s": 166.096, "compose_s": 0.01, "total_s": 168.566}, "peak_gpu_gb": 35.1, "call": 1}
+[paint] bottom: attempt 1, {'iou_before': 0.9977, 'iou': 0.9977, 'shift': [0.0, 0.0], 'scale': 1.0006}, 8.391 s
+[paint] bmw edit-ref: 9 of 10 views in, IoU [0.9715, 0.9303, 0.9694, 0.9748, 0.8519, 0.9566, 0.9264, 0.9694, 0.9234, 0.9432], {'paint_views': 168.6, 'export': 4.3, 'setup_s': 0.762, 'projection_s': 1.697, 'views_s': 166.096, 'compose_s': 0.01, 'total_s': 168.566}
+[paint] bmw i2i-ref-91: 10 of 10 views in, IoU [0.998, 0.9968, 0.9989, 0.9982, 0.998, 0.9958, 0.9974, 0.9983, 0.9978, 0.9983], {'paint_views': 69.8, 'export': 4.3, 'setup_s': 0.752, 'projection_s': 1.69, 'views_s': 67.247, 'compose_s': 0.01, 'total_s': 69.7}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9846, 'colour': 0.5542, 'coverage': 0.14, 'pose': {'azimuth': 338.1, 'elevation': 2.5, 'roll': 0.0, 'fov': 18.7, 'scale': 1.0, 'shift': [0.0006, -0.0044]}, 'mode': 'detail only', 'decals': 50, 'seconds': 0.342}
+[paint] a180: attempt 1, {'iou_before': 0.9986, 'iou': 0.9986, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.83 s
+[paint] a135: attempt 1, {'iou_before': 0.9987, 'iou': 0.9987, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.541 s
+[painter] bmw i2i-ref-80: {"seconds": {"paint_views": 99.3, "export": 4.2, "setup_s": 0.093, "projection_s": 0.368, "views_s": 98.749, "compose_s": 0.01, "total_s": 99.221}, "peak_gpu_gb": 35.3, "call": 2}
+[paint] bmw i2i-ref-80: 10 of 10 views in, IoU [0.998, 0.9969, 0.9989, 0.9981, 0.9985, 0.9967, 0.9977, 0.9987, 0.9981, 0.9986], {'paint_views': 99.3, 'export': 4.2, 'setup_s': 0.093, 'projection_s': 0.368, 'views_s': 98.749, 'compose_s': 0.01, 'total_s': 99.221}
+[paint] a000: attempt 1, {'iou_before': 0.9474, 'iou': 0.9512, 'shift': [1.12, 0.0], 'scale': 1.0038}, 10.734 s
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9846, 'colour': 0.5542, 'coverage': 0.14, 'pose': {'azimuth': 338.1, 'elevation': 2.5, 'roll': 0.0, 'fov': 18.7, 'scale': 1.0, 'shift': [0.0006, -0.0044]}, 'mode': 'detail only', 'decals': 50, 'seconds': 0.332}
+[paint] a225: attempt 1, {'iou_before': 0.9983, 'iou': 0.9983, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.414 s
+[paint] a180: attempt 1, {'iou_before': 0.9986, 'iou': 0.9986, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.368 s
+[paint] a045: attempt 1, {'iou_before': 0.9533, 'iou': 0.9573, 'shift': [1.12, 2.62], 'scale': 1.005}, 10.762 s
+[paint] a000: attempt 1, {'iou_before': 0.9373, 'iou': 0.9426, 'shift': [1.88, 0.38], 'scale': 1.0038}, 11.99 s
+[painter] bmw i2i-80: {"seconds": {"paint_views": 85.4, "export": 3.8, "setup_s": 0.091, "projection_s": 0.442, "views_s": 84.869, "compose_s": 0.011, "total_s": 85.411}, "peak_gpu_gb": 35.3, "call": 2}
+[paint] bmw i2i-80: 10 of 10 views in, IoU [0.9981, 0.997, 0.9989, 0.9982, 0.9986, 0.9967, 0.9977, 0.9987, 0.9983, 0.9986], {'paint_views': 85.4, 'export': 3.8, 'setup_s': 0.091, 'projection_s': 0.442, 'views_s': 84.869, 'compose_s': 0.011, 'total_s': 85.411}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9846, 'colour': 0.5542, 'coverage': 0.14, 'pose': {'azimuth': 338.1, 'elevation': 2.5, 'roll': 0.0, 'fov': 18.7, 'scale': 1.0, 'shift': [0.0006, -0.0044]}, 'mode': 'detail only', 'decals': 50, 'seconds': 0.428}
+[paint] a000: attempt 1, {'iou_before': 0.9982, 'iou': 0.9982, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.514 s
+[paint] a315: attempt 1, {'iou_before': 0.9854, 'iou': 0.9876, 'shift': [0.94, 1.88], 'scale': 1.0038}, 10.669 s
+[paint] a045: attempt 1, {'iou_before': 0.9504, 'iou': 0.9538, 'shift': [0.75, 1.88], 'scale': 1.0038}, 12.063 s
+[paint] a045: attempt 1, {'iou_before': 0.9977, 'iou': 0.9977, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.554 s
+[paint] top: attempt 1, {'iou_before': 0.9441, 'iou': 0.9462, 'shift': [0.31, 1.25], 'scale': 1.0044}, 10.726 s
+[paint] a315: attempt 1, {'iou_before': 0.998, 'iou': 0.998, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.457 s
+[paint] a315: attempt 1, {'iou_before': 0.9506, 'iou': 0.9541, 'shift': [2.5, 1.88], 'scale': 1.0088}, 11.849 s
+[paint] top: attempt 1, {'iou_before': 0.9979, 'iou': 0.9979, 'shift': [0.0, 0.0], 'scale': 1.0006}, 6.559 s
+[paint] a090: attempt 1, {'iou_before': 0.9642, 'iou': 0.9714, 'shift': [0.31, 1.88], 'scale': 1.0069}, 10.918 s
+[paint] a090: attempt 1, {'iou_before': 0.9984, 'iou': 0.9984, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.603 s
+[paint] top: attempt 1, {'iou_before': 0.7323, 'iou': 0.7433, 'shift': [-21.25, 17.5], 'scale': 1.005}, 12.112 s
+[paint] a270: attempt 1, {'iou_before': 0.9906, 'iou': 0.995, 'shift': [1.25, 0.0], 'scale': 1.0019}, 10.94 s
+[paint] a270: attempt 1, {'iou_before': 0.9983, 'iou': 0.9983, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.58 s
+[paint] top: attempt 2, {'iou_before': 0.7568, 'iou': 0.7608, 'shift': [-12.5, 10.62], 'scale': 1.0}, 12.147 s
+[paint] top: left out (IoU under 0.9)
+[paint] bottom: attempt 1, {'iou_before': 0.9988, 'iou': 0.9988, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.582 s
+[paint] bottom: attempt 1, {'iou_before': 0.9502, 'iou': 0.9538, 'shift': [0.0, 1.25], 'scale': 1.0025}, 10.912 s
+[paint] a135: attempt 1, {'iou_before': 0.9989, 'iou': 0.9989, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.623 s
+[paint] a090: attempt 1, {'iou_before': 0.9759, 'iou': 0.9868, 'shift': [-0.94, 2.81], 'scale': 1.0082}, 12.164 s
+[paint] a225: attempt 1, {'iou_before': 0.9983, 'iou': 0.9983, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.717 s
+[paint] a135: attempt 1, {'iou_before': 0.9943, 'iou': 0.9943, 'shift': [0.0, 0.0], 'scale': 1.0}, 10.874 s
+[paint] a180: attempt 1, {'iou_before': 0.9984, 'iou': 0.9984, 'shift': [0.0, 0.0], 'scale': 1.0}, 6.672 s
+[paint] a270: attempt 1, {'iou_before': 0.9252, 'iou': 0.9349, 'shift': [6.56, 2.19], 'scale': 1.0056}, 12.192 s
+[painter] 04 i2i-ref-91: {"seconds": {"paint_views": 68.2, "export": 3.7, "setup_s": 0.104, "projection_s": 0.454, "views_s": 67.641, "compose_s": 0.011, "total_s": 68.21}, "peak_gpu_gb": 35.3, "call": 3}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9846, 'colour': 0.5542, 'coverage': 0.14, 'pose': {'azimuth': 338.1, 'elevation': 2.5, 'roll': 0.0, 'fov': 18.7, 'scale': 1.0, 'shift': [0.0006, -0.0044]}, 'mode': 'detail only', 'decals': 50, 'seconds': 0.405}
+[paint] a225: attempt 1, {'iou_before': 0.9604, 'iou': 0.9622, 'shift': [0.75, 1.5], 'scale': 1.0031}, 11.053 s
+[paint] a000: attempt 1, {'iou_before': 0.9992, 'iou': 0.9992, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.762 s
+[paint] bottom: attempt 1, {'iou_before': 0.6874, 'iou': 0.6925, 'shift': [-1.88, 12.5], 'scale': 1.0382}, 12.173 s
+[paint] a180: attempt 1, {'iou_before': 0.9923, 'iou': 0.9966, 'shift': [0.75, 0.75], 'scale': 1.0031}, 10.842 s
+[painter] 04 edit: {"seconds": {"paint_views": 110.8, "export": 4.3, "setup_s": 0.093, "projection_s": 0.386, "views_s": 110.234, "compose_s": 0.011, "total_s": 110.731}, "peak_gpu_gb": 35.3, "call": 2}
+[paint] 04 edit: 10 of 10 views in, IoU [0.9512, 0.9573, 0.9876, 0.9462, 0.9714, 0.995, 0.9538, 0.9943, 0.9622, 0.9966], {'paint_views': 110.8, 'export': 4.3, 'setup_s': 0.093, 'projection_s': 0.386, 'views_s': 110.234, 'compose_s': 0.011, 'total_s': 110.731}
+[paint] a045: attempt 1, {'iou_before': 0.9987, 'iou': 0.9987, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.92 s
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9846, 'colour': 0.5542, 'coverage': 0.14, 'pose': {'azimuth': 338.1, 'elevation': 2.5, 'roll': 0.0, 'fov': 18.7, 'scale': 1.0, 'shift': [0.0006, -0.0044]}, 'mode': 'detail only', 'decals': 50, 'seconds': 0.339}
+[paint] bottom: attempt 2, {'iou_before': 0.6904, 'iou': 0.7125, 'shift': [0.62, 6.25], 'scale': 1.0752}, 12.167 s
+[paint] bottom: left out (IoU under 0.9)
+[paint] a000: attempt 1, {'iou_before': 0.9992, 'iou': 0.9992, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.258 s
+[paint] a315: attempt 1, {'iou_before': 0.9988, 'iou': 0.9988, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.457 s
+[paint] a135: attempt 1, {'iou_before': 0.8175, 'iou': 0.8575, 'shift': [-18.75, 13.12], 'scale': 0.9925}, 12.192 s
+[paint] a045: attempt 1, {'iou_before': 0.9987, 'iou': 0.9987, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.208 s
+[paint] top: attempt 1, {'iou_before': 0.9983, 'iou': 0.9983, 'shift': [0.0, 0.0], 'scale': 1.0006}, 9.427 s
+[paint] a315: attempt 1, {'iou_before': 0.999, 'iou': 0.999, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.149 s
+[paint] a135: attempt 2, {'iou_before': 0.7993, 'iou': 0.8382, 'shift': [-30.62, 21.56], 'scale': 1.0337}, 12.184 s
+[paint] a135: left out (IoU under 0.9)
+[paint] a090: attempt 1, {'iou_before': 0.9991, 'iou': 0.9991, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.378 s
+[paint] top: attempt 1, {'iou_before': 0.9985, 'iou': 0.9985, 'shift': [0.0, 0.0], 'scale': 1.0006}, 8.328 s
+[paint] a270: attempt 1, {'iou_before': 0.999, 'iou': 0.999, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.366 s
+[paint] a225: attempt 1, {'iou_before': 0.9104, 'iou': 0.9316, 'shift': [-1.5, 26.62], 'scale': 1.0056}, 12.369 s
+[paint] a090: attempt 1, {'iou_before': 0.9992, 'iou': 0.9992, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.374 s
+[paint] bottom: attempt 1, {'iou_before': 0.9986, 'iou': 0.9986, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.314 s
+[paint] a270: attempt 1, {'iou_before': 0.9991, 'iou': 0.9991, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.279 s
+[paint] a180: attempt 1, {'iou_before': 0.9326, 'iou': 0.939, 'shift': [1.12, 0.75], 'scale': 1.0088}, 11.998 s
+[painter] 04 edit-ref: {"seconds": {"paint_views": 160.0, "export": 4.3, "setup_s": 0.093, "projection_s": 0.368, "views_s": 159.44, "compose_s": 0.011, "total_s": 159.913}, "peak_gpu_gb": 35.2, "call": 3}
+[paint] a135: attempt 1, {'iou_before': 0.9992, 'iou': 0.9992, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.347 s
+[paint] bottom: attempt 1, {'iou_before': 0.9986, 'iou': 0.9986, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.265 s
+[paint] 04 edit-ref: 7 of 10 views in, IoU [0.9426, 0.9538, 0.9541, 0.7608, 0.9868, 0.9349, 0.7125, 0.8382, 0.9316, 0.939], {'paint_views': 160.0, 'export': 4.3, 'setup_s': 0.093, 'projection_s': 0.368, 'views_s': 159.44, 'compose_s': 0.011, 'total_s': 159.913}
+[paint] 04 i2i-ref-91: 10 of 10 views in, IoU [0.9982, 0.9977, 0.998, 0.9979, 0.9984, 0.9983, 0.9988, 0.9989, 0.9983, 0.9984], {'paint_views': 68.2, 'export': 3.7, 'setup_s': 0.104, 'projection_s': 0.454, 'views_s': 67.641, 'compose_s': 0.011, 'total_s': 68.21}
+[paint] a225: attempt 1, {'iou_before': 0.9992, 'iou': 0.9992, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.491 s
+[paint] a135: attempt 1, {'iou_before': 0.9993, 'iou': 0.9993, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.308 s
+[paint] a180: attempt 1, {'iou_before': 0.9993, 'iou': 0.9993, 'shift': [0.0, 0.0], 'scale': 1.0}, 9.319 s[paint] a225: attempt 1, {'iou_before': 0.9992, 'iou': 0.9992, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.465 s
+
+[painter] 04 i2i-ref-80: {"seconds": {"paint_views": 97.1, "export": 3.6, "setup_s": 0.095, "projection_s": 0.436, "views_s": 96.55, "compose_s": 0.011, "total_s": 97.093}, "peak_gpu_gb": 35.3, "call": 4}
+[paint] 04 i2i-ref-80: 10 of 10 views in, IoU [0.9992, 0.9987, 0.9988, 0.9983, 0.9991, 0.999, 0.9986, 0.9992, 0.9992, 0.9993], {'paint_views': 97.1, 'export': 3.6, 'setup_s': 0.095, 'projection_s': 0.436, 'views_s': 96.55, 'compose_s': 0.011, 'total_s': 97.093}
+[paint] a180: attempt 1, {'iou_before': 0.9994, 'iou': 0.9994, 'shift': [0.0, 0.0], 'scale': 1.0}, 8.275 s
+[painter] 04 i2i-80: {"seconds": {"paint_views": 85.2, "export": 4.1, "setup_s": 0.08, "projection_s": 0.376, "views_s": 84.644, "compose_s": 0.011, "total_s": 85.111}, "peak_gpu_gb": 35.3, "call": 3}
+[paint] 04 i2i-80: 10 of 10 views in, IoU [0.9992, 0.9987, 0.999, 0.9985, 0.9992, 0.9991, 0.9986, 0.9993, 0.9992, 0.9994], {'paint_views': 85.2, 'export': 4.1, 'setup_s': 0.08, 'projection_s': 0.376, 'views_s': 84.644, 'compose_s': 0.011, 'total_s': 85.111}
+an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7efdcbc27e00>
+asyncgen: <async_generator object Synchronizer._run_generator_async at 0x7efdcbc27e00>
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_utils/async_utils.py", line 856, in __iter__
+    yield from run_async_gen(runner, self._async_iterable)
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7efdcbcbbe10>
+asyncgen: <async_generator object async_merge at 0x7efdcbcbbe10>
+Traceback (most recent call last):
+  File "/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_utils/async_utils.py", line 856, in __iter__
+    yield from run_async_gen(runner, self._async_iterable)
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+RuntimeError: aclose(): asynchronous generator is already running
+Task was destroyed but it is pending!
+task: <Task pending name='Task-5851' coro=<<async_generator_athrow without __name__>()> wait_for=<Future finished result=None>>
+[paint] done: 10 of 10 paintings
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-FryEWEhPtLy2ClkfFzZNG1
+Task was destroyed but it is pending!
+task: <Task cancelling name='Task-2501' coro=<async_merge.<locals>.producer() running at /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/modal/_utils/async_utils.py:1087> wait_for=<Future pending cb=[Task.task_wakeup()]> cb=[gather.<locals>._done_callback() at /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/asyncio/tasks.py:764]>
+Task was destroyed but it is pending!
+task: <Task pending name='Task-3654' coro=<Synchronizer._run_function_async() running at /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/synchronicity/synchronizer.py:596> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/asyncio/tasks.py:908, Task.task_wakeup()]> cb=[shield.<locals>._inner_done_callback() at /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/asyncio/tasks.py:891]>
+Task was destroyed but it is pending!
+task: <Task pending name='Task-3645' coro=<<async_generator_athrow without __name__>()> wait_for=<Future pending cb=[Task.task_wakeup()]>>
+Task was destroyed but it is pending!
+task: <Task pending name='Task-5853' coro=<Synchronizer._run_function_async() done, defined at /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/synchronicity/synchronizer.py:550> wait_for=<Future pending cb=[shield.<locals>._outer_done_callback() at /opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/asyncio/tasks.py:908, Task.task_wakeup()]>>
+exit status: 0
