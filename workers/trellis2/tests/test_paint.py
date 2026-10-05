@@ -891,3 +891,26 @@ def test_paint_views_tells_the_editor_which_try_it_is_and_keeps_its_skip():
     plain, _ = flat_painter()
     result = P.paint_views(mesh, no_picture(), plain, device="cpu", around=2, top=False, bottom=False, log=lambda _: None, **small())
     assert all("skip" not in attempt for view in result.views for attempt in view.attempts)
+
+
+def test_the_views_are_held_to_the_picture_only_where_it_sees_them_face_on():
+    from test_projection import VIEW, make_box, render_box
+
+    mesh = make_box()
+    geom = P.geometry(mesh, "cpu")
+    texture, _ = P.texture_of(mesh, "cpu")
+    tex = P.texels(geom, tuple(texture.shape[:2]))
+    picture = P.project_picture(mesh, render_box(VIEW), tex, texture, "cpu")
+    assert picture.report["applied"], picture.report
+    assert picture.facing is not None and picture.facing.shape == picture.weight.shape
+    held = picture.anchor_weight()
+    seen = picture.weight > 0.05
+    # Seen from 30 degrees round and 20 up: the front nearly face on, the side and the top at a slant
+    square = seen & (picture.facing > P.ANCHOR_FACING[1])
+    slant = seen & (picture.facing < P.ANCHOR_FACING[0])
+    assert int(square.sum()) > 100 and int(slant.sum()) > 100
+    assert torch.allclose(held[square], picture.weight[square]) and float(held[slant].abs().max()) == 0.0
+    assert bool((held <= picture.weight + 1e-6).all())
+    # Without the facing (an unapplied projection), the weight as it is
+    unapplied = P.Picture(texture=texture, weight=picture.weight, azimuth=0.0, elevation=15.0, report={})
+    assert torch.equal(unapplied.anchor_weight(), picture.weight)

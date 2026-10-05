@@ -127,6 +127,12 @@ FULL_WEIGHT = 0.25
 # Renders keep the picture's paint where the projection used the picture this much (its detail weight):
 # fully above the upper end, not at all below the lower
 PROTECT = (0.3, 0.7)
+# The views' colour is held to the picture's own only where the picture sees the surface nearly face on (the cosine
+# between the surface and the picture's camera, over this ramp). The projection takes the picture's shading out
+# relative to TRELLIS.2's texture, which has the same shading painted in, so a side the picture sees at a slant
+# and in shade stays dark: blind test 2 (run 8), held to it, the arcade machine's right side came out a darker red
+# than its coral front, where every view had painted it coral, and all four reviewers chose today's
+ANCHOR_FACING = (0.5, 0.8)
 # Colour match: a view's colour is scaled per channel (linear light) by the weighted median ratio of what
 # is already established (the picture's paint, earlier views) to it, where both see the surface and the
 # established colour is CONFIDENT; at most MAX_GAIN either way, from at least GAIN_TEXELS texels. Run 2: the
@@ -1290,6 +1296,16 @@ class Picture:
     # fit) but its exposure kept (None where not applied); the colour match's anchor, where ``weight`` says it saw
     # well, and what the main colours are named from
     colour: Optional[torch.Tensor] = None
+    # (N,) the cosine between each covered texel's normal and the direction to the picture's camera (None where not
+    # applied): how squarely the picture sees it
+    facing: Optional[torch.Tensor] = None
+
+    def anchor_weight(self) -> torch.Tensor:
+        """How much the views' colour is held to ``colour`` at each texel: ``weight`` where the picture sees the
+        surface nearly face on (ANCHOR_FACING), less where it sees it at a slant."""
+        if self.facing is None:
+            return self.weight
+        return self.weight * projection._smoothstep(ANCHOR_FACING[0], ANCHOR_FACING[1], self.facing)
 
 
 def project_picture(mesh: Any, cutout: Any, tex: Texels, texture: torch.Tensor, device: Any) -> Picture:
@@ -1315,7 +1331,7 @@ def project_picture(mesh: Any, cutout: Any, tex: Texels, texture: torch.Tensor, 
     debug: dict = {}
     _, report = projection.project_picture(stand_in, cutout, device=device, debug=debug)
     weight = torch.zeros(tex.flat.numel(), device=device)
-    colour = None
+    colour = facing = None
     azimuth, elevation = 0.0, ELEVATION
     painted = texture
     if report.get("applied"):
@@ -1330,6 +1346,10 @@ def project_picture(mesh: Any, cutout: Any, tex: Texels, texture: torch.Tensor, 
             full_colour = torch.zeros((tex.size[0] * tex.size[1], 3), device=device)
             full_colour[at] = debug["picture_linear"].to(device).float()
             colour = full_colour[tex.flat]
+        if debug.get("cos") is not None:
+            full_facing = torch.zeros(tex.size[0] * tex.size[1], device=device)
+            full_facing[at] = debug["cos"].to(device).float()
+            facing = full_facing[tex.flat]
         params = debug["params"][0]
         azimuth, elevation = float(params[0]) % 360, float(params[1])
     elif debug.get("params") is not None:
@@ -1337,7 +1357,9 @@ def project_picture(mesh: Any, cutout: Any, tex: Texels, texture: torch.Tensor, 
         params = debug["params"][0]
         azimuth, elevation = float(params[0]) % 360, float(params[1])
     summary = projection.summary(report)
-    return Picture(texture=painted, weight=weight, azimuth=azimuth, elevation=elevation, report=summary, colour=colour)
+    return Picture(
+        texture=painted, weight=weight, azimuth=azimuth, elevation=elevation, report=summary, colour=colour, facing=facing
+    )
 
 
 # --- The painter --------------------------------------------------------------------------------------
@@ -1465,14 +1487,17 @@ def paint_views(
         current = painted_picture
         paint_colour = projection._srgb_to_linear(painted_picture.reshape(-1, 3)[tex.flat])
         established = paint_colour
-        confidence = protect.clone()
-        # What the views' colours are held to: the picture's own colour where it saw the surface well, or its paint
+        # What the views' colours are held to: the picture's own colour where it sees the surface face on
+        # (Picture.anchor_weight), or its paint; ``held_protect`` is how much, as the views go
+        held_protect = protect
         if anchor == "picture" and picture.colour is not None:
-            held, held_weight = picture.colour, picture.weight
+            held, held_weight = picture.colour, picture.anchor_weight()
+            held_protect = projection._smoothstep(PROTECT[0], PROTECT[1], held_weight)
         elif anchor == "paint":
             held, held_weight = paint_colour, protect
         else:
             held, held_weight = paint_colour, torch.zeros_like(protect)
+        confidence = held_protect.clone()
         blend = Blend(tex.flat.numel(), device)
         views: list[View] = []
         weights: list = []  # (view, its weight at each texel), for the shares at the end
@@ -1541,7 +1566,7 @@ def paint_views(
                 # Matched to what's established, with the anchor's colour where the picture is what's established
                 target = established
                 if anchor == "picture" and picture.colour is not None:
-                    target = established + protect[:, None] * (picture.colour - established)
+                    target = established + held_protect[:, None] * (picture.colour - established)
                 sure = samples.weight * (confidence >= CONFIDENT).float() * confidence
                 if colour_model == "tone":
                     found = tone(samples.colour, target, sure)
@@ -1560,7 +1585,7 @@ def paint_views(
             amount = blend.amount(full_weight) * (1 - protect)
             current = compose(painted_picture, tex, blend.colour(), amount)
             established = projection._srgb_to_linear(current.reshape(-1, 3)[tex.flat])
-            confidence = torch.maximum(protect, blend.amount(full_weight))
+            confidence = torch.maximum(held_protect, blend.amount(full_weight))
             view.seconds["bake_s"] = round(time.perf_counter() - bake_started, 3)
             views.append(view)
             clock("views_s")
