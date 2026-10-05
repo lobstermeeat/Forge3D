@@ -96,6 +96,13 @@ MULTIVIEW_GPU = "A10G"  # MV-Adapter on SDXL needs about 14 GB: a 24 GB A10G, ab
 # view takes about 5 s
 PAINTER_GPU = "H100"
 
+# One Trellis2 job's time limit. A final waits for the painter until PAINT_MARGIN s before it, enough for the rest
+# of its export (the projection, glass and gltfpack at 4096, the upload: under a minute), and doesn't ask with
+# less than PAINT_MIN_WAIT s left (ten views alone take most of a minute); either way it keeps its own texture
+TRELLIS2_TIMEOUT = 900
+PAINT_MARGIN = 150
+PAINT_MIN_WAIT = 90
+
 app = modal.App(APP_NAME)
 models = modal.Volume.from_name("orainge-models", create_if_missing=True)
 # What `make` produces, one folder per run, so results outlive the computer that asked for them
@@ -506,7 +513,7 @@ def _call_quietly(runtime: Any, method: str) -> None:
     secrets=storage_secrets,
     # A Pixal3D final takes 1-2 minutes, 3-5 with out-of-memory retries, and may then be made again with
     # TRELLIS.2 (1-3 minutes); a stuck job is still cut off well inside a quarter of an hour
-    timeout=900,
+    timeout=TRELLIS2_TIMEOUT,
     startup_timeout=600,
     scaledown_window=60,  # idle containers are billed; a cold start takes about a minute
     max_containers=2,  # caps spending; raise it for more parallel jobs
@@ -531,11 +538,13 @@ class Trellis2:
         merge_tuning(LOCAL_TUNING, SHARED_TUNING)
         storage = storage_from_env()
         trellis2 = Trellis2Runtime(f"{MODELS}/TRELLIS.2-4B")
-        # A final with "paint" has its texture painted on the Painter's GPU (forge3d_worker/painting.py)
-        trellis2.painter = paint_on_painter
+        # A final with "paint" has its texture painted on the Painter's GPU (forge3d_worker/painting.py), by a
+        # painter generate() gives a deadline inside each job's own time limit
+        self.trellis2 = trellis2
         pool = ModelPool(trellis2)
         handlers: dict[str, Callable[..., dict]] = {"trellis2": handle_job}
         final_model = os.environ.get("ORAINGE_FINAL_MODEL", FINAL_MODEL)
+        self.final_model = final_model
         if final_model == "pixal3d":
             from pixal3d_worker.service import handle_job as pixal3d_handle_job
 
@@ -552,8 +561,7 @@ class Trellis2:
 
     @modal.method()
     def generate(self, job: dict) -> dict:
-        if wants_paint(job):
-            warm_painter()  # Qwen-Image-Edit-2511 loads while TRELLIS.2 makes the shape
+        prepare_job(self.trellis2, self.final_model, job)
         try:
             return run_job(self.handle, job)
         finally:
@@ -690,9 +698,49 @@ def warm_painter() -> None:
         print(f"[orainge] couldn't warm the painter: {type(err).__name__}: {err}")
 
 
-def paint_on_painter(kit: bytes) -> dict:
-    """Trellis2Runtime.painter: one kit (painting.pack_kit) painted on the Painter's GPU."""
-    return Painter().paint.remote(kit)
+def prepare_job(trellis2: Any, final_model: str, job: dict) -> None:
+    """
+    Before each Trellis2 job: its painter waits until PAINT_MARGIN s before the job's own limit at most (past
+    that the final keeps its own texture instead of the whole job timing out), and a final asking to be painted
+    starts the Painter, which loads while TRELLIS.2 makes the shape. Pixal3D's finals aren't painted, so with
+    the recipe on nothing is warmed.
+    """
+    trellis2.painter = painter_until(time.monotonic() + TRELLIS2_TIMEOUT - PAINT_MARGIN)
+    if wants_paint(job) and final_model == "trellis2":
+        warm_painter()
+
+
+def painter_until(deadline: float) -> Callable[[bytes], dict]:
+    """
+    Trellis2Runtime.painter for one job: a kit (painting.pack_kit) painted on the Painter's GPU, waited for until
+    ``deadline`` (time.monotonic()) at most. A painter that hasn't answered by then (an H100 slow to come, a paint
+    that hangs) is cancelled and its error leaves the final with its own texture (painting.hook catches it).
+    """
+
+    def paint(kit: bytes) -> dict:
+        wait = deadline - time.monotonic()
+        if wait < PAINT_MIN_WAIT:
+            raise TimeoutError(f"only {max(wait, 0.0):.0f} s of the job's time left, too little to paint")
+        call = Painter().paint.spawn(kit)
+        try:
+            return call.get(timeout=wait)
+        except (TimeoutError, modal.exception.TimeoutError) as err:
+            # get() raises the builtin TimeoutError when the wait runs out; Modal's own when the painter hit its limit
+            _cancel_quietly(call)
+            raise TimeoutError(f"the painter timed out ({type(err).__name__}; waited at most {wait:.0f} s)") from err
+        except BaseException:
+            _cancel_quietly(call)
+            raise
+
+    return paint
+
+
+def _cancel_quietly(call: Any) -> None:
+    """Stops a painter call that is no longer waited for (it may have finished or failed already)."""
+    try:
+        call.cancel()
+    except Exception as err:  # noqa: BLE001 - nothing more to do about it
+        print(f"[orainge] couldn't cancel the painter's call: {type(err).__name__}: {err}")
 
 
 @app.cls(
@@ -733,9 +781,20 @@ class Painter:
     @modal.method()
     def paint(self, kit: bytes) -> dict:
         from forge3d_worker import painting
+        from forge3d_worker.service import needs_restart
         from painter_worker import views
 
-        result = painting.paint_kit(kit, lambda subject: views.editor(self.painter, subject), device="cuda")
+        try:
+            result = painting.paint_kit(kit, lambda subject: views.editor(self.painter, subject), device="cuda")
+        except Exception as err:
+            if needs_restart(err):
+                from modal.experimental import stop_fetching_inputs
+
+                # CUDA may be unusable after a GPU fault: this kit fails (its final keeps its own texture), and
+                # Modal starts a fresh container for the next one
+                print(f"[painter] a GPU fault; this container takes no more kits: {type(err).__name__}: {err}")
+                stop_fetching_inputs()
+            raise
         print(f"[painter] painted {result['size']}x{result['size']} in {result['seconds']} s")
         return result
 

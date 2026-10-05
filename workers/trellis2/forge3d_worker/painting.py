@@ -128,7 +128,7 @@ def hook(call: Callable[[bytes], dict], subject: str, options: Optional[dict] = 
     Trellis2Runtime.before_projection for one final: sends to_glb's mesh and the generated mesh's cutout to
     ``call`` (the painter, paint_kit on its own GPU) and puts the texture that comes back in the mesh's material.
     Returns the final's "paint" note: ``{"applied": True, "size", "views", "seconds", ...}``, or ``{"applied":
-    False, "reason"}`` when the painter failed, which leaves the texture as it was.
+    False, "reason"}`` when the painter failed or kept none of its views, which leaves the texture as it was.
     """
     from .pipeline import CUTOUT
 
@@ -139,6 +139,21 @@ def hook(call: Callable[[bytes], dict], subject: str, options: Optional[dict] = 
             painted = call(kit)
             if not isinstance(painted, dict) or "texture" not in painted:
                 raise PaintError(f"the painter answered {type(painted).__name__}, not a texture")
+            views = (painted.get("report") or {}).get("views") or []
+            if not any(view.get("accepted") for view in views):
+                # paint_views then hands back TRELLIS.2's own texture, only scaled up: the final keeps its own,
+                # at its own size, and the server offers it texture options as for any unpainted final
+                kept_none = f"the painter kept none of its {len(views)} views"
+                note = {
+                    "applied": False,
+                    "reason": kept_none if views else "the painter reported no views",
+                    "views": 0,
+                    "of": len(views),
+                    "painter_s": painted.get("seconds"),
+                    "seconds": round(time.perf_counter() - started, 1),
+                }
+                print(f"[forge3d] paint: not applied, {json.dumps(note)}")
+                return note
             texture = Image.open(io.BytesIO(painted["texture"]))
             texture.load()
             material = glb.visual.material

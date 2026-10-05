@@ -147,8 +147,11 @@ photos:
 
 It runs on its own GPU: the `Painter` class in `modal_app.py` (an H100: the model keeps 58 GB of weights
 resident). The Trellis2 container sends it the final's mesh, picture and prompt as one kit and waits for the
-texture (`trellis2/forge3d_worker/painting.py`); a painter that fails or can't be reached costs the final only
-the wait, and the final keeps TRELLIS.2's texture. A final asks for it with `"paint": true` (Job contracts); the
+texture (`trellis2/forge3d_worker/painting.py`); a painter that fails, can't be reached or keeps none of its
+views costs the final only the wait, and the final keeps TRELLIS.2's texture. The wait ends 150 s before the
+Trellis2 job's 15-minute limit at most (`PAINT_MARGIN` in `modal_app.py`), when the call is cancelled, so a slow
+H100 can't time the whole final out; a GPU fault in the painter retires its container, as in the other workers.
+A final asks for it with `"paint": true` (Job contracts); the
 server does so with `AI_PAINT=1` (The Studio's AI panel). Painting takes 44 to 89 s on the H100 (median 58 s on
 the thirteen objects of run 13: about 4.3 s a try, ten views and the tries some need), the colour match and bake
 about a second more; sending the kit to the painter and the texture back added 8 to 23 s in the staging runs
@@ -359,7 +362,8 @@ Finals also carry `projection`, whether the picture was painted onto the model (
 time is part of `export_s`.
 
 A final can ask for the painter (The painter, above) with `"paint": true` and `"subject"`, what the object is in
-the creator's words (the prompt; "object" when left out, as for a photo). Previews and texture options ignore it.
+the creator's words (the prompt, cut to its first 200 characters; "object" when left out, as for a photo).
+Previews and texture options ignore it.
 Its result then carries `paint`, and its textures are packed up to 4096 (`painting.SIZE`):
 
 ```json
@@ -367,8 +371,9 @@ Its result then carries `paint`, and its textures are packed up to 4096 (`painti
 ```
 
 `views` of `of` went into the texture; `joint` is what their colours were held to (`"picture"`, or `"none"` when
-the picture's projection didn't fit). A final that couldn't be painted is made as always and says why:
-`{ "applied": false, "reason": "TimeoutError: …" }` (or `"this worker has no painter"`, on RunPod and with the
+the picture's projection didn't fit). A final that couldn't be painted is made as always, packed at its usual
+size, and says why: `{ "applied": false, "reason": "TimeoutError: the painter timed out …" }`, `"the painter kept
+none of its 10 views"` (with `"views": 0, "of": 10`), or `"this worker has no painter"` (on RunPod and with the
 recipe on). The painting is part of `export_s`. A preset with `drop_floaters` adds `floaters`: how many pieces the model had,
 how many were dropped, their faces and share of the surface, and the largest of them.
 

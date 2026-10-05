@@ -273,7 +273,11 @@ def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) 
 
 
 def _paint_subject(paint: object, subject: object) -> Optional[str]:
-    """``"paint": true`` asks for the painter, with ``"subject"`` saying what the object is (else "object")."""
+    """
+    ``"paint": true`` asks for the painter, with ``"subject"`` saying what the object is (else "object"). The
+    subject is the creator's prompt, which the server allows longer than the painter's prompts use: it is cut
+    to MAX_SUBJECT characters, never refused (a refusal would fail a final the preview of which was made).
+    """
     if paint is None or paint is False:
         return None
     if paint is not True:
@@ -283,6 +287,4 @@ def _paint_subject(paint: object, subject: object) -> Optional[str]:
     if not isinstance(subject, str):
         raise InputError("subject must be a string")
     text = " ".join("".join(c if c.isprintable() else " " for c in subject).split())
-    if len(text) > MAX_SUBJECT:
-        raise InputError(f"subject must be at most {MAX_SUBJECT} characters")
-    return text or "object"
+    return text[:MAX_SUBJECT].rstrip() or "object"
