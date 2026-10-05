@@ -174,6 +174,9 @@ STRATEGIES = {
     # no dark bottom), baked at 4096 and also shipped at 2048 (the 4096 texture scaled down); and with flatter light
     "qie-v6": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096, "also": (2048,), "views_only": False},
     "qie-v6-flat": {"model": "qwen", "picture": 0, "prompt": QIE_FLAT, "texture": 4096, "also": (2048,), "views_only": False},
+    # Run 7: production's painter (forge3d_worker/painting.py): the prompt's colours and the colour match's anchor
+    # from the picture with its shading taken out; give it --attempts 3 as production does
+    "qie-v7": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096, "views_only": False},
 }
 # klein's shifted 4-step schedule (1 MP), and the schedules the "start" values ask for
 SCHEDULES = {0.91: None, 0.8: (1.0, 0.8, 0.6, 0.35)}

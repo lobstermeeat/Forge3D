@@ -789,16 +789,46 @@ def main_colours(cutout: Image.Image, *, count: int = 3, min_share: float = 0.1)
     if not inside.any():
         return []
     pixels = torch.tensor(rgba[..., :3][inside])
-    if pixels.shape[0] > 200_000:
-        pixels = pixels[torch.linspace(0, pixels.shape[0] - 1, 200_000).long()]
+    return colour_names(projection._srgb_to_linear(pixels), None, count=count, min_share=min_share)
+
+
+def colour_names(
+    linear: torch.Tensor, weight: Optional[torch.Tensor] = None, *, count: int = 3, min_share: float = 0.1
+) -> list:
+    """
+    Colours (N, 3, linear) by name (COLOUR_NAMES, nearest in CIELAB), the most (by ``weight``, or each counting
+    the same) first: those with at least ``min_share`` of it, at most ``count``.
+    """
+    if linear.shape[0] == 0:
+        return []
+    if linear.shape[0] > 200_000:
+        keep = torch.linspace(0, linear.shape[0] - 1, 200_000, device=linear.device).long()
+        linear = linear[keep]
+        weight = weight[keep] if weight is not None else None
     names = list(COLOUR_NAMES)
-    swatches = torch.tensor([COLOUR_NAMES[n] for n in names], dtype=torch.float32) / 255
-    lab = projection._lab(projection._srgb_to_linear(pixels))
+    swatches = torch.tensor([COLOUR_NAMES[n] for n in names], dtype=torch.float32, device=linear.device) / 255
+    lab = projection._lab(linear.float())
     lab_swatches = projection._lab(projection._srgb_to_linear(swatches))
     nearest = torch.cdist(lab, lab_swatches).argmin(1)
-    shares = torch.bincount(nearest, minlength=len(names)).float() / nearest.numel()
+    w = torch.ones(nearest.shape[0], device=linear.device) if weight is None else weight.float()
+    shares = torch.zeros(len(names), device=linear.device).index_add_(0, nearest, w)
+    shares = shares / shares.sum().clamp_min(1e-9)
     order = torch.argsort(shares, descending=True).tolist()
     return [names[i] for i in order if float(shares[i]) >= min_share][:count]
+
+
+def picture_colours(picture: "Picture", cutout: Image.Image, *, sure: float = 0.3) -> list:
+    """
+    The main colours the prompt names: from the picture's own colours with its shading taken out, where the picture
+    saw the surface well (run 6: named from the cutout's pixels, the arcade machine's shaded sides made "dark red"
+    its main colour, and the editing model painted its coral sides maroon); from the cutout when the projection
+    didn't apply.
+    """
+    if picture.colour is not None:
+        weight = picture.weight * (picture.weight >= sure).float()
+        if float(weight.sum()) > 0:
+            return colour_names(picture.colour, weight)
+    return main_colours(cutout)
 
 
 # --- Bake ---------------------------------------------------------------------------------------------
@@ -1171,8 +1201,9 @@ class Picture:
     azimuth: float  # the picture's camera (0 and ELEVATION when the projection didn't find it)
     elevation: float
     report: dict
-    # (N, 3) linear: the picture's own colour at each covered texel, before the projection matched its exposure to
-    # the texture's (None where not applied); the joint colour match's anchor, where ``weight`` says it saw well
+    # (N, 3) linear: the picture's own colour at each covered texel, its shading taken out (projection's lighting
+    # fit) but its exposure kept (None where not applied); the colour match's anchor, where ``weight`` says it saw
+    # well, and what the main colours are named from
     colour: Optional[torch.Tensor] = None
 
 
@@ -1337,7 +1368,7 @@ def paint_views(
         clock("projection_s")
         log(f"[paint] picture: {picture.report}")
         reference = picture_reference(cutout)
-        colours = main_colours(cutout)
+        colours = picture_colours(picture, cutout)
         if cameras is None:
             cameras = ring(geom.verts, picture.azimuth, **camera_options)
         ordered = by_angle(cameras, picture.azimuth, picture.elevation)
