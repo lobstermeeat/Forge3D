@@ -914,3 +914,91 @@ def test_the_views_are_held_to_the_picture_only_where_it_sees_them_face_on():
     # Without the facing (an unapplied projection), the weight as it is
     unapplied = P.Picture(texture=texture, weight=picture.weight, azimuth=0.0, elevation=15.0, report={})
     assert torch.equal(unapplied.anchor_weight(), picture.weight)
+
+
+def test_robust_colour_leaves_out_a_reflection_in_the_view_that_sees_a_texel_best():
+    paint = torch.tensor([0.05, 0.12, 0.45])  # a blue car paint, linear
+    reflection = paint + 0.35  # a softbox reflected in it
+    n = 3
+    square = P.Samples(weight=torch.full((n,), 0.9), colour=torch.stack([reflection, paint, reflection]))
+    slant = P.Samples(weight=torch.full((n,), 0.3), colour=torch.stack([paint, paint, paint * 1.05]))
+    robust = P.robust_colour([square, slant], select=P.SELECT)
+    # Two views see each texel: the darker is the reference, so the square-on view's reflection is left out
+    assert torch.allclose(robust[0], paint, atol=1e-4)
+    assert torch.allclose(robust[1], paint, atol=1e-4)  # they agree: mostly the square-on view
+    # A view that sees the texel only at a slant (under ROBUST_ELIGIBLE of the best) isn't counted for the reference
+    glancing = P.Samples(weight=torch.full((n,), 0.1), colour=torch.stack([paint * 0.5] * n))
+    robust = P.robust_colour([square, glancing], select=P.SELECT)
+    assert torch.allclose(robust[0], reflection, atol=1e-3)  # only one counted: its own colour
+    # Three views: the median, so a ghost one view drew darker goes out as before
+    ghost = P.Samples(weight=torch.full((n,), 0.8), colour=torch.stack([paint * 0.3] * n))
+    third = P.Samples(weight=torch.full((n,), 0.7), colour=torch.stack([paint] * n))
+    robust = P.robust_colour([third, ghost, slant], select=P.SELECT)
+    assert torch.allclose(robust[1], paint, atol=1e-3)
+
+
+def test_deglare_takes_a_sheen_off_evenly_where_it_turns_the_hue_across_pure_red():
+    # A coral paint (a little more green than blue) under a broad studio sheen that turns it a little towards
+    # magenta, across pure red, where hard hue bins used to split: the sheen's pixels fell in a bin of their own,
+    # whose whiteness was the sheen's, and it stayed (run 8 and 11: the arcade machine's side in patches)
+    yy, xx = _grid()
+    generator = torch.Generator().manual_seed(3)
+    sheen = 0.25 * torch.exp(-((yy - 14) ** 2 + (xx - 16) ** 2) / (2 * 12.0**2))
+    tint = 0.01 + (torch.rand(64, 64, generator=generator) - 0.5) * 0.01 - 0.06 * sheen / 0.25
+    paint = torch.stack([torch.full((64, 64), 0.7), 0.06 + tint.clamp_min(0), 0.06 + (-tint).clamp_min(0)], -1)
+    view = projection._linear_to_srgb((_shaded(paint) + sheen[..., None]).clamp(0, 1))
+    out, _ = P.deglare(view, torch.ones(64, 64, dtype=torch.bool))
+    linear = projection._srgb_to_linear(out)
+    whiteness = linear.amin(-1) / (linear.amax(-1) - linear.amin(-1)).clamp_min(1e-4)
+    lit, unlit = sheen > 0.1, sheen < 0.005
+    assert float(whiteness[lit].mean()) < float(whiteness[unlit].mean()) + 0.03
+
+
+def test_deglare_fills_a_reflection_that_dims_the_paint_under_it_from_the_paint_round_it():
+    yy, xx = _grid()
+    paint = torch.tensor([0.05, 0.12, 0.45]).expand(64, 64, 3).clone()
+    softbox = ((yy - 30).abs() < 8) & ((xx - 34).abs() < 12)
+    # Under a softbox the clear coat reflects white and lets less of the paint through
+    glossy = torch.where(softbox[..., None], 0.55 * paint + 0.4, paint)
+    out, share = P.deglare(projection._linear_to_srgb(glossy), torch.ones(64, 64, dtype=torch.bool))
+    restored = projection._srgb_to_linear(out)
+    assert torch.allclose(restored[softbox], paint[softbox], atol=0.02)
+    assert torch.allclose(restored[~softbox], paint[~softbox], atol=1e-4)
+    assert abs(share - float(softbox.float().mean())) < 0.01
+
+
+def test_deglare_keeps_a_light_logo_where_the_render_has_a_grey_smudge():
+    # The iPhone's back: blue titanium with an apple the texture has only as a grey smudge, which the editing model
+    # draws cleanly in silver; a white reflection elsewhere goes
+    yy, xx = _grid()
+    blue = torch.tensor([0.08, 0.13, 0.3])
+    logo = ((yy - 32) ** 2 + (xx - 20) ** 2) < 8**2
+    reflection = ((yy - 32) ** 2 + (xx - 48) ** 2) < 8**2
+    silver = torch.tensor([0.55, 0.57, 0.6])
+    view = torch.where(logo[..., None], silver, blue.expand(64, 64, 3))
+    view = torch.where(reflection[..., None], blue + 0.35, view)
+    render = torch.where(logo[..., None], torch.tensor([0.12, 0.12, 0.13]), blue.expand(64, 64, 3))
+    out, _ = P.deglare(projection._linear_to_srgb(view), torch.ones(64, 64, dtype=torch.bool), projection._linear_to_srgb(render))
+    restored = projection._srgb_to_linear(out)
+    inside = ((yy - 32) ** 2 + (xx - 20) ** 2) < 5**2  # the logo away from the render's 5 x 5 at its edge
+    assert torch.allclose(restored[inside], view[inside], atol=1e-3)
+    assert torch.allclose(restored[reflection], blue.expand(64, 64, 3)[reflection], atol=0.02)
+
+
+def test_deglare_fills_a_reflections_white_core_but_not_a_silver_logo():
+    yy, xx = _grid()
+    blue = torch.tensor([0.06, 0.14, 0.45])
+    view = blue.expand(64, 64, 3).clone()
+    # A softbox: a light blue ring of reflected light round a white core (too grey to read a hue from)
+    ring = ((yy - 20) ** 2 + (xx - 44) ** 2) < 10**2
+    core = ((yy - 20) ** 2 + (xx - 44) ** 2) < 5**2
+    view[ring] = 0.6 * blue + 0.45
+    view[core] = torch.tensor([0.95, 0.96, 0.97])
+    # A silver logo with a blue tinge, which the texture (the render) doesn't have
+    logo = ((yy - 46) ** 2 + (xx - 18) ** 2) < 7**2
+    view[logo] = torch.tensor([0.5, 0.53, 0.58])
+    render = projection._linear_to_srgb(blue.expand(64, 64, 3).clone())
+    out, _ = P.deglare(projection._linear_to_srgb(view), torch.ones(64, 64, dtype=torch.bool), render)
+    restored = projection._srgb_to_linear(out)
+    assert torch.allclose(restored[ring], blue.expand(64, 64, 3)[ring], atol=0.02)  # the core with it
+    assert torch.allclose(restored[logo], view[logo], atol=0.02)

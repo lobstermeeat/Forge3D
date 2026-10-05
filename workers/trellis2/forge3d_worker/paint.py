@@ -107,9 +107,19 @@ NOVELTY_SIZE = 256
 EDGE = 0.5
 EDGE_REACH = 2
 MAX_NOVELTY = 0.2
-# Robust blend: where views disagree, only those within ROBUST_TOLERANCE (log luminance, about 30%) of the
-# weighted median count (a highlight or a ghost in one view doesn't go in)
+# Robust blend: where views disagree, only those within ROBUST_TOLERANCE (log luminance, about 30%) of a reference
+# count (a highlight or a ghost in one view doesn't go in). On a coloured surface (the views' blend at least
+# ROBUST_CHROMA saturated) the reference is the ROBUST_REFERENCE quantile of the luminance of the views that see the
+# texel well (weight at least ROBUST_ELIGIBLE of its best view's), each counted once: the median of three or more,
+# the darker of two. Taken by weight, as it still is on greys, it was the view that sees the texel most squarely
+# whenever two saw it, and the studio reflections the editing model paints on glossy paint (a car's bonnet, a
+# phone's back) went in from that view even where the other view had the paint (blind tests 2 and 3: whitish
+# blotches on the BMW's bonnet and the cartoon car's roof). On a grey, a view darker than the square-on one is
+# more likely shaded than the other is lit, so there the heavier view stays the reference
 ROBUST_TOLERANCE = 0.25
+ROBUST_REFERENCE = 0.4
+ROBUST_ELIGIBLE = 0.25
+ROBUST_CHROMA = 0.2
 
 # --- Bake ---------------------------------------------------------------------------------------------
 # As mvtexture.bake_views: a view's weight at a texel is cos ** COS_POWER (fading to nothing between
@@ -167,15 +177,32 @@ MAX_SATURATION = 1.5
 SELECT = 0.1
 # Glare out of the painted views before they go in (run 6: the views' studio reflections went into the cartoon car's
 # roof as a white patch, and three of four reviewers preferred today's texture there). A glossy highlight adds white
-# to a paint; shading only scales it. So per hue (GLARE_BINS bins round the colour wheel) a pixel may keep the
-# whiteness (min channel over chroma, max - min) of its paint, the GLARE_QUANTILE of that hue's pixels, or of the
-# render there (what the texture already has: a cream decal stays cream), whichever is more; the white above it is
-# taken off. Greys (chroma under GLARE_CHROMA of the brightest channel) can't tell white paint from a highlight and
-# are left alone; so is a hue with fewer than GLARE_PIXELS pixels
+# to a paint; shading only scales it. So a pixel may keep the whiteness (min channel over chroma, max - min) of its
+# paint, or of the render there (what the texture already has: a cream decal stays cream), whichever is more; the
+# white above it is taken off. A paint's whiteness is the GLARE_QUANTILE of the pixels of its hue, with GLARE_SLACK
+# more allowed so that a paint's own grain (brushed metal, a phone's frosted back) isn't evened into blotches: measured at
+# GLARE_BINS hues round the colour wheel (red, green and blue among them), each over the pixels within one step
+# either side, and read between the two nearest for each pixel's own hue. Read from hard bins instead (run 8 and
+# 11), a red or blue paint, whose hue sat on a boundary, came out in patches: the pixels either side of it took
+# different whitenesses, and the arcade machine's side and the BMW's bonnet got whitish mottling. Greys (chroma
+# under GLARE_CHROMA of the brightest channel, ramping in) can't tell white paint from a highlight and are left
+# alone; so is a hue with fewer than GLARE_PIXELS pixels. The render's whiteness counts where its hue is within
+# GLARE_HUE degrees of the view's, and wherever the render is grey there (a logo or a decal the texture has as a grey
+# smudge: the iPhone's apple, which the editing model draws cleanly in silver, stays)
 GLARE_BINS = 12
-GLARE_CHROMA = 0.15
+GLARE_CHROMA = (0.15, 0.25)
 GLARE_QUANTILE = 0.35
+GLARE_SLACK = 0.25
 GLARE_PIXELS = 200
+GLARE_HUE = (20.0, 40.0)
+# A softbox the editing model reflects in glossy paint (a car's bonnet) isn't white added to the paint alone: under
+# it the paint is greyer and darker too, so with the white taken off it stays as a darker patch. Where more than
+# GLARE_FILL (linear) of white came off a clearly coloured pixel (GLARE_FILL_CHROMA), and in the white core such a
+# reflection walls in, the colour is the paint's round it instead (filled in from the coloured pixels near it,
+# coarse to fine); a reflection's soft edge, with less white, only has the white taken off. A light detail on the
+# paint isn't filled: it is greyer than that (the iPhone's silver apple) and the paint round it isn't reflection
+GLARE_FILL = 0.06
+GLARE_FILL_CHROMA = 0.3
 # A bottom view whose render is this dark (median sRGB luminance over the object) isn't painted: the editing model
 # turned the dark underside of two cars into a second top, roof and windows (run 4 and 5), and a dark underside
 # has nothing to gain from it
@@ -601,13 +628,18 @@ def object_mask(
 
 
 def _whiteness(linear: torch.Tensor) -> tuple:
-    """Linear colours (..., 3) as (brightest channel, darkest channel, chroma, hue bin of GLARE_BINS)."""
+    """Linear colours (..., 3) as (brightest channel, darkest channel, chroma, hue in radians: 0 red, 2 pi / 3 green)."""
     top = linear.amax(-1)
     low = linear.amin(-1)
     r, g, b = linear.unbind(-1)
     hue = torch.atan2(math.sqrt(3) * (g - b), 2 * r - g - b)
-    bins = ((hue + math.pi) / (2 * math.pi) * GLARE_BINS).long().clamp(0, GLARE_BINS - 1)
-    return top, low, top - low, bins
+    return top, low, top - low, hue
+
+
+def _hue_apart(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """How far apart two hues (radians) are round the colour wheel, 0 to pi."""
+    d = torch.remainder(a - b, 2 * math.pi)
+    return torch.minimum(d, 2 * math.pi - d)
 
 
 def deglare(image: torch.Tensor, mask: torch.Tensor, render: Optional[torch.Tensor] = None) -> tuple[torch.Tensor, float]:
@@ -617,36 +649,68 @@ def deglare(image: torch.Tensor, mask: torch.Tensor, render: Optional[torch.Tens
     and the share of the masked pixels it changed.
     """
     linear = projection._srgb_to_linear(image.clamp(0, 1))
-    top, low, chroma, bins = _whiteness(linear)
-    coloured = mask & (chroma > GLARE_CHROMA * top.clamp_min(1e-4)) & (top > 0.02)
+    top, low, chroma, hue = _whiteness(linear)
+    # How much each pixel counts as coloured (a grey can't tell white paint from a highlight)
+    share = projection._smoothstep(GLARE_CHROMA[0], GLARE_CHROMA[1], chroma / top.clamp_min(1e-4))
+    share = share * (mask & (top > 0.02)).float()
+    coloured = share > 0.5
     ratio = low / chroma.clamp_min(1e-4)
-    render_ratio = render_bins = None
+    # The paint's whiteness at each of GLARE_BINS hues, from the pixels within one step either side (inf: too few)
+    step = 2 * math.pi / GLARE_BINS
+    centres = [-math.pi + k * step for k in range(GLARE_BINS)]
+    paint_ratio = torch.full((GLARE_BINS,), float("inf"), device=linear.device)
+    for k, centre in enumerate(centres):
+        near = coloured & (_hue_apart(hue, torch.tensor(centre, device=hue.device)) < step)
+        if int(near.sum()) < GLARE_PIXELS:
+            continue
+        values = ratio[near]
+        if values.numel() > GAIN_SAMPLES:
+            values = values[torch.linspace(0, values.numel() - 1, GAIN_SAMPLES, device=values.device).long()]
+        paint_ratio[k] = torch.quantile(values, GLARE_QUANTILE)
+    # Read between the two nearest hues (one with too few pixels gives way to the other)
+    position = (hue + math.pi) / step
+    below = torch.floor(position).long() % GLARE_BINS
+    above = (below + 1) % GLARE_BINS
+    t = position - torch.floor(position)
+    low_ratio, high_ratio = paint_ratio[below], paint_ratio[above]
+    both = torch.isfinite(low_ratio) & torch.isfinite(high_ratio)
+    allowed = torch.where(
+        both,
+        torch.lerp(torch.where(both, low_ratio, 0.0), torch.where(both, high_ratio, 0.0), t),
+        torch.minimum(low_ratio, high_ratio),
+    ) * (1 + GLARE_SLACK)
     if render is not None:
-        r_top, r_low, r_chroma, render_bins = _whiteness(projection._srgb_to_linear(render.clamp(0, 1)))
+        r_top, r_low, r_chroma, r_hue = _whiteness(projection._srgb_to_linear(render.clamp(0, 1)))
         render_ratio = torch.where(
-            r_chroma > GLARE_CHROMA * r_top.clamp_min(1e-4), r_low / r_chroma.clamp_min(1e-4), torch.full_like(r_low, 1e3)
+            r_chroma > sum(GLARE_CHROMA) / 2 * r_top.clamp_min(1e-4),
+            r_low / r_chroma.clamp_min(1e-4),
+            torch.full_like(r_low, 1e3),
         )
         # A grey in the render (its outline on the backdrop, its dark parts) has no hue to judge by and lets any
         # whiteness stay. The render and the view can be a pixel or two apart, so each pixel takes the least white
         # of the 5 x 5 round it: the render's greys don't shield the coloured pixels next to them (a rim highlight
         # on the outline still goes), and a decal the render has keeps its white inside its edges
         render_ratio = -F.max_pool2d(-render_ratio[None, None], 5, 1, 2)[0, 0]
-    out = linear
-    changed = torch.zeros_like(mask)
-    for k in range(GLARE_BINS):
-        where = coloured & (bins == k)
-        if int(where.sum()) < GLARE_PIXELS:
-            continue
-        values = ratio[where]
-        if values.numel() > GAIN_SAMPLES:
-            values = values[torch.linspace(0, values.numel() - 1, GAIN_SAMPLES, device=values.device).long()]
-        allowed = torch.full_like(ratio, float(torch.quantile(values, GLARE_QUANTILE)))
-        if render_ratio is not None:
-            allowed = torch.where(render_bins == k, torch.maximum(allowed, render_ratio.clamp(max=50.0)), allowed)
-        excess = (low - allowed * chroma).clamp_min(0) * where.float()
-        big = excess > 0.01
-        out = torch.where(big[..., None], (linear - excess[..., None]).clamp(0, 1), out)
-        changed |= big
+        same = 1 - projection._smoothstep(math.radians(GLARE_HUE[0]), math.radians(GLARE_HUE[1]), _hue_apart(hue, r_hue))
+        same = torch.where(render_ratio >= 1e3, torch.ones_like(same), same)  # a grey has no hue to differ by
+        kept = render_ratio.clamp(max=50.0)
+        allowed = torch.where(torch.isfinite(allowed), allowed + same * (kept - allowed).clamp_min(0), allowed)
+    excess = (low - allowed * chroma).clamp_min(0) * share
+    excess = torch.where(torch.isfinite(excess), excess, torch.zeros_like(excess))
+    out = (linear - excess[..., None]).clamp(0, 1)
+    changed = excess > 0.01
+    # Reflections, and the white cores they wall in: the paint round them instead
+    strong = (excess > GLARE_FILL) & (chroma >= GLARE_FILL_CHROMA * top.clamp_min(1e-4)) & mask
+    if bool(strong.any()):
+        edge = torch.zeros_like(strong)
+        edge[0], edge[-1], edge[:, 0], edge[:, -1] = True, True, True, True
+        walled = mask & ~strong & ~_flood(~strong, edge)
+        strong = strong | walled
+        paint = (mask & ~strong & (share > 0.5)).float()
+        if float(paint.sum()) > 0:
+            filled = projection._push_pull(out.permute(2, 0, 1), paint).permute(1, 2, 0)
+            out = torch.where(strong[..., None], filled.clamp(0, 1), out)
+            changed |= strong
     return projection._linear_to_srgb(out), float(changed.sum()) / max(1, int(mask.sum()))
 
 
@@ -1225,22 +1289,42 @@ class Blend:
         return projection._smoothstep(0.0, full_weight, self.total)
 
 
-def robust_colour(samples: Sequence[Samples], tolerance: float = ROBUST_TOLERANCE, select: float = 0.0) -> torch.Tensor:
+def robust_colour(
+    samples: Sequence[Samples],
+    tolerance: float = ROBUST_TOLERANCE,
+    select: float = 0.0,
+    *,
+    reference: float = ROBUST_REFERENCE,
+    eligible: float = ROBUST_ELIGIBLE,
+    chroma: float = ROBUST_CHROMA,
+) -> torch.Tensor:
     """
     The views' colour at each texel (N, 3, linear), blended by weight over the views whose luminance lies
-    within ``tolerance`` (log) of the weighted median of all of them: a highlight or a ghost that only one
-    view drew doesn't go in. Where one view has all the weight, it is that view's colour. With ``select``, the
-    views kept are blended by their weights sharpened (select_weights), so each texel takes mostly the best of them.
+    within ``tolerance`` (log) of a reference, so a highlight or a ghost that only one view drew doesn't go in:
+    where the views' blend is at least ``chroma`` saturated, the ``reference`` quantile of the luminance of the
+    views whose weight there is at least ``eligible`` of the best one's, each counted once (ROBUST_REFERENCE: the
+    median of three or more, the darker of two); elsewhere the weighted median. Where one view has all the weight,
+    it is that view's colour. With ``select``, the views kept are blended by their weights sharpened
+    (select_weights), so each texel takes mostly the best of them.
     """
     weight = torch.stack([s.weight for s in samples])  # (K, N)
     colour = torch.stack([s.colour for s in samples])  # (K, N, 3)
     luma = torch.log(projection._luma(colour) + 1e-3)
+    last = len(samples) - 1
     order = torch.argsort(luma, dim=0)
     sorted_luma = torch.gather(luma, 0, order)
-    cumulative = torch.cumsum(torch.gather(weight, 0, order), 0)
-    half = 0.5 * cumulative[-1:]
-    index = (cumulative < half).sum(0, keepdim=True).clamp(max=len(samples) - 1)
-    median = torch.gather(sorted_luma, 0, index)  # (1, N)
+    # By weight: where the running weight reaches half
+    by_weight = torch.cumsum(torch.gather(weight, 0, order), 0)
+    weighted = (by_weight < 0.5 * by_weight[-1:]).sum(0, keepdim=True).clamp(max=last)
+    # Each well-seen view once: the one of rank floor(reference * count) + 1 from the darkest
+    counted = ((weight > 0) & (weight >= eligible * weight.amax(0, keepdim=True))).float()
+    by_count = torch.cumsum(torch.gather(counted, 0, order), 0)
+    rank = torch.floor(reference * by_count[-1:]) + 1
+    fair = (by_count < rank).sum(0, keepdim=True).clamp(max=last)
+    blend = (weight[..., None] * colour).sum(0) / weight.sum(0).clamp_min(1e-9)[:, None]
+    top = blend.amax(-1)
+    coloured = ((top - blend.amin(-1)) >= chroma * top.clamp_min(1e-6))[None]
+    median = torch.gather(sorted_luma, 0, torch.where(coloured, fair, weighted))  # (1, N)
     keep = weight * ((luma - median).abs() <= tolerance).float()
     if select > 0:
         keep = select_weights(keep, select)
