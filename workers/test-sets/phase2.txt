@@ -25,6 +25,16 @@
 # (even on everyday asks, 13 to 13; Phase 5 on weak spots, 11 to 3), so finals stay TRELLIS.2's.
 # Verdicts: phase2.phase6-verdicts.json; the pairs: phase2.phase6-paired.json.
 #
+# Phase 7 (2 Oct 2026) worked on textures, on TRELLIS.2's own shapes, in staging apps. Ways to make the
+# one texture better (CFG 3, 24 steps, MV-Adapter's image+geometry views baked in or steering the
+# texture flow) didn't beat production's in blinded pairs. But the texture is a lottery: drawn three
+# more times on the same shape, four reviewers per texture found the best of the four publishable for
+# 16 of 20 in each of three runs (Phase 4's seeds, the next seeds, Phase 4's with other noise), against
+# 10, 11 and 14 for the final's own texture (15.8, 15.7 and 15.8 when two reviewers pick and two others
+# judge). Image statistics and a self-hosted VLM judge (Qwen3-VL-8B: 27.5 of 40 against 25) couldn't
+# find the best one reliably, so the Studio offers the creator the three more textures to pick from
+# (texture options). Verdicts and picks: phase2.phase7-textures.json.
+#
 # One run per line: a prompt, or the path of a photo relative to this file (png, jpg, webp).
 # Lines starting with # are notes.
 

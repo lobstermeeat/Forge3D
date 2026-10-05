@@ -19,36 +19,46 @@ export function useEngine(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     if (!canvas) return;
 
     let disposed = false;
-    const renderer = new Renderer({ canvas, preferWebGPU: true });
-    rendererRef.current = renderer;
 
-    renderer.init().then((type) => {
-      // StrictMode cleanup may have run before init resolved
-      if (disposed) {
-        renderer.dispose();
-        return;
-      }
+    // Start on the next task, not now. In development React's StrictMode mounts, cleans up and
+    // mounts again at once, and two renderers on one canvas fight over its WebGPU context: each
+    // configures it with its own GPU device, and if the discarded one does so last, the live one
+    // draws nothing (an empty viewport). StrictMode's throwaway mount is cleaned up before this
+    // timer fires, so only the live mount makes a renderer.
+    const start = window.setTimeout(() => {
+      if (disposed) return;
+      const renderer = new Renderer({ canvas, preferWebGPU: true });
+      rendererRef.current = renderer;
 
-      renderer.addStudioEnvironment();
-      setRendererType(type);
-      setBackendLabel(renderer.getBackendLabel());
+      void renderer.init().then((type) => {
+        // Unmounted before init resolved
+        if (disposed) {
+          renderer.dispose();
+          return;
+        }
 
-      const controls = new ViewportControls({
-        camera: renderer.camera,
-        domElement: canvas,
+        renderer.addStudioEnvironment();
+        setRendererType(type);
+        setBackendLabel(renderer.getBackendLabel());
+
+        const controls = new ViewportControls({
+          camera: renderer.camera,
+          domElement: canvas,
+        });
+        controlsRef.current = controls;
+
+        renderer.start((dt) => {
+          controls.update();
+          for (const cb of frameCallbacksRef.current) cb(dt);
+        });
+
+        setReady(true);
       });
-      controlsRef.current = controls;
-
-      renderer.start((dt) => {
-        controls.update();
-        for (const cb of frameCallbacksRef.current) cb(dt);
-      });
-
-      setReady(true);
-    });
+    }, 0);
 
     return () => {
       disposed = true;
+      window.clearTimeout(start);
       controlsRef.current?.dispose();
       rendererRef.current?.dispose();
       rendererRef.current = null;

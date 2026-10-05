@@ -1,6 +1,7 @@
 """Texture options (mode "textures") with a fake runtime: the shape, the seeds, the keys, the failures."""
 
 import base64
+import dataclasses
 import gc
 import io
 import json
@@ -14,7 +15,15 @@ from forge3d_worker import service
 from forge3d_worker.compress import CompressionError
 from forge3d_worker.inputs import InputError, parse_job
 from forge3d_worker.service import TEXTURES_NEED_TRELLIS2, handle_job, texture_seed
-from forge3d_worker.settings import CREDITS, MAX_TEXTURES, MODES, PRESETS, TEXTURE_COUNT, TEXTURE_SEED_STEP
+from forge3d_worker.settings import (
+    CREDITS,
+    FALLBACK_PIPELINE,
+    MAX_TEXTURES,
+    MODES,
+    PRESETS,
+    TEXTURE_COUNT,
+    TEXTURE_SEED_STEP,
+)
 
 
 def png(size=(64, 48)) -> str:
@@ -340,6 +349,45 @@ def test_the_shape_reports_its_pipeline():
 
     out = handle_job(textures_job(), FellBack(), FakeStorage(), Packer())
     assert out["pipeline"] == "512" and len(out["textures"]) == 3
+
+
+def test_a_final_that_fell_back_to_512_has_its_shape_made_with_512_at_once():
+    """The final's own fallback made its shape: the cascade would make another, or run out of memory again."""
+    runtime = FakeRuntime()
+    out = handle_job(textures_job(pipeline="512"), runtime, FakeStorage(), Packer())
+    final = PRESETS["final"]
+    fell_back = dataclasses.replace(final, pipeline_type=FALLBACK_PIPELINE[final.pipeline_type])
+    assert fell_back.pipeline_type == "512"
+    # The final's preset with the fallback's pipeline, through the generate() every job runs, then exported
+    # with the final's settings, as the final that fell back was
+    assert runtime.calls[0] == ("generate", fell_back, 1234, (64, 48), [])
+    assert [call[2] for call in runtime.calls if call[0] == "export"] == [fell_back] * 3
+    assert dataclasses.replace(fell_back, pipeline_type=final.pipeline_type) == final
+    assert out["pipeline"] == "512" and len(out["textures"]) == 3 and "texture_errors" not in out
+
+
+def test_the_finals_own_pipeline_is_the_same_as_none():
+    runtime = FakeRuntime()
+    out = handle_job(textures_job(pipeline="1024_cascade"), runtime, FakeStorage(), Packer())
+    assert runtime.calls[0] == ("generate", PRESETS["final"], 1234, (64, 48), [])
+    assert out["pipeline"] == "1024_cascade"
+    for pipeline in ("1024_cascade", None):
+        assert parse_job(payload(pipeline=pipeline), fallback_id="job").pipeline is None
+    assert parse_job(payload(pipeline="512"), fallback_id="job").pipeline == "512"
+
+
+@pytest.mark.parametrize("pipeline", ["1536_cascade", "1024", "512 ", "", 512, True, ["512"]])
+def test_other_pipelines_are_refused_before_anything_runs(pipeline):
+    runtime = FakeRuntime()
+    out = handle_job(textures_job(pipeline=pipeline), runtime, FakeStorage(), Packer())
+    assert out == {"error": "invalid input: pipeline must be the final's: '1024_cascade' or '512'"}
+    assert runtime.calls == []
+
+
+@pytest.mark.parametrize("mode", ["preview", "final"])
+def test_previews_and_finals_ignore_pipeline(mode):
+    job = parse_job({"image_base64": PICTURE, "mode": mode, "pipeline": "2048"}, fallback_id="job")
+    assert job.mode == mode and job.pipeline is None
 
 
 class Projecting(FakeRuntime):

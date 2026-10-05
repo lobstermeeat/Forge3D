@@ -19,7 +19,7 @@ from typing import Callable, Optional
 
 from PIL import Image, ImageOps
 
-from .settings import MAX_TEXTURES, MODES, TEXTURE_COUNT, Mode
+from .settings import FALLBACK_PIPELINE, MAX_TEXTURES, MODES, PRESETS, TEXTURE_COUNT, Mode
 
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_IMAGE_SIDE = 4096
@@ -54,6 +54,9 @@ class Job:
     views: tuple[View, ...] = ()
     # How many textures a "textures" job makes (1 to MAX_TEXTURES); 0 for the other modes
     count: int = 0
+    # The pipeline a "textures" job makes the final's shape with at once: the one the final fell back to
+    # ("512"). None makes it as the final job did (the final preset's own), and for the other modes
+    pipeline: Optional[str] = None
 
     @property
     def output_key(self) -> str:
@@ -213,6 +216,20 @@ def _texture_count(count: object) -> int:
     return count
 
 
+def _texture_pipeline(pipeline: object) -> Optional[str]:
+    """
+    A textures job's pipeline, which is the final's: the final preset's own (the same as none: the shape is
+    made as the final job made it), or the one a final falls back to (FALLBACK_PIPELINE), for one that did.
+    """
+    final = PRESETS["final"].pipeline_type
+    fallback = FALLBACK_PIPELINE[final]
+    if pipeline is None or (isinstance(pipeline, str) and pipeline == final):
+        return None
+    if not isinstance(pipeline, str) or pipeline != fallback:
+        raise InputError(f"pipeline must be the final's: {final!r} or {fallback!r}")
+    return pipeline
+
+
 def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) -> Job:
     """Turn a RunPod ``input`` payload into a validated ``Job``."""
     if not isinstance(payload, dict):
@@ -231,8 +248,10 @@ def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) 
     elif not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed < 2**31:
         raise InputError("seed must be an integer between 0 and 2^31 - 1")
 
-    # Only a textures job reads it; the other modes ignore it, as they ignore any field they don't know
-    count = _texture_count(payload.get("count")) if mode == "textures" else 0
+    # Only a textures job reads these; the other modes ignore them, as they ignore any field they don't know
+    textures = mode == "textures"
+    count = _texture_count(payload.get("count")) if textures else 0
+    pipeline = _texture_pipeline(payload.get("pipeline")) if textures else None
 
     request_id = payload.get("request_id", fallback_id)
     if not isinstance(request_id, str) or not REQUEST_ID.match(request_id):
@@ -240,4 +259,6 @@ def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) 
 
     image = _read_image(payload, fetch)
     views = _parse_views(payload.get("views"), fetch)
-    return Job(mode=mode, seed=seed, image=image, request_id=request_id, views=views, count=count)
+    return Job(
+        mode=mode, seed=seed, image=image, request_id=request_id, views=views, count=count, pipeline=pipeline
+    )

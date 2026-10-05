@@ -1,5 +1,6 @@
 """Trellis2Runtime on a fake pipeline: the retry after running out of GPU memory."""
 
+import dataclasses
 import os
 import sys
 import types
@@ -11,7 +12,7 @@ import torch
 from PIL import Image
 
 from forge3d_worker.pipeline import Trellis2Runtime
-from forge3d_worker.settings import PRESETS
+from forge3d_worker.settings import FALLBACK_PIPELINE, PRESETS
 
 
 def failure(kind: str, run: int) -> Exception:
@@ -222,6 +223,26 @@ def test_a_failed_fallback_is_raised_after_restoring(kind, capsys):
     # Its tensors were let go before the weights went back onto the GPU, and nothing tries a fourth time
     assert pipeline.low_vram is False and pipeline.weights() == {"cuda"} and pipeline.live_at_cuda == [0, 0]
     assert capsys.readouterr().out.count("\n") == 2
+
+
+@pytest.mark.parametrize("outcomes, low_vram", [(["mesh"], [False]), (["oom", "mesh"], [False, True])])
+def test_a_shape_made_again_for_a_final_that_fell_back_runs_its_fallback_pipeline_at_once(outcomes, low_vram):
+    """A textures job for a final that fell back ("pipeline": "512") gets the final's preset with that pipeline."""
+    pipeline = FakePipeline(outcomes=outcomes)
+    runtime = runtime_around(pipeline)
+    final = PRESETS["final"]
+    fell_back = dataclasses.replace(final, pipeline_type=FALLBACK_PIPELINE[final.pipeline_type])
+
+    assert runtime.generate(cutout(), fell_back, seed=7) == "mesh"
+
+    # The run the final's fallback made, on the same picture with the same seed, and never the cascade first.
+    # Running out of memory gets the one retry in low-VRAM mode any job gets, and nothing cheaper after it
+    assert [run["pipeline_type"] for run in pipeline.runs] == ["512"] * len(outcomes)
+    assert [run["low_vram"] for run in pipeline.runs] == low_vram and pipeline.runs[-1]["seed"] == 7
+    assert runtime.pipeline_used == "512"
+    # Its shape latent is the 512 one, so retexture() samples on it with the 512 texture flow, as run() did
+    assert runtime.last_latent.pipeline_type == "512" and runtime.last_latent.resolution == 512
+    assert pipeline.low_vram is False and pipeline.weights() == {"cuda"}
 
 
 def test_each_job_reports_the_pipeline_that_made_its_mesh():

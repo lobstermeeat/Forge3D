@@ -61,15 +61,19 @@ export function multiviewEnabled(env: Record<string, string | undefined> = proce
   return env['AI_MULTIVIEW']?.trim() === '1';
 }
 
+/** The values of AI_TEXTURE_OPTIONS that turn texture options off, in any case */
+const OFF = new Set(['0', 'false', 'off', 'no']);
+
 /**
  * Texture options: after each final, TRELLIS.2 makes 3 more textures for its shape and the
- * creator picks one in the panel. On by default; AI_TEXTURE_OPTIONS=0 (or false) turns it off.
+ * creator picks one in the panel. On by default; AI_TEXTURE_OPTIONS=0 (or false, off or no)
+ * turns it off.
  */
 export function textureOptionsEnabled(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
-  const value = env['AI_TEXTURE_OPTIONS']?.trim().toLowerCase();
-  return value !== '0' && value !== 'false';
+  const value = env['AI_TEXTURE_OPTIONS']?.trim().toLowerCase() ?? '';
+  return !OFF.has(value);
 }
 
 let studio: AIStudio | null = null;

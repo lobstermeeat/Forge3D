@@ -15,7 +15,7 @@ from PIL import Image
 
 from . import cleanup, multiview, normals, projection, rebake, uv_raster
 from .inputs import InputError, View
-from .settings import MULTIVIEW, MultiView, Preset
+from .settings import FALLBACK_PIPELINE, MULTIVIEW, MultiView, Preset
 
 MODEL_DIR = os.environ.get("TRELLIS2_MODEL_DIR", "/models/TRELLIS.2-4B")
 # The background-removed picture (RGBA, full frame) travels from generate() to export() on the mesh
@@ -138,17 +138,6 @@ def is_out_of_memory(err: BaseException) -> bool:
         return True
     # CuMesh (hole filling, inside run) checks its own cudaMalloc calls and raises a plain RuntimeError
     return isinstance(err, RuntimeError) and "out of memory" in str(err)
-
-
-# What a preset falls back to when it runs out of GPU memory even in low-VRAM mode. A final falls back to
-# the preview's pipeline: with the same seed, '512' samples the same 32³ sparse structure and the same
-# 512 shape latent as the cascade's first stage, so it rebuilds the shape the user approved, and it is
-# known to fit, since the preview of this picture ran with it. The cascade can't be made cheaper instead:
-# sample_shape_slat_cascade only lowers hr_resolution while it is above 1024, whatever max_num_tokens
-# says, and a 768 or 896 cascade would mean re-implementing run() to drive the 1024 models at resolutions
-# upstream never runs them at. Nor would it be sure to fit: what runs out is CuMesh's hole filling on the
-# decoded mesh, after every model has left the GPU, and that mesh would still be 56 to 77 % of the size.
-FALLBACK_PIPELINE = {"1024_cascade": "512"}
 
 
 def clear_cuda_error() -> Optional[str]:
@@ -295,7 +284,7 @@ class Trellis2Runtime:
         views_used then says how many were used. The image alone is the cutout the projection paints.
 
         Running out of GPU memory gets one retry in low-VRAM mode, and a final that still runs out is
-        made once more, still in low-VRAM mode, with the preview's pipeline (see FALLBACK_PIPELINE); a
+        made once more, still in low-VRAM mode, with the preview's pipeline (settings.FALLBACK_PIPELINE); a
         final that runs out while the models are already off the GPU (an A10, or asleep beside Pixal3D)
         goes to that pipeline at once. pipeline_used then says which pipeline made the mesh.
 

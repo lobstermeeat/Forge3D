@@ -22,7 +22,14 @@ type Job =
       noObject: boolean;
       viewsUsed: number;
     }
-  | { kind: 'textures'; readyAt: number; seed: number; count: number; noTextures: boolean };
+  | {
+      kind: 'textures';
+      readyAt: number;
+      seed: number;
+      count: number;
+      pipeline: string;
+      noTextures: boolean;
+    };
 
 const MOCK_CREDITS = ['Mock model for development: no AI ran'];
 /** Ratings like the FLUX worker's, by position, so the second picture is always the best */
@@ -156,13 +163,20 @@ export class MockWorkers implements StudioWorkers {
     };
   }
 
-  async startTextures(input: { image: Buffer; seed: number; count: number }): Promise<string> {
+  async startTextures(input: {
+    image: Buffer;
+    seed: number;
+    count: number;
+    pipeline?: string;
+  }): Promise<string> {
     const { width = 0 } = await sharp(input.image).metadata();
     return this.add({
       kind: 'textures',
       readyAt: Date.now() + this.delayMs * 2,
       seed: input.seed,
       count: input.count,
+      // Like the worker, the shape is made with the pipeline the final fell back to, if it did
+      pipeline: input.pipeline ?? MOCK_FINAL_PIPELINE,
       // A small photo stands in for a textures job that failed, so the panel's note can be seen
       noTextures: width < 256,
     });
@@ -187,7 +201,7 @@ export class MockWorkers implements StudioWorkers {
     });
     return {
       status: 'done',
-      output: { textures, errors: [], pipeline: MOCK_FINAL_PIPELINE, seconds: 1.5 * job.count },
+      output: { textures, errors: [], pipeline: job.pipeline, seconds: 1.5 * job.count },
     };
   }
 

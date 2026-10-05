@@ -94,6 +94,11 @@ export interface ModelOutput {
    * for finals, and "512" for a final that ran out of GPU memory (see workers/README.md).
    */
   pipeline?: string;
+  /**
+   * The model that made it, when the host says: "trellis2", or "pixal3d" for a final with the
+   * recipe on. Orainge's job API on Modal says; RunPod and older workers leave it out.
+   */
+  model?: string;
 }
 
 /**
@@ -181,13 +186,16 @@ export interface StudioWorkers {
   model(jobId: string): Promise<WorkerJobState<ModelOutput>>;
   /**
    * Makes `count` more textures for a final's shape (texture options), from what the final was
-   * made from: its picture, seed and views. Only workers that can make them have these.
+   * made from: its picture, seed and views, and its pipeline when it fell back to "512". Only
+   * workers that can make them have these.
    */
   startTextures?(input: {
     image: Buffer;
     views?: ModelView[];
     seed: number;
     count: number;
+    /** "512" for a final that fell back to it: the worker then makes the shape with it at once */
+    pipeline?: string;
     requestId: string;
   }): Promise<string>;
   textures?(jobId: string): Promise<WorkerJobState<TexturesOutput>>;
