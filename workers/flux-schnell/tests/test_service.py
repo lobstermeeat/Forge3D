@@ -28,7 +28,7 @@ def test_generates_consecutive_seeds_and_uploads_pngs():
     out = handle_job({"id": "j", "input": {"prompt": "a brass pocket watch", "count": 3, "seed": 10, "request_id": "gen_7"}}, fake_generate(calls), storage)
 
     assert [c[1] for c in calls] == [10, 11, 12]
-    assert calls[0][0].startswith("a brass pocket watch. A single object, centered")
+    assert calls[0][0].startswith("A studio product photo of a brass pocket watch: an angled perspective shot")
     assert [img["seed"] for img in out["images"]] == [10, 11, 12]
     assert out["images"][0]["url"] == "https://assets.example.com/ai/gen_7/reference-10.png"
     data, content_type = storage.saved["ai/gen_7/reference-12.png"]
@@ -74,5 +74,5 @@ def test_gpu_faults_restart_the_worker_but_other_failures_dont():
     assert out == {"error": "generation failed: ConnectionError: R2 unreachable"}
 
 
-def test_template_does_not_double_the_full_stop():
-    assert build_prompt("a red kettle.").startswith("a red kettle. A single object")
+def test_template_takes_the_prompt_without_its_full_stop():
+    assert build_prompt("a red kettle.").startswith("A studio product photo of a red kettle: an angled")

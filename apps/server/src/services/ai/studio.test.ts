@@ -244,16 +244,17 @@ const sentViews = (start: { input: Record<string, unknown> }) =>
   start.input['views'] as ModelView[] | undefined;
 
 /**
- * AIStudio with scripted workers; `multiview` is AI_MULTIVIEW=1 and `textureOptions` is
- * AI_TEXTURE_OPTIONS (on unless false)
+ * AIStudio with scripted workers; `multiview` is AI_MULTIVIEW=1, `textureOptions` is
+ * AI_TEXTURE_OPTIONS (on unless false) and `paint` is AI_PAINT=1
  */
 function setup(
   prompts = true,
   {
     multiview = false,
     textureOptions,
+    paint,
     fetchImpl,
-  }: { multiview?: boolean; textureOptions?: boolean; fetchImpl?: FetchLike } = {},
+  }: { multiview?: boolean; textureOptions?: boolean; paint?: boolean; fetchImpl?: FetchLike } = {},
 ) {
   const store = memoryStore();
   const storage = memoryStorage();
@@ -264,6 +265,7 @@ function setup(
     storage,
     multiview,
     textureOptions,
+    paint,
     fetchImpl,
   });
   return { studio, store, storage, ...jobs };
@@ -1119,6 +1121,73 @@ describe('AIStudio with AI_MULTIVIEW=1 (the views step)', () => {
       viewsError: expect.stringContaining('128 px'),
     });
     expect((await studio.get('u1', photo.id)).status).toBe('reviewing');
+  });
+});
+
+describe('AIStudio with AI_PAINT=1 (the painter)', () => {
+  let warn: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => warn.mockRestore());
+
+  /** A prompt's generation taken to its final, which comes back as `final` says; returns the poll that found it */
+  async function finished(
+    t: ReturnType<typeof setup>,
+    final: Partial<ModelOutput> = {},
+    user = 'u1',
+  ): Promise<GenerationView> {
+    const gen = await picking(t, user);
+    await t.studio.pick(user, gen.id, 0);
+    t.models.set([...t.models.keys()].at(-1)!, { status: 'done', output: modelOutput(4242, 'preview') });
+    await t.studio.get(user, gen.id);
+    await t.studio.keep(user, gen.id);
+    t.models.set([...t.models.keys()].at(-1)!, {
+      status: 'done',
+      output: { ...modelOutput(4242, 'final'), pipeline: '1024_cascade', ...final },
+    });
+    await t.studio.get(user, gen.id);
+    return t.studio.get(user, gen.id);
+  }
+
+  it('asks for the final to be painted, saying what the object is, and starts the painter during the preview', async () => {
+    const t = setup(true, { paint: true });
+    const gen = await finished(t, { painted: { applied: true, views: 9, of: 10, size: 4096 } });
+    const preview = t.started.find((s) => s.kind === 'preview')!;
+    const final = t.started.find((s) => s.kind === 'final')!;
+    expect(preview.input).not.toHaveProperty('paint');
+    expect(final.input).toMatchObject({ mode: 'final', seed: 4242, paint: { subject: 'a vintage film camera' } });
+    // The painter's weights take a while to load: it starts once the preview is there to look at
+    expect(t.warmed).toContain('painter');
+    expect(gen).toMatchObject({ status: 'done', error: null });
+  });
+
+  it('offers no texture options for a painted final, but does for one the painter left alone', async () => {
+    const t = setup(true, { paint: true });
+    const painted = await finished(t, { painted: { applied: true, views: 9, of: 10 } });
+    expect(painted).toMatchObject({ status: 'done', textures: null });
+    expect(t.store.rows.get(painted.id)).toMatchObject({ texturesStatus: null, texturesJobId: null });
+    expect(t.started.some((s) => s.kind === 'textures')).toBe(false);
+
+    const unpainted = await finished(t, { painted: { applied: false, reason: 'TimeoutError: too slow' } }, 'u2');
+    expect(unpainted.textures?.status).toBe('running');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('TimeoutError: too slow'));
+  });
+
+  it('asks nothing of the painter without AI_PAINT=1', async () => {
+    const t = setup();
+    await finished(t);
+    expect(t.started.find((s) => s.kind === 'final')!.input).not.toHaveProperty('paint');
+    expect(t.warmed).not.toContain('painter');
+  });
+
+  it('paints a photo as an "object": it has no words', async () => {
+    const t = setup(true, { paint: true });
+    const gen = await t.studio.startFromPhoto('u1', await png('#468'));
+    t.models.set([...t.models.keys()].at(-1)!, { status: 'done', output: modelOutput(9, 'preview') });
+    await t.studio.get('u1', gen.id);
+    await t.studio.keep('u1', gen.id);
+    expect(t.started.find((s) => s.kind === 'final')!.input).toMatchObject({ paint: { subject: '' } });
   });
 });
 

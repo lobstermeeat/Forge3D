@@ -1614,6 +1614,9 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
     seen = visible.float() * fades * _smoothstep(0.0, 0.15, cos_face)
     old_lin = _srgb_to_linear(model.texture.view(-1, 3)[flat])
     new_lin = _srgb_to_linear(sample(picture.rgb.permute(2, 0, 1)))
+    # The picture's own colour at each texel with its shading taken out but its exposure kept (debug: what the
+    # painter holds its views to); the picture as it is where the lighting can't be fitted
+    picture_texels = new_lin
 
     # The texture's roughness and metallic at each texel (the same atlas, at its own resolution)
     rows = torch.div(flat, tex_w, rounding_mode="floor").float()
@@ -1629,6 +1632,7 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
     exposure = {"gain": 1.0, "shading": 1.0, "note": note}
     if coef is not None:
         factor = torch.exp(-(face_normals @ coef[1:] + coef[0])).clamp(*GAIN_RANGE)
+        picture_texels = (new_lin * (factor / factor[strong].median())[:, None]).clamp(0, 1)
         new_lin = (new_lin * factor[:, None]).clamp(0, 1)
         seen_factor = factor[strong]
         exposure["gain"] = round(float(seen_factor.median()), 3)
@@ -1659,6 +1663,7 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
         debug.update(
             weight=detail_weight, flat=flat, xy=xy, zbuf=zbuf, outline=outline, edge_fade=edge_fade,
             misfit_fade=misfit_fade, cos=cos, visible=visible, highlight=highlight, texture_size=(tex_h, tex_w),
+            picture_linear=picture_texels,
         )
     if coverage < MIN_COVERAGE:
         raise _Skip(f"too little of the model faces the camera ({coverage:.1%} of texels)")

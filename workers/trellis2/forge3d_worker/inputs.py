@@ -28,6 +28,8 @@ MAX_VIEWS = 8
 # A view's weight against the others (see settings.MultiView)
 MAX_VIEW_WEIGHT = 100.0
 REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+# What a painted final's object is, in the creator's words (the prompt): at most this many characters
+MAX_SUBJECT = 200
 
 
 class InputError(ValueError):
@@ -57,6 +59,9 @@ class Job:
     # The pipeline a "textures" job makes the final's shape with at once: the one the final fell back to
     # ("512"). None makes it as the final job did (the final preset's own), and for the other modes
     pipeline: Optional[str] = None
+    # A final whose texture the painter paints again (painting.py): what the object is, in the creator's words
+    # ("object" when there are none). None for no painting, and for the other modes
+    paint: Optional[str] = None
 
     @property
     def output_key(self) -> str:
@@ -252,6 +257,8 @@ def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) 
     textures = mode == "textures"
     count = _texture_count(payload.get("count")) if textures else 0
     pipeline = _texture_pipeline(payload.get("pipeline")) if textures else None
+    # Only a final is painted
+    paint = _paint_subject(payload.get("paint"), payload.get("subject")) if mode == "final" else None
 
     request_id = payload.get("request_id", fallback_id)
     if not isinstance(request_id, str) or not REQUEST_ID.match(request_id):
@@ -260,5 +267,24 @@ def parse_job(payload: object, fallback_id: str, fetch: Optional[Fetch] = None) 
     image = _read_image(payload, fetch)
     views = _parse_views(payload.get("views"), fetch)
     return Job(
-        mode=mode, seed=seed, image=image, request_id=request_id, views=views, count=count, pipeline=pipeline
+        mode=mode, seed=seed, image=image, request_id=request_id, views=views, count=count, pipeline=pipeline,
+        paint=paint,
     )
+
+
+def _paint_subject(paint: object, subject: object) -> Optional[str]:
+    """
+    ``"paint": true`` asks for the painter, with ``"subject"`` saying what the object is (else "object"). The
+    subject is the creator's prompt, which the server allows longer than the painter's prompts use: it is cut
+    to MAX_SUBJECT characters, never refused (a refusal would fail a final the preview of which was made).
+    """
+    if paint is None or paint is False:
+        return None
+    if paint is not True:
+        raise InputError("paint must be true or false")
+    if subject is None:
+        return "object"
+    if not isinstance(subject, str):
+        raise InputError("subject must be a string")
+    text = " ".join("".join(c if c.isprintable() else " " for c in subject).split())
+    return text[:MAX_SUBJECT].rstrip() or "object"

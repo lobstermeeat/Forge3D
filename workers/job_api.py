@@ -11,7 +11,7 @@ works with either host:
 
 and one route RunPod doesn't have:
 
-    POST /{worker}/warm           ->  {"status": "WARMING"}
+    POST /{worker}/warm           ->  {"status": "WARMING"}  (also a worker that takes no jobs here: "painter")
 
 which starts one of the worker's containers without waiting for it, so a job that follows soon
 skips the cold start (about 45 s for FLUX and 100 s for TRELLIS.2).
@@ -108,6 +108,11 @@ class ModalCalls:
     @property
     def workers(self) -> tuple[str, ...]:
         return tuple(self._functions)
+
+    @property
+    def warmable(self) -> tuple[str, ...]:
+        """The workers that can be warmed: those that take jobs, and those other workers call (the painter)."""
+        return tuple(dict.fromkeys([*self._functions, *self._warm]))
 
     def spawn(self, worker: str, job: dict) -> str:
         with _modal_outages():
@@ -253,6 +258,11 @@ def create_app(token: str, calls: Calls, runsync_wait: float = RUNSYNC_WAIT_S) -
             raise HTTPException(status_code=404, detail=f"unknown worker {worker!r}")
         return worker
 
+    def warmable_name(worker: str) -> str:
+        if worker not in getattr(calls, "warmable", calls.workers):
+            raise HTTPException(status_code=404, detail=f"unknown worker {worker!r}")
+        return worker
+
     def spawn(worker: str, body: Any) -> str:
         if not isinstance(body, dict) or not isinstance(body.get("input"), dict):
             raise HTTPException(status_code=400, detail='the body must be {"input": {...}}')
@@ -290,7 +300,7 @@ def create_app(token: str, calls: Calls, runsync_wait: float = RUNSYNC_WAIT_S) -
         return {"id": job_id, "status": "CANCELLED"}
 
     @app.post("/{worker}/warm")
-    def warm(worker: str = Depends(worker_name)) -> dict:
+    def warm(worker: str = Depends(warmable_name)) -> dict:
         try:
             calls.warm(worker)
         except WorkersUnavailable as err:

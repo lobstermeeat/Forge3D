@@ -13,7 +13,7 @@ from typing import Any, Callable, Iterator, Optional, Sequence
 
 from PIL import Image
 
-from . import cleanup, multiview, normals, projection, rebake, uv_raster
+from . import cleanup, glass, multiview, normals, projection, rebake, uv_raster
 from .inputs import InputError, View
 from .settings import FALLBACK_PIPELINE, MULTIVIEW, MultiView, Preset
 
@@ -245,6 +245,9 @@ class Trellis2Runtime:
     # (which carries the cutout), it may change the texture in place; what it returns is kept as
     # last_before_projection. None in production
     before_projection: Optional[Callable[[Any, Any], Any]] = None
+    # While that step runs, to_glb's RGBA base colour (the alpha is TRELLIS.2's opacity, which the texture the
+    # step sees no longer has), for experiments that export again themselves (glass.split_glass needs it)
+    last_rgba: Any = None
     # The last successful generate()'s shape latent and what it was made from (None after a failed one),
     # which retexture() samples a new texture for
     last_latent: Optional[Latent] = None
@@ -252,6 +255,8 @@ class Trellis2Runtime:
     last_retexture: Optional[dict] = None
     # What the last export() dropped as floating pieces (None when the preset has the cleanup off)
     last_cleanup: Optional[dict] = None
+    # What the last export() made of the model's glass (glass.summary of split_glass's report; None untextured)
+    last_glass: Optional[dict] = None
     # Texture options: the second and later exports of a retextured shape sample only their texture, on the
     # layout to_glb worked out for the first (rebake.py). Experiments turn this off to compare: then every
     # export runs to_glb in full, and no layout is used or kept
@@ -607,6 +612,7 @@ class Trellis2Runtime:
         self.last_projection: Optional[dict] = None
         self.last_before_projection: Any = None
         self.last_cleanup = None
+        self.last_glass = None
         self.last_export = None
         try:
             return self._export(mesh, preset)
@@ -630,19 +636,35 @@ class Trellis2Runtime:
         self._free_gpu_memory()
         glb = self._textured(mesh, preset)
         material = glb.visual.material
-        textured = getattr(material, "baseColorTexture", None) is not None
+        # to_glb's RGBA base colour: its alpha is TRELLIS.2's opacity, which unpremultiply drops
+        original = getattr(material, "baseColorTexture", None)
+        textured = original is not None
         if textured:
-            material.baseColorTexture = unpremultiply(material.baseColorTexture)
+            material.baseColorTexture = unpremultiply(original)
         if preset.drop_floaters:
             # Before the projection, which then fits the picture's silhouette to the model without them
             self.last_cleanup = self._drop_floaters(glb)
         if textured and self.before_projection is not None:
-            self.last_before_projection = self.before_projection(glb, mesh)
+            self.last_rgba = original
+            try:
+                self.last_before_projection = self.before_projection(glb, mesh)
+            finally:
+                self.last_rgba = None
         if textured and preset.project_picture:
             # Before the normals, which may split vertices: the projection works on to_glb's mesh
             self.last_projection = self._project(glb, getattr(mesh, CUTOUT, None))
         glb = shade(glb, mesh.voxel_size)
-        return glb.export(file_type="glb"), int(len(glb.faces))
+        if textured:
+            # After the shading normals, which take one mesh: glass can come back as a second primitive
+            glb = self._glass(glb, original, mesh.voxel_size)
+        return glb.export(file_type="glb"), glass.face_count(glb)
+
+    def _glass(self, glb: Any, original: Any, voxel_size: Any) -> Any:
+        """See-through glass as a BLEND primitive of its own, other glass glossy (never raises)."""
+        model, report = glass.split_glass(glb, original, voxel_size)
+        self.last_glass = glass.summary(report)
+        print(f"[forge3d] glass: {json.dumps(self.last_glass)}")
+        return model
 
     def _textured(self, mesh: Any, preset: Preset) -> Any:
         """

@@ -229,6 +229,11 @@ export interface StudioDeps {
    * workers can. On unless false.
    */
   textureOptions?: boolean;
+  /**
+   * AI_PAINT=1: finals are painted again from views round the model (the painter). A painted
+   * final gets no texture options. Off by default.
+   */
+  paint?: boolean;
   /** Downloads worker outputs stored at a URL (workers with R2) */
   fetchImpl?: FetchLike;
 }
@@ -429,6 +434,10 @@ export class AIStudio {
           mode: kind,
           // The final refines the preview's shape
           seed: kind === 'final' ? (record.seed ?? undefined) : undefined,
+          // What the object is, for the painter's prompts (a photo has no words: the worker says "object")
+          ...(kind === 'final' && this.deps.paint
+            ? { paint: { subject: record.prompt ?? '' } }
+            : {}),
           requestId: record.id,
         });
       }
@@ -515,6 +524,15 @@ export class AIStudio {
         durationMs: (record.durationMs ?? 0) + Math.round(output.seconds * 1000),
         updatedAt: new Date(),
       };
+      if (kind === 'preview' && this.deps.paint) {
+        // The painter loads 58 GB of weights: start it while the creator looks at the preview
+        this.warm(record.userId, 'painter');
+      }
+      if (output.painted && !output.painted.applied) {
+        console.warn(
+          `[AI] Generation ${record.id}: the final wasn't painted: ${output.painted.reason ?? 'no reason given'}`,
+        );
+      }
       return await this.settle(
         record,
         kind === 'preview'
@@ -532,8 +550,11 @@ export class AIStudio {
               finalTriangles: output.triangles,
               finalPipeline: output.pipeline ?? null,
               // More textures for its shape follow (the next poll starts their job), unless
-              // another model than TRELLIS.2 made it
-              ...(this.textureOptions() && retexturable(output) ? TEXTURES_TO_START : NO_TEXTURES),
+              // another model than TRELLIS.2 made it, or the painter painted it (the options
+              // would be TRELLIS.2's own textures, unpainted)
+              ...(this.textureOptions() && retexturable(output) && !output.painted?.applied
+                ? TEXTURES_TO_START
+                : NO_TEXTURES),
             },
       );
     } catch (err) {

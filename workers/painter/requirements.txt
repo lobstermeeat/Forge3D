@@ -1,0 +1,23 @@
+# Runtime dependencies on top of torch 2.6.0 and torchvision 0.21.0 (cu124), which the image installs, on Python
+# 3.10 or later (diffusers 0.37 and peft 0.18 need it). torchvision is needed: the processor's image and video
+# processors are torchvision-based. These pins install together (pip check passes).
+#
+# Qwen-Image-Edit-2511 came to diffusers in 0.37.0: its transformer config sets zero_cond_t, which 0.36 doesn't
+# know (it would load the weights but modulate the input pictures as if they were noisy). 0.37.1 is that line's
+# last patch release; 0.38-0.40 change nothing this pipeline does at batch size 1, and 0.40 needs
+# huggingface_hub 1.x, which transformers 4.x doesn't allow.
+diffusers==0.37.1
+# The Qwen2.5-VL text encoder, its tokenizer and processor. The checkpoint was saved with transformers 4.57.1;
+# 4.57.6 is that line's last patch release (the judge pins the same)
+transformers==4.57.6
+tokenizers==0.22.2
+huggingface_hub==0.36.2
+# accelerate puts each weight straight on the GPU (from_pretrained's device_map)
+accelerate==1.12.0
+# load_lora_weights and fuse_lora go through peft (diffusers 0.37 asks for 0.17 or later; 0.18.1 was the last
+# release before diffusers 0.37.0)
+peft==0.18.1
+safetensors==0.7.0
+pillow==12.1.1
+numpy<2.3
+# Not needed: sentencepiece (Qwen's tokenizer is byte-level BPE: vocab.json and merges.txt)

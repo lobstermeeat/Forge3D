@@ -1,0 +1,19 @@
+# Real products: eight prompts that name a real product, typed the way creators type them. FLUX.1
+# [schnell] tends to draw these the way catalogues show them, straight from the front or the side,
+# which hides the sides and back that image-to-3D then has to make up. The first is the founder's
+# own prompt, which got three straight-on front views out of four (2 Oct 2026). ops/exp_pictures.py
+# measures which way the pictures face, together with phase2.txt.
+#
+#   modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/products.txt --name products --pictures-only
+#
+# One run per line: a prompt, or the path of a photo relative to this file (png, jpg, webp).
+# Lines starting with # are notes.
+
+make a bmw car m3 model blue
+a red Nike Air Jordan 1 sneaker
+a white PlayStation 5 controller
+an iPhone 15 Pro in blue titanium
+a yellow Lamborghini Huracan
+a classic Coca-Cola glass bottle
+a Rolex Submariner watch
+a cherry red Gibson Les Paul guitar

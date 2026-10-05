@@ -1,5 +1,7 @@
 """modal_app.py without Modal's servers: its pins, its shape and the per-job wrapper."""
 
+from types import SimpleNamespace
+
 import ast
 import base64
 import io
@@ -50,7 +52,8 @@ def test_defines_the_workers_the_api_and_the_helpers():
     assert isinstance(modal_app.FluxSchnell, modal.Cls)
     assert isinstance(modal_app.MultiView, modal.Cls)
     assert isinstance(modal_app.GeometryViews, modal.Cls)
-    assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d"]  # download order
+    assert isinstance(modal_app.Painter, modal.Cls)
+    assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d", "painter"]  # download order
     assert isinstance(modal_app.download_models, modal.Function)
     assert isinstance(modal_app.api, modal.Function)
     assert isinstance(modal_app.make_model, modal.Function)
@@ -465,6 +468,8 @@ class FakeWorkers:
             "pipeline": "512" if mode == "preview" else "1024_cascade",
             "timings": {"generate_s": 1.0},
         }
+        if mode == "final" and job["input"].get("paint"):  # the painter's note, when asked
+            result["paint"] = {"applied": True, "size": 4096, "views": 9, "of": 10}
         if mode == "final":  # the worker says whether it painted the picture onto the model
             result["projection"] = {"applied": False, "reason": "the silhouettes don't match well enough"}
             result["views_used"] = 0
@@ -1041,3 +1046,127 @@ def test_saving_the_kernel_caches_never_fails_a_job(tmp_path, monkeypatch, capsy
     monkeypatch.setattr(modal_app, "cache", BrokenCache())
     modal_app.share_caches()  # reported, not raised
     assert "kernel caches not saved: RuntimeError: volume unavailable" in capsys.readouterr().out
+
+
+def test_a_final_asking_to_be_painted_warms_the_painter_first(monkeypatch):
+    assert modal_app.wants_paint({"input": {"paint": True}})
+    assert modal_app.wants_paint({"input": {"mode": "final", "paint": True}})
+    assert not modal_app.wants_paint({"input": {"mode": "preview", "paint": True}})
+    assert not modal_app.wants_paint({"input": {"mode": "textures", "paint": True}})
+    assert not modal_app.wants_paint({"input": {"paint": "yes"}}) and not modal_app.wants_paint({"input": {}})
+    assert not modal_app.wants_paint({})
+
+    spawned = []
+
+    class Methods:
+        warm = SimpleNamespace(spawn=lambda: spawned.append("warm"))
+
+    monkeypatch.setattr(modal_app, "Painter", lambda: Methods)
+    modal_app.warm_painter()
+    assert spawned == ["warm"]
+
+    def down():
+        raise RuntimeError("Modal is down")
+
+    monkeypatch.setattr(modal_app, "Painter", down)
+    modal_app.warm_painter()  # only costs time
+
+
+class PainterCall:
+    """A spawned Painter.paint call: answers, raises, or never finishes in time."""
+
+    def __init__(self, kit, outcome, cancel_fails=False):
+        self.kit, self.outcome, self.cancel_fails = kit, outcome, cancel_fails
+        self.waited = None
+        self.cancelled = False
+
+    def get(self, timeout=None):
+        self.waited = timeout
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return {"texture": b"png", "kit": self.kit}
+
+    def cancel(self):
+        self.cancelled = True
+        if self.cancel_fails:
+            raise RuntimeError("already finished")
+
+
+def painter_with(monkeypatch, outcome=None, cancel_fails=False):
+    calls = []
+
+    def spawn(kit):
+        calls.append(PainterCall(kit, outcome, cancel_fails))
+        return calls[-1]
+
+    monkeypatch.setattr(modal_app, "Painter", lambda: SimpleNamespace(paint=SimpleNamespace(spawn=spawn)))
+    return calls
+
+
+def test_the_painter_is_waited_for_until_the_jobs_deadline(monkeypatch):
+    calls = painter_with(monkeypatch)
+    deadline = modal_app.time.monotonic() + 500
+    assert modal_app.painter_until(deadline)(b"kit") == {"texture": b"png", "kit": b"kit"}
+    assert 490 < calls[0].waited <= 500 and not calls[0].cancelled
+
+
+@pytest.mark.parametrize(
+    "outcome", [TimeoutError(), modal.exception.FunctionTimeoutError("the painter's own limit")],
+)
+def test_a_painter_that_doesnt_answer_in_time_is_cancelled_and_says_so(monkeypatch, outcome):
+    calls = painter_with(monkeypatch, outcome)
+    with pytest.raises(TimeoutError, match="the painter timed out"):
+        modal_app.painter_until(modal_app.time.monotonic() + 300)(b"kit")
+    assert calls[0].cancelled
+
+
+def test_a_painter_that_fails_is_cancelled_and_its_error_kept(monkeypatch):
+    calls = painter_with(monkeypatch, RuntimeError("CUDA error: an illegal memory access"), cancel_fails=True)
+    with pytest.raises(RuntimeError, match="illegal memory access"):  # not the failed cancel's error
+        modal_app.painter_until(modal_app.time.monotonic() + 300)(b"kit")
+    assert calls[0].cancelled
+
+
+def test_a_final_with_too_little_time_left_doesnt_ask_the_painter(monkeypatch):
+    calls = painter_with(monkeypatch)
+    with pytest.raises(TimeoutError, match="too little to paint"):
+        modal_app.painter_until(modal_app.time.monotonic() + modal_app.PAINT_MIN_WAIT - 5)(b"kit")
+    assert calls == []
+
+
+def test_each_job_gets_a_painter_with_a_deadline_inside_its_limit(monkeypatch):
+    warmed = []
+    monkeypatch.setattr(modal_app, "warm_painter", lambda: warmed.append(True))
+    calls = painter_with(monkeypatch)
+    runtime = SimpleNamespace()
+    modal_app.prepare_job(runtime, "trellis2", {"input": {"mode": "final", "paint": True}})
+    assert warmed == [True]
+    runtime.painter(b"kit")
+    budget = modal_app.TRELLIS2_TIMEOUT - modal_app.PAINT_MARGIN
+    assert budget - 5 < calls[0].waited <= budget
+    # A job not asking, or a final Pixal3D makes (it isn't painted), starts no H100
+    modal_app.prepare_job(runtime, "trellis2", {"input": {"mode": "preview"}})
+    modal_app.prepare_job(runtime, "pixal3d", {"input": {"mode": "final", "paint": True}})
+    assert warmed == [True] and callable(runtime.painter)
+    # The margin leaves the export after painting (projection, glass, gltfpack at 4096, upload) its time
+    assert modal_app.PAINT_MARGIN >= 120 and modal_app.TRELLIS2_TIMEOUT == 900
+
+
+def test_the_trellis2_class_uses_the_timeout_the_painter_deadline_assumes():
+    source = (WORKERS / "modal_app.py").read_text()
+    decorator = source[: source.index("class Trellis2:")].rsplit("@app.cls(", 1)[1]
+    assert "timeout=TRELLIS2_TIMEOUT," in decorator
+
+
+def test_a_run_asks_for_a_painted_final_only_when_told(tmp_path):
+    workers = FakeWorkers()
+    state = run(tmp_path / "run-p", workers, prompt="a yellow Lamborghini Huracan", final=True, paint=True)
+    preview, final = (call[1]["input"] for call in workers.calls if call[0] == "trellis")
+    assert "paint" not in preview and "subject" not in preview
+    assert (final["paint"], final["subject"]) == (True, "a yellow Lamborghini Huracan")
+    assert state["steps"]["final"]["paint"] == {"applied": True, "size": 4096, "views": 9, "of": 10}
+
+    workers = FakeWorkers()
+    state = run(tmp_path / "run-q", workers, prompt="a mug", final=True)
+    final = [call[1]["input"] for call in workers.calls if call[0] == "trellis"][-1]
+    assert "paint" not in final and "paint" not in state["steps"]["final"]

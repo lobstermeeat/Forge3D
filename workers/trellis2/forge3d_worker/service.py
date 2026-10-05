@@ -8,6 +8,7 @@ import time
 import traceback
 from typing import Any, Callable, Optional, Protocol, Sequence
 
+from . import painting
 from .inputs import Fetch, InputError, Job, View, parse_job
 from .settings import CREDITS, PRESETS, TEXTURE_SEED_STEP, Preset
 from .storage import Storage
@@ -69,6 +70,11 @@ def handle_job(
     "elevation", "weight"?}]``. Reuse the preview's ``seed`` and ``views`` for the final pass so the final
     refines the approved shape. ``"mode": "textures"`` with the final's input (its ``seed`` required),
     ``"count"``? and ``"pipeline"``? makes more textures for the final's shape instead: see make_textures.
+
+    A final with ``"paint": true`` (and ``"subject"``: what the object is, in the creator's words) has its
+    texture painted again by the runtime's ``painter`` (painting.py) before the picture's projection, and is
+    packed with textures up to painting.SIZE; its result's ``paint`` says how that went. Without a painter,
+    or when painting fails, the final is made as always and ``paint`` says why it wasn't painted.
     """
     try:
         spec = parse_job(job.get("input"), fallback_id=str(job.get("id", "job")), fetch=fetch)
@@ -87,13 +93,27 @@ def handle_job(
         timings[name] = round(now - clock, 3)
         clock = now
 
+    painter = getattr(runtime, "painter", None) if spec.paint is not None else None
+    paint_note: Optional[dict] = None
+    if spec.paint is not None and not callable(painter):
+        paint_note = {"applied": False, "reason": "this worker has no painter"}
     try:
         mesh, views_used = _generate(spec, runtime, preset)
         pipeline = getattr(runtime, "pipeline_used", None) or preset.pipeline_type
         lap("generate_s")
-        raw, triangles = runtime.export(mesh, preset)
+        if callable(painter):
+            runtime.before_projection = painting.hook(painter, spec.paint)
+        try:
+            raw, triangles = runtime.export(mesh, preset)
+        finally:
+            if callable(painter):
+                runtime.before_projection = None
+                paint_note = getattr(runtime, "last_before_projection", None) or {
+                    "applied": False, "reason": "the export didn't reach the painter",
+                }
         lap("export_s")
-        packed = pack(raw, preset.texture_size)
+        painted = bool(paint_note and paint_note.get("applied"))
+        packed = pack(raw, painting.SIZE if painted else preset.texture_size)
         lap("compress_s")
         stored = storage.put(spec.output_key, packed, "model/gltf-binary")
         lap("upload_s")
@@ -120,6 +140,8 @@ def handle_job(
     }
     notes = _export_notes(runtime)
     result.update(notes)
+    if paint_note is not None:
+        result["paint"] = paint_note
     if _gpu_fault(notes):
         result["refresh_worker"] = True
     return result
@@ -255,7 +277,7 @@ def _export_notes(runtime: Any) -> dict:
     apart it dropped (presets with drop_floaters). Each only when there is one.
     """
     notes = {}
-    for key, attribute in (("projection", "last_projection"), ("floaters", "last_cleanup")):
+    for key, attribute in (("projection", "last_projection"), ("floaters", "last_cleanup"), ("glass", "last_glass")):
         value = getattr(runtime, attribute, None)
         if isinstance(value, dict) and value:
             notes[key] = value

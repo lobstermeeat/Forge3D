@@ -9,6 +9,7 @@ work. There are no third-party AI APIs involved.
 | [`pixal3d/`](pixal3d)           | Pixal3D (MIT) on TRELLIS.2    | image to textured GLB: finals, off by default | 48 GB (L40S); finals peak at 28–31 GB            |
 | [`flux-schnell/`](flux-schnell) | FLUX.1 [schnell] (Apache-2.0) | text to reference images                      | 48 GB (L40S, A6000, A40)                         |
 | [`multiview/`](multiview)       | MV-Adapter on SDXL 1.0        | picture to six views, off by default          | 24 GB (A10G)                                     |
+| [`painter/`](painter)           | Qwen-Image-Edit-2511 (Apache-2.0) | a final's texture painted from ten views, off by default | 80 GB (H100)                            |
 
 They run on [Modal](https://modal.com) (`modal_app.py`, the simplest way to start) or on
 RunPod serverless (the Dockerfiles; the multiview and Pixal3D workers have none yet). Both hosts
@@ -72,6 +73,15 @@ else. The real parts that come loose sit much closer: a fox's tail tip 0.9 % awa
 0.75 %, a balloon's pilot and burner up to 1.4 %; sprinkles, pearls and chopsticks touch the model
 (within 0.35 %). It takes 0.1 to 1.3 s per final on one CPU core.
 
+**Glass is see-through** (`trellis2/forge3d_worker/glass.py`, every textured export since Phase 8). TRELLIS.2
+predicts an opacity with the colour, which `to_glb` keeps in the texture's alpha; the export used to divide the
+colour by it and drop it, so glass came out opaque and up to four times brighter (the BMW's pale mint windows).
+Glass with something behind it (a car's windows over its cabin, a cup over its tea) is now a second primitive
+with its own BLEND material: a dark glossy tint, not metal, whose opacity follows TRELLIS.2's alpha. Other glass
+(lamp lenses) stays in the body, glossy and not metal, in its own colour; warm, saturated glass (tail lights,
+eyes) and matte low alpha (a dragon's skin) are left alone. The body stays OPAQUE, so nothing else is drawn as
+transparent. It never fails an export, and results say what it did (`glass`, Job contracts).
+
 **A generation's shape can be retextured** (for experiments: `Trellis2Runtime.retexture`). After
 `generate()`, `last_latent` holds the shape latent TRELLIS.2 sampled (a few MB, on the CPU), with the
 picture, its cutout and the seed. `retexture(sampler_params=…, seed=…, views=…)` samples only the
@@ -86,6 +96,100 @@ doesn't show, TRELLIS.2's texture is a lottery. In Phase 7's three sets of rolls
 time), the final's own texture was publishable for 35 of 60, and the best of four textures on the same shape
 for about 47. So after a final, the worker makes three more textures for the same shape with `retexture`,
 and the creator picks one.
+
+## The painter: finals painted from views round the model (Phase 8), off by default
+
+TRELLIS.2 gets a product's shape right, but its texture comes from a coarse voxel field: soft and blotchy, paler
+than the picture, with the picture's shadows and reflections copied in, and the sides the picture doesn't show
+made up (a garbled Coca-Cola script, an arcade machine's sides a different red from its front). The painter
+paints the final's texture again from views round the model, the way a 3D artist would texture it from product
+photos:
+
+1. **Views.** The final's mesh (to_glb's, before the picture's projection) is rendered with its own texture from
+   ten cameras: eight round it 15° above the horizon, the first where the picture was taken from, then the top
+   and the bottom (`trellis2/forge3d_worker/paint.py`, `ring`).
+2. **Painting.** Qwen-Image-Edit-2511 (Apache-2.0, with lightx2v's 8-step Lightning LoRA, Apache-2.0) turns each
+   render into a clean product photo of the same object from exactly the same viewpoint
+   (`painter/painter_worker/views.py`: the render is its only picture; the prompt names the side and the
+   picture's main colours, read from the picture with its shading taken out and each paint named once, so the
+   arcade machine's shaded sides aren't asked for as a second, darker red). Given the picture as well, it
+   copied the picture's viewpoint instead (Phase 8, runs 4 and 5). Each painted view must keep the render's
+   outline (silhouette IoU at least 0.9 after the best small shift and scale), draw nothing the render doesn't
+   have (`novelty`, at most 0.2) and paint no part in another colour (`recolour`, at most 6% of the object: run 12
+   painted the all-red sneaker's toe and side panels silver, and the views after it carried the colourway on).
+   A view gets three tries: the first from pure noise, which paints the
+   cleanest views; the second and third from the render's own latents noised to 0.95 and then 0.9 (the first
+   one or two of the eight Lightning steps skipped, `views.SKIPS`), because from pure noise the model turns
+   some objects to the angle catalogues show them at (run 7: the sneaker kept 3 of its 10 views, the watch 4,
+   the controller 5; run 10, with the later tries started part way: 10, 10 and 10). A view that fails all
+   three is left out. A bottom view whose render is dark isn't painted (the model turned two cars' dark
+   undersides into a second roof). Each view goes into the texture before the next is rendered, so the views
+   agree.
+3. **Glare.** A painted view's glossy highlights come out before it's baked (`deglare`): a highlight adds white
+   to a paint where shading only darkens it, so each pixel keeps the whiteness of its paint (read for its own hue
+   round the colour wheel, with some slack for the paint's grain), or of the render there (a cream decal the
+   texture has stays cream), and loses the white above it. A softbox reflected in glossy paint dims the paint
+   under it too, so where a lot of white came off a clearly coloured pixel, it takes the paint round it instead.
+   Without this the views' studio reflections baked into the cartoon car's roof as a pale patch; read from hard
+   hue bins (runs 8 and 11), a red or blue paint came out mottled.
+4. **Colour.** A view's brightness and saturation (never its hue, so grey stays grey) are matched to the other
+   views where they overlap and to the picture's own colour, with its shading taken out, where the picture sees
+   the surface nearly face on (`joint_tone`: one least-squares solve for all views, robust to details only one
+   view drew; `Picture.anchor_weight`). A side the picture sees at a slant keeps the shade it was in, so it
+   isn't held to: held to it, the arcade machine's right side came out a darker red than its coral front.
+5. **Bake.** Each texel takes its colour mostly from the view that sees it most squarely (`select_weights`),
+   leaving out views whose brightness there disagrees with the others (a highlight one view drew; on coloured
+   paint, where two views see a texel well, the darker sets the bar, so a reflection in the square-on view
+   doesn't win), into a
+   4096 × 4096 base colour on the final's own UV layout (the 2048 texture scaled up first: at 2048 the bake lost
+   the wheel spokes and grille slats the views drew). Then the export carries on as for any final: the picture's
+   projection on top, the shading normals, the glass, gltfpack.
+
+It runs on its own GPU: the `Painter` class in `modal_app.py` (an H100: the model keeps 58 GB of weights
+resident). The Trellis2 container sends it the final's mesh, picture and prompt as one kit and waits for the
+texture (`trellis2/forge3d_worker/painting.py`); a painter that fails, can't be reached or keeps none of its
+views costs the final only the wait, and the final keeps TRELLIS.2's texture. The wait ends 150 s before the
+Trellis2 job's 15-minute limit at most (`PAINT_MARGIN` in `modal_app.py`), when the call is cancelled, so a slow
+H100 can't time the whole final out; a GPU fault in the painter retires its container, as in the other workers.
+A final asks for it with `"paint": true` (Job contracts); the
+server does so with `AI_PAINT=1` (The Studio's AI panel). Painting takes 44 to 89 s on the H100 (median 58 s on
+the thirteen objects of run 13: about 4.3 s a try, ten views and the tries some need), the colour match and bake
+about a second more; sending the kit to the painter and the texture back added 8 to 23 s in the staging runs
+below; loading the model from cold takes one to two minutes, which the server starts while the creator looks at
+the preview.
+
+**Phase 8's blind tests.** Thirteen objects (five of Phase 2's prompts and eight real products, the first the
+founder's own BMW prompt) were made as today's finals and then painted, on the same shapes. Each round, four
+reviewers who didn't know which was which compared the two textures against the picture, from six sides and three
+close-ups, and chose one (two of them saw every pair the other way round). Each round tested the fixes the one
+before it called for:
+
+| Round | The painter | Painted chosen | Objects won: painted, today, split |
+| --- | --- | --- | --- |
+| 1 | Run 6: the first painter | 35 of 52 | 8, 4, 1 |
+| 2 | Run 8: glare out, each paint named once | 36 of 52 | 8, 3, 2 |
+| 3 | Run 11: later tries started part way, colour held to the picture face on | 33 of 52 | 7, 4, 2 |
+| 4 | Run 12: glare off evenly round the colour wheel, reflections out of the blend | 37 of 52 | 9, 3, 1 |
+| 5 | Run 13, as shipped: views that repaint parts in other colours tried again | 37 of 52 | 8, 2, 3 |
+
+In round 5 the reviewers found the painted texture closer to the picture 32 times to today's 7 (13 the same) and
+the cleaner finish 20 times to 12 (20 the same). Today's two wins (the arcade machine and the PS5 controller,
+whose clean flat paint TRELLIS.2 already gets right) were each by the narrowest margin from all four reviewers.
+Round 3 lost ground to whitish mottling from the glare step's hue bins (fixed in round 4) and round 4 lost the
+sneaker to a silver colourway the editing model invented (fixed in round 5).
+
+What it doesn't fix: the shape (TRELLIS.2's); what TRELLIS.2's texture already got wrong where the picture can't
+help, which the views clean up but keep (the shield's ghost lion on its back, the iPhone's smudged logo, the
+watch's ghost dial on its case back); glare in the picture itself (the BMW's roof); fine print (a watch dial, the
+Coca-Cola script), which comes out garbled or doubled; and the odd detail the editing model knows the product has
+but the picture doesn't show (the PS5 controller's light bar, lit blue).
+
+**Through the app's own path.** In a staging app, `make --final --paint` (the request the server makes with
+`AI_PAINT=1`) made the BMW, the sneaker and the Coca-Cola bottle from prompt to painted final with the code as
+shipped: 9, 10 and 10 of their ten views kept, the painting step 64, 93 and 103 s from the final's side, and each
+final done 121 to 157 s after it started. With the painter's deadline and the other fixes of a code review, the
+same path painted the BMW again (9 of 10 views, 57 s) and a 240-character sneaker prompt that the earlier code
+refused (9 of 10 views, 102 s; its colours weren't held to the picture, whose camera was ambiguous).
 
 ## The recipe: Pixal3D finals, off by default
 
@@ -257,8 +361,28 @@ sent when a view is left out: one with no object in it, or one whose object runs
 off, and the model comes out crumpled; `CLIPPED_EDGE` in `pipeline.py`).
 
 Finals also carry `projection`, whether the picture was painted onto the model (see above); its
-time is part of `export_s`. A preset with `drop_floaters` adds `floaters`: how many pieces the model had,
+time is part of `export_s`.
+
+A final can ask for the painter (The painter, above) with `"paint": true` and `"subject"`, what the object is in
+the creator's words (the prompt, cut to its first 200 characters; "object" when left out, as for a photo).
+Previews and texture options ignore it.
+Its result then carries `paint`, and its textures are packed up to 4096 (`painting.SIZE`):
+
+```json
+{ "paint": { "applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 61.2, "seconds": 64.0 } }
+```
+
+`views` of `of` went into the texture; `joint` is what their colours were held to (`"picture"`, or `"none"` when
+the picture's projection didn't fit). A final that couldn't be painted is made as always, packed at its usual
+size, and says why: `{ "applied": false, "reason": "TimeoutError: the painter timed out …" }`, `"the painter kept
+none of its 10 views"` (with `"views": 0, "of": 10`), or `"this worker has no painter"` (on RunPod and with the
+recipe on). The painting is part of `export_s`. A preset with `drop_floaters` adds `floaters`: how many pieces the model had,
 how many were dropped, their faces and share of the surface, and the largest of them.
+
+Every textured result (previews, finals, texture options) also carries `glass` (Glass is see-through, above):
+whether any glass was split off or made glossy (`applied`, `reason`), the see-through, opaque and coloured glass
+it found (`regions`, `faces`, `area_share` each), the see-through glass's `opacity` and `tint` when there is
+some, and `seconds`.
 
 A final made by the recipe has the same fields, with Pixal3D in its `credits`, and says what the recipe
 did. For example:
@@ -674,13 +798,15 @@ texture options).
    modal run --detach workers/modal_app.py::download_models --which reference
    ```
 
-   Add `--which pixal3d` only to turn the recipe on (step 6). It fetches both of Pixal3D's weight
+   Add `--which painter` only if the server will run with `AI_PAINT=1` (the painter, 59 GB: Qwen-Image-Edit-2511
+   and its Lightning LoRA, every file checked against its pinned sha256). Add `--which pixal3d` only to turn the
+   recipe on (step 6). It fetches both of Pixal3D's weight
    sets (about 44 GB: the multi-view set for most pictures, the single-view set for thin, flat
    objects), MoGe-2 and NAF, and reuses the TRELLIS.2 weights' decoders, DINOv3 and BiRefNet, so it
    comes after `--which trellis2`. Add `--which multiview` only if the server will run with
    `AI_MULTIVIEW=1` (it also fetches the image+geometry adapter the experiments use, 3.6 GB). Without
-   `--which`, `download_models` fetches all four sets, about 119 GB (Pixal3D's two flow-model sets are
-   44 GB of it).
+   `--which`, `download_models` fetches all five sets, about 178 GB (Pixal3D's two flow-model sets are
+   44 GB of it, the painter's 59 GB).
 
 5. Update the server's database. From Phase 6 on, the server reads the `views` and `views_error`
    columns of `ai_generations` (`apps/server/src/db/schema.ts`) even with `AI_MULTIVIEW` off, so
@@ -892,6 +1018,16 @@ model made gets none (on Modal its result's `model` says, e.g. `"pixal3d"` with 
 retexturing is TRELLIS.2's. Workers with the recipe on (`ORAINGE_FINAL_MODEL=pixal3d`) refuse every
 textures job, even for a final TRELLIS.2 made in Pixal3D's place, so turn them off there too.
 
+**Painted finals (`AI_PAINT=1`, off by default).** With `AI_PAINT=1` on the server, every final asks for the
+painter (The painter, above) with the creator's prompt as its subject, and the server starts the painter's GPU
+while the creator looks at the preview (at most once every 2 minutes per user), so a final rarely waits for the
+model to load. A painted final takes a minute or two longer and gets no texture options: they would be TRELLIS.2's
+own textures, unpainted. A final the painter couldn't paint (its result's `paint` says why; the server logs it)
+is kept as made, with texture options as usual. Painted finals are about twice the size (3 MB rather than 1.5 MB),
+for their 4096 textures. It needs the painter's weights (`download_models --which painter`) and the job API's
+`painter` route, which `modal_app.py` registers (warming only); on RunPod there is no painter and finals are
+made as before.
+
 To try the panel without GPUs, start the server with `AI_WORKERS_MOCK=1`: stand-in workers draw
 labelled pictures (rated, with the second always the best) and return a small house model after
 a second or two, then the final's house in 3 other colours as its texture options. A prompt with
@@ -958,6 +1094,8 @@ GiB-hour of memory, so about $2.30/h for a FLUX container and $2.50/h for a TREL
 | Cold start and 60 s idle, per container scaled up                                  | ~2 min          | ~$0.08      |
 | Six views (multiview, A10G at ~$1.30/h all-in)                                     | 46 s            | ~$0.02      |
 | Final by the recipe, when `ORAINGE_FINAL_MODEL=pixal3d`                            | 45–103 s        | ~$0.03–0.07 |
+| Painting a final, when `AI_PAINT=1` (H100 at $0.001097/s, ~$4.85/h with its 8 cores and 64 GiB) | 44–89 s (median 58 s) | ~$0.06–0.12 |
+| The painter's cold start and 120 s idle, per container scaled up                   | ~3–4 min        | ~$0.25–0.30 |
 | Pixal3D loading, when `ORAINGE_FINAL_MODEL=pixal3d` and a final starts a container | ~90 s           | ~$0.06      |
 
 The views run only with `AI_MULTIVIEW=1`. The GPU work in a prompt-to-final run comes to about
@@ -987,6 +1125,10 @@ is pinned at commit `f7cf38429b0bd264f1995f0f8743a88b1c728b94` and its weights a
 NAF (Apache-2.0), all pinned and installed in the TRELLIS.2 image either way, and it reuses the
 TRELLIS.2 worker's decoders, DINOv3 and BiRefNet. The About dialog lists TRELLIS.2 for image to 3D;
 a Pixal3D final's `credits` name Pixal3D.
+
+The painter ([`painter/NOTICE.md`](painter/NOTICE.md)), off by default, runs Qwen-Image-Edit-2511 (Qwen,
+Apache-2.0) with lightx2v's Qwen-Image-Edit-2511-Lightning LoRA (Apache-2.0), both at pinned revisions, through
+diffusers (Apache-2.0). Nothing of it needs crediting in the app.
 
 Never installed: NATTEN (not a licensing matter; the one call NAF makes is computed in PyTorch,
 `pixal3d/pixal3d_worker/neighborhood.py`), nvdiffrast and nvdiffrec (research-only; replaced by
