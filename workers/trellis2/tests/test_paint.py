@@ -540,3 +540,61 @@ def test_sheet_puts_each_view_on_a_row():
     views = [P.View(camera=None, render=render, painted=render, aligned=render), P.View(camera=None, render=render)]
     image = P.sheet(views, height=40)
     assert image.size == (3 * 80, 80)
+
+
+# --- The joint colour match ---------------------------------------------------------------------------------
+
+
+def _views_of(truth, gains, coverage, weight=1.0):
+    """Samples of ``truth`` (N, 3 linear) as views that see ``coverage`` (list of bool masks) at ``gains``."""
+    out = []
+    for gain, seen in zip(gains, coverage):
+        colour = (truth * torch.tensor(gain)).clamp(0, 1)
+        out.append(P.Samples(weight=seen.float() * weight, colour=colour))
+    return out
+
+
+def test_joint_gains_undo_each_views_exposure():
+    torch.manual_seed(0)
+    n = 3000
+    truth = torch.rand(n, 3) * 0.5 + 0.1
+    index = torch.arange(n)
+    coverage = [index < 1500, (index >= 1000) & (index < 2500), (index >= 2000) | (index < 200)]
+    exposures = [(1.0, 1.0, 1.0), (1.5, 1.2, 0.8), (0.7, 0.9, 1.3)]
+    views = _views_of(truth, exposures, coverage)
+    anchor_weight = (index < 800).float()  # the picture is sure of the first texels, which view 0 sees
+    found = P.joint_gains(views, truth, anchor_weight)
+    expected = torch.tensor([[1 / e for e in exposure] for exposure in exposures])
+    assert torch.allclose(found, expected, rtol=0.03), found
+
+
+def test_joint_gains_ignore_a_detail_one_view_drew():
+    torch.manual_seed(1)
+    n = 4000
+    truth = torch.full((n, 3), 0.3)
+    index = torch.arange(n)
+    coverage = [index < 3000, index >= 1000]
+    views = _views_of(truth, [(1.0, 1.0, 1.0), (1.25, 1.25, 1.25)], coverage)
+    # View 1 also drew a dark decal over a quarter of the overlap
+    views[1].colour[1000:1500] = 0.02
+    found = P.joint_gains(views, truth, (index < 1000).float())
+    assert abs(float(found[1, 0]) - 0.8) < 0.04, found
+    assert abs(float(found[0, 0]) - 1.0) < 0.03, found
+
+
+def test_joint_gains_leave_a_lone_view_alone():
+    n = 500
+    truth = torch.full((n, 3), 0.4)
+    index = torch.arange(n)
+    views = _views_of(truth, [(1.0, 1.0, 1.0), (2.0, 2.0, 2.0)], [index < 250, index >= 250])
+    found = P.joint_gains(views, truth, torch.zeros(n))
+    assert torch.allclose(found, torch.ones(2, 3), atol=1e-3), found
+
+
+def test_joint_gains_stay_within_the_limit():
+    n = 1000
+    truth = torch.full((n, 3), 0.05)
+    index = torch.arange(n)
+    views = _views_of(truth, [(10.0, 10.0, 10.0)], [index >= 0])
+    found = P.joint_gains(views, truth, torch.ones(n), max_gain=2.0)
+    assert torch.allclose(found, torch.full((1, 3), 0.5), atol=1e-4), found

@@ -132,6 +132,15 @@ MAX_GAIN = 2.0
 GAIN_TEXELS = 500
 CONFIDENT = 0.5
 GAIN_SAMPLES = 400_000
+# Joint colour match (run 3: the BMW's left side came out a lighter blue than its back, a seam where they met).
+# After every view is in, per-view per-channel gains are solved together, so that the views agree with each other
+# where two of them see the same texel and with the picture's paint where it is CONFIDENT: weighted least squares
+# on log colour, with JOINT_ROBUST more rounds that all but ignore texels disagreeing by much more than
+# JOINT_SCALE (log units; Cauchy weights: a decal one view drew and another didn't), each gain pulled towards 1
+# by JOINT_PRIOR of its weight
+JOINT_SCALE = 0.15
+JOINT_ROBUST = 4
+JOINT_PRIOR = 0.01
 
 
 def _device(device: Optional[Any]) -> torch.device:
@@ -866,6 +875,82 @@ def gains(
     return torch.exp(median).clamp(1 / max_gain, max_gain)
 
 
+def joint_gains(
+    samples: Sequence[Samples],
+    anchor: torch.Tensor,
+    anchor_weight: torch.Tensor,
+    *,
+    max_gain: float = MAX_GAIN,
+    scale: float = JOINT_SCALE,
+    rounds: int = JOINT_ROBUST,
+    prior: float = JOINT_PRIOR,
+) -> torch.Tensor:
+    """
+    Per-view, per-channel gains (K, 3) for K views' ``samples`` (colour in linear light), solved together: they
+    minimise, per channel, on log colour l,
+
+        sum over view pairs i, j and texels t of  min(w_i, w_j) (l_i + g_i - l_j - g_j)^2
+      + sum over views i and texels t of          w_i a (l_i + g_i - l_anchor)^2
+      + prior * (each view's total weight) * g_i^2
+
+    where a is ``anchor_weight`` (N,), how sure the ``anchor`` colour (N, 3, linear: the picture's paint) is.
+    Texels near black in either colour don't count. After the first solve, ``rounds`` more re-weight each term
+    by Cauchy's weight on its residual (``scale`` log units), so a detail one view drew and another didn't
+    hardly pulls the gains. The views then agree where they overlap, without a seam where one view's exposure
+    differed, and as a whole match the picture. Gains stay within ``max_gain`` either way; a view that overlaps
+    nothing keeps 1.
+    """
+    count = len(samples)
+    device = anchor.device
+    if count == 0:
+        return torch.ones((0, 3), device=device)
+    eps = 1e-4
+    weight = torch.stack([s.weight for s in samples])  # (K, N)
+    log = torch.log(torch.stack([s.colour for s in samples]) + eps)  # (K, N, 3)
+    lit = torch.stack([projection._luma(s.colour) > 0.004 for s in samples])  # (K, N)
+    log_anchor = torch.log(anchor + eps)  # (N, 3)
+    anchored = (anchor_weight * (projection._luma(anchor) > 0.004).float())[None] * weight * lit.float()  # (K, N)
+    gains = torch.zeros((count, 3), device=device)
+    for round_number in range(max(0, rounds) + 1):
+        matrix = torch.zeros((3, count, count), device=device, dtype=torch.float64)
+        rhs = torch.zeros((3, count), device=device, dtype=torch.float64)
+        totals = torch.zeros(count, device=device, dtype=torch.float64)
+        for i in range(count):
+            # Pairs: view i against every view j (both orders appear, so each pair counts once per order)
+            both = torch.minimum(weight[i][None], weight) * (lit[i][None] & lit).float()  # (K, N)
+            both[i] = 0
+            difference = log[i][None] - log  # (K, N, 3): l_i - l_j
+            if round_number:
+                residual = difference + (gains[i][None, None] - gains[:, None])  # with the current gains
+                both = both[..., None] * _cauchy_weight(residual, scale)  # (K, N, 3)
+            else:
+                both = both[..., None].expand(-1, -1, 3)
+            pair = both.sum(1).double()  # (K, 3): S_ij per channel
+            matrix[:, i, i] += pair.sum(0)
+            matrix[:, i, :] -= pair.T
+            rhs[:, i] -= (both * difference).sum(1).sum(0).double()
+            # The anchor
+            to_anchor = log[i] - log_anchor  # (N, 3)
+            a = anchored[i][:, None].expand(-1, 3)
+            if round_number:
+                a = a * _cauchy_weight(to_anchor + gains[i][None], scale)
+            matrix[:, i, i] += a.sum(0).double()
+            rhs[:, i] -= (a * to_anchor).sum(0).double()
+            totals[i] = float(weight[i].sum())
+        # Pull towards no change, in proportion to each view's weight (and a little for views overlapping nothing)
+        ridge = prior * totals + 1e-6
+        matrix += torch.diag_embed(ridge.expand(3, -1))
+        solved = torch.linalg.solve(matrix, rhs[..., None])[..., 0].T.float()  # (K, 3)
+        limit = math.log(max_gain)
+        gains = solved.clamp(-limit, limit)
+    return torch.exp(gains)
+
+
+def _cauchy_weight(residual: torch.Tensor, scale: float) -> torch.Tensor:
+    """Cauchy's IRLS weight, 1 / (1 + (r / scale)^2): near 1 within ``scale``, near 0 for gross misfits."""
+    return 1.0 / (1.0 + (residual / scale).square())
+
+
 class Blend:
     """The views' colours at the covered texels, summed by weight in linear light."""
 
@@ -1002,6 +1087,7 @@ class View:
     accepted: bool = False
     attempts: list = field(default_factory=list)
     gains: Optional[list] = None
+    joint_gains: Optional[list] = None  # the joint colour match's, when it ran (these replace ``gains``)
     texels: int = 0  # covered texels it set more than half of, when it went in
     seconds: dict = field(default_factory=dict)
 
@@ -1011,6 +1097,7 @@ class View:
             "accepted": self.accepted,
             "attempts": self.attempts,
             "gains": self.gains,
+            "joint_gains": self.joint_gains,
             "texels": self.texels,
             "seconds": self.seconds,
         }
@@ -1041,6 +1128,7 @@ def paint_views(
     max_novelty: float = MAX_NOVELTY,
     full_weight: float = FULL_WEIGHT,
     match_colour: bool = True,
+    joint: bool = True,
     device: Optional[Any] = None,
     log: Callable[[str], None] = print,
     **camera_options: Any,
@@ -1053,8 +1141,10 @@ def paint_views(
     ``ring``: elevation, around, top, bottom, perspective, margin, pixels); they are painted nearest the
     picture first. Each view gets ``attempts`` tries (seeds ``seed + 100 * view + attempt``) to reach
     ``min_iou`` with no more than ``max_novelty``. ``match_colour`` scales each view to the colours already
-    established. The mesh isn't changed. The result has the views blended by weight (``texture``) and
-    robustly (``robust``).
+    established, for the renders of the views after it; with ``joint`` the final blend instead takes every
+    view's own colours scaled by gains solved for all views together (joint_gains: they agree where they
+    overlap, and with the picture's paint). The mesh isn't changed. The result has the views blended by
+    weight (``texture``) and robustly (``robust``).
     """
     device = _device(device)
     started = time.perf_counter()
@@ -1090,6 +1180,7 @@ def paint_views(
         views: list[View] = []
         weights: list = []  # (view, its weight at each texel), for the shares at the end
         kept: list = []  # every accepted view's samples, for the robust blend
+        raw: list = []  # the same before the sequential colour match, for the joint one
         for number, camera in enumerate(ordered):
             view_started = time.perf_counter()
             shot = render(geom, current, camera)
@@ -1134,6 +1225,7 @@ def paint_views(
             view.aligned = as_image(aligned)
             view.accepted = True
             samples = view_samples(geom, tex, camera, aligned, shot.mask & aligned_mask)
+            raw.append((view, Samples(weight=samples.weight, colour=samples.colour.clone())))
             if match_colour:
                 found = gains(samples.colour, established, samples.weight * (confidence >= CONFIDENT).float() * confidence)
                 if found is not None:
@@ -1152,6 +1244,21 @@ def paint_views(
             clock("views_s")
 
         # The views over the original texture: the picture's projection goes on top afterwards
+        joint_report = None
+        if joint and match_colour and raw:
+            found = joint_gains(
+                [s for _, s in raw], projection._srgb_to_linear(anchor.reshape(-1, 3)[tex.flat]), protect
+            )
+            blend = Blend(tex.flat.numel(), device)
+            kept = []
+            for (view, samples), gain in zip(raw, found):
+                matched = Samples(weight=samples.weight, colour=(samples.colour * gain).clamp(0, 1))
+                blend.add(matched)
+                kept.append(matched)
+                view.joint_gains = [round(float(g), 3) for g in gain]
+            joint_report = {view.camera.name: view.joint_gains for view, _ in raw}
+            clock("joint_s")
+        del raw
         amount = blend.amount(full_weight)
         final = compose(texture, tex, blend.colour(), amount)
         robust = compose(texture, tex, robust_colour(kept), amount) if kept else final
@@ -1170,6 +1277,7 @@ def paint_views(
         "texels": int(tex.flat.numel()),
         "changed": int((amount > 0.5).sum()),
         "changed_share": round(float((amount > 0.5).float().mean()), 4),
+        "joint_gains": joint_report,
         "flipped": geom.flipped,
         "timings": {**timings, "total_s": round(time.perf_counter() - started, 3)},
     }
