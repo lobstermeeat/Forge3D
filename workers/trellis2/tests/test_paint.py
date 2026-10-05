@@ -419,7 +419,7 @@ def test_paint_views_repaints_what_the_views_see():
     mesh = box()
     before = np.asarray(mesh.visual.material.baseColorTexture).copy()
     paint, calls = flat_painter(shift=(2, 1))
-    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=4, top=True, bottom=True, log=lambda _: None, **small())
+    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=4, top=True, bottom=True, max_recolour=1.0, log=lambda _: None, **small())
     report = result.report
     assert report["picture"]["applied"] is False
     assert report["accepted"] == 6 and len(result.views) == 6
@@ -504,7 +504,7 @@ def test_paint_views_scales_later_views_to_the_first():
         colours = iter([(40, 160, 220)] + [(20, 80, 110)] * 10)
         result = P.paint_views(
             mesh, no_picture(), paint, device="cpu", around=8, top=False, bottom=False, log=lambda _: None,
-            colour_model=model, **small(),
+            colour_model=model, max_recolour=1.0, **small(),
         )
         gains = {view.camera.name: view.gains for view in result.views}
         assert gains["a000"] is None  # nothing established before the first view
@@ -682,7 +682,7 @@ def test_tone_keeps_saturation_without_colour_in_common():
 def test_paint_views_says_what_the_joint_match_did():
     mesh = box()
     painter, _ = flat_painter()
-    result = P.paint_views(mesh, no_picture(), painter, device="cpu", around=4, top=False, bottom=False, log=lambda _: None, **small())
+    result = P.paint_views(mesh, no_picture(), painter, device="cpu", around=4, top=False, bottom=False, max_recolour=1.0, log=lambda _: None, **small())
     joint = result.report["joint_gains"]
     # No picture here: nothing to hold the views to
     assert joint["model"] == "tone" and joint["anchor"] == "none"
@@ -858,7 +858,7 @@ def test_paint_views_takes_the_glare_out_of_each_view():
     for glare in (True, False):
         result = P.paint_views(
             box(), no_picture(), glossy_painter(), device="cpu", around=4, top=False, bottom=False, glare=glare,
-            max_novelty=1.0, log=lambda _: None, **small(),
+            max_novelty=1.0, max_recolour=1.0, log=lambda _: None, **small(),
         )
         assert result.report["accepted"] == 4
         shares = [view.attempts[-1].get("glare") for view in result.views]
@@ -884,12 +884,18 @@ def test_paint_views_tells_the_editor_which_try_it_is_and_keeps_its_skip():
         out.info["skip"] = view["attempt"]  # as views.editor marks how far in it started
         return out
 
-    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=2, top=False, bottom=False, attempts=3, log=lambda _: None, **small())
+    result = P.paint_views(
+        mesh, no_picture(), paint, device="cpu", around=2, top=False, bottom=False, attempts=3, max_recolour=1.0,
+        log=lambda _: None, **small(),
+    )
     assert seen == [("a000", 0), ("a000", 1), ("a180", 0), ("a180", 1)]
     assert all(view.accepted and [a.get("skip") for a in view.attempts] == [0, 1] for view in result.views)
     # An editor that doesn't say leaves no skip in the report
     plain, _ = flat_painter()
-    result = P.paint_views(mesh, no_picture(), plain, device="cpu", around=2, top=False, bottom=False, log=lambda _: None, **small())
+    result = P.paint_views(
+        mesh, no_picture(), plain, device="cpu", around=2, top=False, bottom=False, max_recolour=1.0,
+        log=lambda _: None, **small(),
+    )
     assert all("skip" not in attempt for view in result.views for attempt in view.attempts)
 
 
@@ -1002,3 +1008,48 @@ def test_deglare_fills_a_reflections_white_core_but_not_a_silver_logo():
     restored = projection._srgb_to_linear(out)
     assert torch.allclose(restored[ring], blue.expand(64, 64, 3)[ring], atol=0.02)  # the core with it
     assert torch.allclose(restored[logo], view[logo], atol=0.02)
+
+
+def test_recolour_counts_parts_painted_in_other_colours_but_not_darker_glass_or_detail():
+    yy, xx = _grid(96)
+    mask = ((yy - 48).abs() < 40) & ((xx - 48).abs() < 40)
+    red = projection._linear_to_srgb(torch.tensor([0.55, 0.03, 0.03]))
+    render = torch.full((96, 96, 3), 0.92)
+    render[mask] = red
+    # A toe panel painted silver: a light grey where the render is red
+    silver = render.clone()
+    panel = mask & (xx < 30)
+    silver[panel] = 0.8
+    share = P.recolour(render, silver, mask)
+    assert abs(share - float(panel.sum()) / float(mask.sum())) < 0.06 and share > P.MAX_RECOLOUR
+    # The same red, darker and cleaner, with glass gone black and a thin white line: no change of paint
+    clean = render.clone()
+    clean[mask] = projection._linear_to_srgb(torch.tensor([0.45, 0.02, 0.025]))
+    clean[mask & (yy < 20)] = 0.05  # dark glass
+    clean[mask & ((xx - 60).abs() < 1)] = 0.95  # a line thinner than a cell
+    assert P.recolour(render, clean, mask, size=24) == 0.0
+    # Red turned blue
+    blue = render.clone()
+    blue[mask & (yy > 70)] = projection._linear_to_srgb(torch.tensor([0.03, 0.05, 0.5]))
+    assert P.recolour(render, blue, mask) > 0.1
+    # Too little of the object to judge
+    assert P.recolour(render, silver, mask & (yy < 12) & (xx < 12)) == 0.0
+
+
+def test_paint_views_leaves_out_a_view_that_repaints_a_side_in_another_colour():
+    mesh = box(colours={side: (200, 30, 30) for side in SIDES})
+    flat, _ = flat_painter((205, 35, 35))
+    tries = []
+
+    def paint(render, picture, neighbour, seed, view):
+        tries.append((view["name"], view["attempt"]))
+        if view["name"] == "a090" and view["attempt"] == 0:
+            return flat_painter((215, 215, 220))[0](render, picture, neighbour, seed, view)  # silver
+        return flat(render, picture, neighbour, seed, view)
+
+    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=4, top=False, bottom=False, attempts=2, log=lambda _: None, **small())
+    by_name = {view.camera.name: view for view in result.views}
+    first, second = by_name["a090"].attempts
+    assert first["recolour"] > P.MAX_RECOLOUR and second["recolour"] <= P.MAX_RECOLOUR
+    assert by_name["a090"].accepted and ("a090", 1) in tries
+    assert all(view.attempts[0]["recolour"] < 0.02 for name, view in by_name.items() if name != "a090")
