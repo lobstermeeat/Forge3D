@@ -1,0 +1,34 @@
+└── ✓ Created Function Trellis2.*.
+Stopping app - local entrypoint completed.
+painter: already downloaded (--force to fetch again)
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-8LprDBOz6CrIWbMFhcamHG
+== p8prod3-bmw
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod3-bmw: saving each step in the orainge-outputs volume under p8prod3-bmw/
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 47 s, 720 LoRA layers, 8 steps
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 44 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 46.4 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 46.4, "seconds": 64.0}
+Done: reference-128494165.png, reference-128494166.png, reference-128494167.png, reference-128494168.png, preview-118812884.glb, final-118812884.glb in orainge-outputs/p8prod3-bmw
+{"final": {"status": "done", "paint": {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 46.4, "seconds": 64.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9722, "colour": 0.3596, "coverage": 0.0387, "pose": {"azimuth": 142.5, "elevation": 0.0, "roll": -1.0, "fov": 46.4, "scale": 1.009, "shift": [-0.0016, -0.0012]}, "mode": "detail only", "decals": 523, "seconds": 1.919}, "timings": {"generate_s": 26.905, "export_s": 87.598, "compress_s": 2.931, "upload_s": 0.004}, "gpu_seconds": 117.4, "bytes": 3037824}}
+== p8prod3-jordan
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod3-jordan: saving each step in the orainge-outputs volume under p8prod3-jordan/
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 39 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 84.2 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 10, "of": 10, "joint": "picture", "painter_s": 84.2, "seconds": 92.6}
+Done: reference-611514639.png, reference-611514640.png, reference-611514641.png, reference-611514642.png, preview-1387106714.glb, final-1387106714.glb in orainge-outputs/p8prod3-jordan
+{"final": {"status": "done", "paint": {"applied": true, "size": 4096, "output": "robust", "views": 10, "of": 10, "joint": "picture", "painter_s": 84.2, "seconds": 92.6}, "projection": {"applied": true, "reason": "applied", "iou": 0.9746, "colour": 0.5974, "coverage": 0.0594, "pose": {"azimuth": 28.8, "elevation": -2.5, "roll": 0.0, "fov": 20.2, "scale": 1.006, "shift": [0.0037, -0.0009]}, "mode": "detail only", "decals": 1066, "seconds": 1.623}, "timings": {"generate_s": 29.791, "export_s": 120.938, "compress_s": 3.147, "upload_s": 0.004}, "gpu_seconds": 153.9, "bytes": 3137320}}
+== p8prod3-coke
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod3-coke: saving each step in the orainge-outputs volume under p8prod3-coke/
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 36 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 79.7 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 10, "of": 10, "joint": "picture", "painter_s": 79.7, "seconds": 102.9}
+Done: reference-1329303023.png, reference-1329303024.png, reference-1329303025.png, reference-1329303026.png, preview-662844973.glb, final-662844973.glb in orainge-outputs/p8prod3-coke
+{"final": {"status": "done", "paint": {"applied": true, "size": 4096, "output": "robust", "views": 10, "of": 10, "joint": "picture", "painter_s": 79.7, "seconds": 102.9}, "projection": {"applied": true, "reason": "applied", "iou": 0.9674, "colour": 0.6804, "coverage": 0.099, "pose": {"azimuth": 4.7, "elevation": 5.0, "roll": 0.2, "fov": 50.3, "scale": 1.019, "shift": [0.0, 0.0006]}, "mode": "detail only", "decals": 163, "seconds": 1.895}, "timings": {"generate_s": 10.739, "export_s": 123.504, "compress_s": 3.87, "upload_s": 0.003}, "gpu_seconds": 138.1, "bytes": 2484500}}
+exit status: 0
