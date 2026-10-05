@@ -2,19 +2,33 @@
 # What the "AI ops (Modal)" workflow runs when this is pushed (see .github/workflows/ai-ops.yml).
 # Files written to ops-out/ are saved with the log, and ops-out/private/ only encrypted (ops/seal.sh).
 #
-# ai-ops-paint: Phase 8, the view painter, in staging apps. Nothing is deployed; production's orainge-ai keeps
-# running what it runs.
+# ai-ops-paintprod: Phase 8's painter the way production would run it, in a staging app (orainge-p8-prodtest):
+# modal_app.py's Painter class, called by the Trellis2 container in the middle of a final's export, through
+# `make --final --paint` (the request the server sends with AI_PAINT=1). Nothing is deployed; production's
+# orainge-ai keeps running what it runs.
 #
-# Run 7: production's painter (forge3d_worker/painting.py: the prompt's colours and the colour match's anchor from
-# the picture with its shading taken out, three tries a view) on run 6's thirteen shapes.
+# First the painter's weights are checked into place (they are in the orainge-models volume since the
+# experiments; this writes the marker the Painter class looks for), then three prompts go from words to a
+# painted final.
 set -euo pipefail
 mkdir -p ops-out/private
-export ORAINGE_APP_NAME=orainge-p8-paint
+export ORAINGE_APP_NAME=orainge-p8-prodtest
 status=0
-modal run ops/exp_paint.py::check --only bmw,04,06,08,12,13,p2,p3,p4,p5,p6,p7,p8 \
-  --variants qie-v7 --attempts 3 --out ops-out/private/paint7 \
-  >ops-out/private/modal-paint7.log 2>&1 || status=$?
-grep -aE "^\[paint\] (app|making|painting|done|[a-z0-9]+ qie)|^\[shapes\]|Traceback|Error|error" ops-out/private/modal-paint7.log |
-  grep -avE "it/s\]|s/it\]" | cut -c1-300 | tail -80 || true
-du -sh ops-out/private/paint7 2>/dev/null || true
+modal run workers/modal_app.py::download_models --which painter >ops-out/private/download.log 2>&1 || status=$?
+tail -5 ops-out/private/download.log || true
+run() {
+  modal run workers/modal_app.py::make --prompt "$1" --final --paint --run "$2" >"ops-out/private/$2.log" 2>&1
+}
+run "make a bmw car m3 model blue" p8prod-bmw & a=$!
+run "a red Nike Air Jordan 1 sneaker" p8prod-jordan & b=$!
+run "a classic Coca-Cola glass bottle" p8prod-coke & c=$!
+for pid in $a $b $c; do wait "$pid" || status=$?; done
+for name in p8prod-bmw p8prod-jordan p8prod-coke; do
+  echo "== $name"
+  grep -aE "\[orainge\]|\[forge3d\] paint|\[painter\]|Done:|Traceback|Error|error" "ops-out/private/$name.log" | cut -c1-300 | tail -20 || true
+  if [ -d "orainge-outputs/$name" ]; then
+    cp -r "orainge-outputs/$name" ops-out/private/
+    python3 -c "import json,sys; s=json.load(open(sys.argv[1])); f=s['steps'].get('final',{}); print(json.dumps({'final': {k: f.get(k) for k in ('status','paint','projection','timings','gpu_seconds','bytes')}}))" "orainge-outputs/$name/progress.json" || true
+  fi
+done
 exit $status
