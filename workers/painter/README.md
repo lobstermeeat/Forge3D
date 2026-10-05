@@ -1,18 +1,27 @@
 # View painter (Phase 8)
 
-Repaints a plain grey render of our mesh, seen from a given camera, so that it looks like the object in a reference
-picture, keeping the render's exact outline and framing. It is [Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511)
+Paints a render of our mesh, seen from one of the cameras round it, as a clean product photo of the object, keeping
+the render's exact outline and framing; `trellis2/forge3d_worker/paint.py` bakes ten such views back into the final's
+texture (workers/README.md, "The painter"). It is [Qwen-Image-Edit-2511](https://huggingface.co/Qwen/Qwen-Image-Edit-2511)
 through diffusers' `QwenImageEditPlusPipeline`, with lightx2v's
 [8-step Lightning LoRA](https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning) fused in, both Apache-2.0
-([NOTICE.md](NOTICE.md)), on one H100 80GB in BF16 with every model resident. Not wired into `modal_app.py` yet.
+([NOTICE.md](NOTICE.md)), on one H100 80GB in BF16 with every model resident: the `Painter` class in
+`modal_app.py`, which finals call when the server asks for painting (`AI_PAINT=1`).
 
 ```python
-from painter_worker.qwen import LORA_DIR, MODEL_DIR, PROMPT_PAINT, QwenPainter, from_square
+from painter_worker import views
+from painter_worker.qwen import LORA_DIR, MODEL_DIR, QwenPainter
 
 painter = QwenPainter(MODEL_DIR, LORA_DIR)  # once per container; painter.load_seconds
-painted = painter.paint([render, picture, other_view], PROMPT_PAINT, seed=7)  # painter.last_seconds
-painted_like_render = from_square(painted, render.size)  # only needed when the render isn't square
+paint_view = views.editor(painter, "make a bmw car m3 model blue")  # paint.paint_views' Painter for one object
+painted = paint_view(render, None, None, seed=7, view={"name": "a045", "side": "from its left side", "colours": ["steel blue"]})
 ```
+
+`views.py` is how production asks: the render is the only picture (Picture 1), padded to a square on the renders'
+own light grey; the prompt (`views.PROMPT`) names the object, the side the camera is on and the picture's main
+colours, and asks for the same viewpoint, outline and parts, plain surfaces kept plain, soft even light. Given the
+picture as a second reference (`PROMPT_PAINT` below, the first plan), the model copied the picture's viewpoint
+instead of the render's, and most views failed the painter's outline check (Phase 8, runs 4 and 5).
 
 **In:** 1 to 3 PIL images. Picture 1 is the grey render, Picture 2 the reference picture, Picture 3 (optional)
 another reference, such as a view painted before (Qwen-Image-Edit-2509's model card: "optimal performance is
@@ -75,8 +84,8 @@ encoder and the VAE. `painter.last_seconds` says what it really is.
 ## The prompt
 
 The pipeline shows the pictures to the text encoder as "Picture 1: … Picture 2: …", so the prompts name them that
-way, as Qwen's own prompt rewriter does. `PROMPT_PAINT` (three pictures; `PROMPT_PAINT_ONE_REFERENCE` without
-Picture 3) is a starting point to tune on real renders:
+way, as Qwen's own prompt rewriter does. Production's prompt is `views.PROMPT` (one picture, above). `PROMPT_PAINT`
+(three pictures; `PROMPT_PAINT_ONE_REFERENCE` without Picture 3), the first plan, which the runs above turned down:
 
 > Repaint the grey 3D model in Picture 1 as the exact object shown in Picture 2: the same colours, paint,
 > materials, logos and details. Keep the shape, outline, camera angle and framing of Picture 1 exactly. Where
