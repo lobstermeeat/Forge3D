@@ -856,11 +856,13 @@ def run_pipeline(
     pick: Optional[int] = None,
     pictures_only: bool = False,
     final_weights: Sequence[str] = (),
+    paint: bool = False,
 ) -> dict:
     """
     Prompt or image -> reference images -> preview GLB -> (optionally) final GLB, written into
     `folder`. Each finished step is recorded in progress.json, so running it again on the same
-    folder skips what is done and continues where it stopped.
+    folder skips what is done and continues where it stopped. With `paint` the final asks for the
+    painter, as the server does with AI_PAINT=1 (its step keeps the "paint" note).
 
     The reference picture the worker scored best goes on to 3D (the first, if it didn't score
     them) unless `pick` names another (1-4), the way a user picks one in the Studio.
@@ -973,6 +975,8 @@ def run_pipeline(
             }
             if state.get("seed") is not None:
                 job["seed"] = state["seed"]
+            if mode == "final" and paint:
+                job.update(paint=True, subject=prompt or "")
             result = checked(trellis({"input": job}))
             # The final reuses the preview's seed, so it refines the shape the preview showed
             state["seed"] = result["seed"]
@@ -999,6 +1003,8 @@ def run_pipeline(
                 step["views_used"] = result["views_used"]
             if result.get("projection"):  # finals: whether the picture was painted on, and why not
                 step["projection"] = result["projection"]
+            if result.get("paint"):  # finals asked to be painted: whether they were, and why not
+                step["paint"] = result["paint"]
             return step
 
         return work
@@ -1032,6 +1038,7 @@ def make_model(
     seed: int = -1,
     pick: int = 0,
     pictures_only: bool = False,
+    paint: bool = False,
 ) -> dict:
     """The whole flow in the cloud; see run_pipeline. Results land in orainge-outputs/<run>/."""
     if not RUN_NAME.fullmatch(run):
@@ -1051,6 +1058,7 @@ def make_model(
         pick=pick or None,
         pictures_only=pictures_only,
         final_weights=FINAL_WEIGHTS,
+        paint=paint,
     )
 
 
@@ -1063,11 +1071,13 @@ def make(
     run: str = "",
     pick: int = 0,
     pictures_only: bool = False,
+    paint: bool = False,
 ) -> None:
     """
     Prompt or image to 3D in Modal's cloud. Start it with `modal run --detach` and it finishes
     even if this computer sleeps or goes offline; `--run NAME` continues an earlier run.
     `--pictures-only` stops at the four pictures; `--run NAME --pick 3` makes the third into 3D.
+    `--final --paint` has the final painted again from views round it (the painter, AI_PAINT=1).
     """
     if not (prompt or image or run):
         raise SystemExit("Give --prompt or --image, or --run NAME to continue a run")
@@ -1091,6 +1101,7 @@ def make(
         seed=seed,
         pick=pick,
         pictures_only=pictures_only,
+        paint=paint,
     )
     # Still connected: copy the results here too
     target = pathlib.Path("orainge-outputs") / run
