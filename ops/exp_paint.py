@@ -57,6 +57,11 @@ KLEIN_DIR = f"{prod.MODELS}/p8-paint/FLUX.2-klein-4B-{KLEIN[1][:7]}"
 CACHE_DIR = "p8-paint"
 # The founder's BMW: the prompt, the picked picture's FLUX.1 [schnell] seed and the final's TRELLIS.2 seed
 BMW = {"name": "bmw", "prompt": "make a bmw car m3 model blue", "picture_seed": 1627471494, "seed": 663008479}
+# Real products (workers/test-sets/products.txt, "p1" its first line): each drawn four times from these seeds
+# (the template production draws with), the best-scored picture taken, as the panel suggests it
+PRODUCTS = HERE.parents[1] / "workers" / "test-sets" / "products.txt"
+PRODUCT_PICTURE_SEED = 20261005
+PRODUCT_SEED = 663008479
 TEXTURE_SIZE = 2048  # the final preset's
 # Qwen-Image-Edit-2511 and its Lightning LoRA, as ops/p8_download.py put them in the models volume (the revisions
 # workers/painter/scripts/download_weights.py pins)
@@ -112,6 +117,17 @@ QIE_EDIT_VIEW = (
     "doors, handles, text, logos or patterns that Picture 1 doesn't show. Soft, even, diffused studio lighting from "
     "all around, with no cast shadows and no strong reflections. Plain light grey background."
 )
+# The same with flatter light (run 5: the views' reflections on the BMW's bonnet went into its texture as pale smears)
+QIE_FLAT = (
+    "Turn Picture 1, a rough 3D render of a {subject} seen {side}, into a clean, photorealistic studio product "
+    "photo of the same {subject} from exactly the same viewpoint. Keep the camera angle, framing, outline, "
+    "proportions and position of every part exactly as they are in Picture 1: do not move, add, remove or reshape "
+    "anything. Replace the blotchy, smeared surface with clean, crisp, realistic materials and fine details in the "
+    "same colours{colours}. Where Picture 1 shows a plain surface, keep it plain: do not invent screens, buttons, "
+    "doors, handles, text, logos or patterns that Picture 1 doesn't show. Flat, even, shadowless light from all "
+    "around, as in a reference photo for a texture: no reflections, no highlights, no glare. Plain light grey "
+    "background."
+)
 QIE_REF = (
     "Turn Picture 1, a rough 3D render of a {subject} seen {side}, into a clean, photorealistic studio product "
     "photo of it from exactly the same viewpoint as Picture 1. Keep Picture 1's camera angle, framing, outline, "
@@ -127,6 +143,9 @@ QIE_NEIGHBOUR = (
     "finish exactly."
 )
 
+# paint_views' colour match and blend as runs 4 and 5 had them
+RUN5 = {"colour_model": "gains", "anchor": "paint", "select": 0.0}
+
 # How each variant asks klein: "base" is Flux2KleinPipeline with the listed references (the render first);
 # "img2img" is Flux2KleinInpaintPipeline with the whole frame as the mask, which starts from the render's latent
 # noised to ``start`` (the render is also its first reference) with the picture as ``image_reference``. klein's
@@ -140,12 +159,21 @@ STRATEGIES = {
     "i2i-ref-91": {"pipeline": "img2img", "picture": 512 * 512, "start": 0.91, "prompt": EDIT_REF},
     "i2i-ref-80": {"pipeline": "img2img", "picture": 512 * 512, "start": 0.8, "prompt": EDIT_REF},
     "i2i-80": {"pipeline": "img2img", "picture": 0, "start": 0.8, "prompt": EDIT},
-    # Qwen-Image-Edit-2511 (QwenPaint): the render alone; with the picture; with the picture and the nearest view
-    "qie-edit-view": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW},
+    # Qwen-Image-Edit-2511 (QwenPaint): the render alone; with the picture; with the picture and the nearest view.
+    # These blend as runs 4 and 5 did ("paint": paint_views' options then): per-channel gains held to the picture's
+    # paint, every view by cos^4
+    "qie-edit-view": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "paint": RUN5},
     # The same, baked into a 4096 base colour (the 2048 one upsampled first, same layout) and shipped at 4096
-    "qie-edit-view-4k": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096},
-    "qie-ref": {"model": "qwen", "picture": 768 * 768, "prompt": QIE_REF},
-    "qie-ref-nb": {"model": "qwen", "picture": 768 * 768, "neighbour": True, "prompt": QIE_REF, "neighbour_text": QIE_NEIGHBOUR},
+    "qie-edit-view-4k": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096, "paint": RUN5},
+    "qie-ref": {"model": "qwen", "picture": 768 * 768, "prompt": QIE_REF, "paint": RUN5},
+    "qie-ref-nb": {
+        "model": "qwen", "picture": 768 * 768, "neighbour": True, "prompt": QIE_REF, "neighbour_text": QIE_NEIGHBOUR,
+        "paint": RUN5,
+    },
+    # Run 6: paint_views as it is now (tone held to the picture's own colour, each texel mostly from its best view,
+    # no dark bottom), baked at 4096 and also shipped at 2048 (the 4096 texture scaled down); and with flatter light
+    "qie-v6": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096, "also": (2048,), "views_only": False},
+    "qie-v6-flat": {"model": "qwen", "picture": 0, "prompt": QIE_FLAT, "texture": 4096, "also": (2048,), "views_only": False},
 }
 # klein's shifted 4-step schedule (1 MP), and the schedules the "start" values ask for
 SCHEDULES = {0.91: None, 0.8: (1.0, 0.8, 0.6, 0.35)}
@@ -544,7 +572,8 @@ def paint_job(owner, job: dict, make_editor, default_steps: int) -> dict:
     torch.cuda.reset_peak_memory_stats()
     owner.prompts = []
     clock = time.time()
-    result = paint.paint_views(mesh, cutout, make_editor(subject, variant, steps), device="cuda", **options)
+    painting = {**STRATEGIES[variant].get("paint", {}), **options}
+    result = paint.paint_views(mesh, cutout, make_editor(subject, variant, steps), device="cuda", **painting)
     paint_s = round(time.time() - clock, 1)
 
     rgba = None
@@ -553,10 +582,15 @@ def paint_job(owner, job: dict, make_editor, default_steps: int) -> dict:
         rgba.load()
     glass_reports = []
 
-    def export(texture, project: bool):
-        """Production's export from the painted texture: the picture's projection on top, smoothed normals, glass, gltfpack."""
+    def export(texture, project: bool, limit: int = size):
+        """
+        Production's export from the painted texture: the picture's projection on top, smoothed normals, glass,
+        gltfpack (textures at most ``limit``; a texture larger than that is scaled down to it first).
+        """
         started = time.time()
         copy = paint.unpack_mesh((folder / "mesh.npz").read_bytes())
+        if max(texture.size) > limit:
+            texture = texture.resize((limit, limit), Image.Resampling.LANCZOS)
         copy.visual.material.baseColorTexture = texture
         report = None
         if project:
@@ -566,24 +600,27 @@ def paint_job(owner, job: dict, make_editor, default_steps: int) -> dict:
         if rgba is not None:
             glb, glass_report = glass.split_glass(glb, rgba, meta["voxel_size"])
             glass_reports.append(glass.summary(glass_report))
-        packed = pack_glb(glb.export(file_type="glb"), size)
+        packed = pack_glb(glb.export(file_type="glb"), limit)
         return packed, report, copy.visual.material.baseColorTexture, round(time.time() - started, 1)
 
     packed, report, final_texture, export_s = export(result.texture, True)
     robust, robust_report, _, _ = export(result.robust or result.texture, True)
-    unprojected, _, _, _ = export(result.texture, False)
 
     out = f"{name}/{variant}"
     files = {
         f"{out}/painted.glb": packed,
         f"{out}/robust.glb": robust,
-        f"{out}/views-only.glb": unprojected,
         f"{out}/sheet.jpg": _jpeg(paint.sheet(result.views, 320), 88),
         f"{out}/texture-painted.jpg": _jpeg(result.texture, 90),
         f"{out}/texture-final.jpg": _jpeg(final_texture, 90),
         f"{out}/prompts.json": json.dumps(owner.prompts, indent=1).encode(),
         f"{name}/reference.jpg": _jpeg(paint.picture_reference(cutout), 92),
     }
+    if STRATEGIES[variant].get("views_only", True):
+        files[f"{out}/views-only.glb"] = export(result.texture, False)[0]
+    for smaller in STRATEGIES[variant].get("also", ()):
+        files[f"{out}/painted-{smaller // 1024}k.glb"] = export(result.texture, True, smaller)[0]
+        files[f"{out}/robust-{smaller // 1024}k.glb"] = export(result.robust or result.texture, True, smaller)[0]
     for number, view in enumerate(result.views):
         stem = f"{out}/views/{number:02d}-{view.camera.name}"
         files[f"{stem}-render.jpg"] = _jpeg(view.render)
@@ -595,7 +632,7 @@ def paint_job(owner, job: dict, make_editor, default_steps: int) -> dict:
         "strategy": {k: v for k, v in STRATEGIES[variant].items() if k not in ("prompt", "neighbour_text")},
         "prompt": prompt_for(variant, subject, False, {"side": "<side>", "colours": result.report.get("colours")}),
         "subject": subject,
-        "options": {**options, "steps": steps, "texture_size": size},
+        "options": {**painting, "steps": steps, "texture_size": size, "also": list(STRATEGIES[variant].get("also", ()))},
         "paint": result.report,
         "projection": projection.summary(report),
         "projection_robust": projection.summary(robust_report),
@@ -704,6 +741,12 @@ def runs_by_number(volume: modal.Volume, prefix: str) -> dict[str, str]:
     return {match[1]: name for name in names if (match := pattern.fullmatch(name))}
 
 
+def products() -> list[str]:
+    """The products test set's prompts, in order."""
+    lines = [line.strip() for line in PRODUCTS.read_text().splitlines()]
+    return [line for line in lines if line and not line.startswith("#")]
+
+
 def _read(volume: modal.Volume, path: str) -> bytes:
     return b"".join(volume.read_file(path))
 
@@ -758,6 +801,15 @@ def check(
     for name in names:
         if name == "bmw":
             job = {"name": "bmw", "seed": BMW["seed"], "prompt": BMW["prompt"], "source": "founder"}
+        elif re.fullmatch(r"p\d+", name):
+            number = int(name[1:])
+            if not 1 <= number <= len(products()):
+                print(f"[paint] no product {name}")
+                continue
+            job = {
+                "name": name, "seed": PRODUCT_SEED + number, "prompt": products()[number - 1], "source": "products",
+                "picture_seed": PRODUCT_PICTURE_SEED + 10 * number,
+            }
         else:
             number = name.zfill(2)
             if number not in pictures:
@@ -793,9 +845,34 @@ def check(
                 "prompt": drawn.get("prompt"),
             }
             _write(root, "bmw/picture-redrawn.png", job["picture"])
+        elif job["source"] == "products":
+            clock = time.time()
+            drawn = prod.FluxSchnell().generate.remote(
+                {
+                    "id": f"p8-paint-{job['name']}-picture",
+                    "input": {"prompt": job["prompt"], "count": 4, "seed": job["picture_seed"], "request_id": f"p8-paint-{job['name']}"},
+                }
+            )
+            if drawn.get("error"):
+                print(f"[paint] {job['name']}: the pictures failed: {drawn['error']}")
+                report["objects"][job["name"]] = {"error": f"pictures: {drawn['error']}"}
+                continue
+            best = max(drawn["images"], key=lambda image: image.get("score") or 0.0)
+            job["picture"] = base64.b64decode(best["base64"])
+            report.setdefault("pictures", {})[job["name"]] = {
+                "prompt": job["prompt"],
+                "seed": best.get("seed"),
+                "score": best.get("score"),
+                "issues": best.get("issues"),
+                "scores": [image.get("score") for image in drawn["images"]],
+                "seconds": round(time.time() - clock, 1),
+            }
+            for image in drawn["images"]:
+                _write(root, f"{job['name']}/pictures/{image.get('seed')}.png", base64.b64decode(image["base64"]))
         else:
             state = json.loads(_read(prod.outputs, f"{job['source']}/progress.json"))
             job["picture"] = _read(prod.outputs, f"{job['source']}/{state['input']}")
+    todo = [job for job in todo if "picture" in job]
     if todo:
         print(f"[paint] making {len(todo)} shapes: {', '.join(job['name'] for job in todo)}")
         for job, made in zip(todo, Shapes().make.map(todo, return_exceptions=True, order_outputs=True)):
@@ -864,7 +941,8 @@ def check(
         views = made["summary"]["paint"]["views"]
         print(
             f"[paint] {job['name']} {job['variant']}: {made['summary']['paint']['accepted']} of {len(views)} views in, "
-            f"IoU {[v['attempts'][-1]['iou'] for v in views]}, {made['summary']['seconds']}"
+            f"IoU {[v['attempts'][-1]['iou'] if v['attempts'] else v.get('skipped') for v in views]}, "
+            f"{made['summary']['seconds']}"
         )
     (root / "summary.json").write_text(json.dumps(report, indent=2, default=str))
     print(f"[paint] done: {len(paint_jobs) - failed} of {len(paint_jobs)} paintings")
