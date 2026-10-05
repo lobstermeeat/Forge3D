@@ -1060,18 +1060,102 @@ def test_a_final_asking_to_be_painted_warms_the_painter_first(monkeypatch):
 
     class Methods:
         warm = SimpleNamespace(spawn=lambda: spawned.append("warm"))
-        paint = SimpleNamespace(remote=lambda kit: {"texture": b"png", "kit": kit})
 
     monkeypatch.setattr(modal_app, "Painter", lambda: Methods)
     modal_app.warm_painter()
     assert spawned == ["warm"]
-    assert modal_app.paint_on_painter(b"kit") == {"texture": b"png", "kit": b"kit"}
 
     def down():
         raise RuntimeError("Modal is down")
 
     monkeypatch.setattr(modal_app, "Painter", down)
     modal_app.warm_painter()  # only costs time
+
+
+class PainterCall:
+    """A spawned Painter.paint call: answers, raises, or never finishes in time."""
+
+    def __init__(self, kit, outcome, cancel_fails=False):
+        self.kit, self.outcome, self.cancel_fails = kit, outcome, cancel_fails
+        self.waited = None
+        self.cancelled = False
+
+    def get(self, timeout=None):
+        self.waited = timeout
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return {"texture": b"png", "kit": self.kit}
+
+    def cancel(self):
+        self.cancelled = True
+        if self.cancel_fails:
+            raise RuntimeError("already finished")
+
+
+def painter_with(monkeypatch, outcome=None, cancel_fails=False):
+    calls = []
+
+    def spawn(kit):
+        calls.append(PainterCall(kit, outcome, cancel_fails))
+        return calls[-1]
+
+    monkeypatch.setattr(modal_app, "Painter", lambda: SimpleNamespace(paint=SimpleNamespace(spawn=spawn)))
+    return calls
+
+
+def test_the_painter_is_waited_for_until_the_jobs_deadline(monkeypatch):
+    calls = painter_with(monkeypatch)
+    deadline = modal_app.time.monotonic() + 500
+    assert modal_app.painter_until(deadline)(b"kit") == {"texture": b"png", "kit": b"kit"}
+    assert 490 < calls[0].waited <= 500 and not calls[0].cancelled
+
+
+@pytest.mark.parametrize(
+    "outcome", [TimeoutError(), modal.exception.FunctionTimeoutError("the painter's own limit")],
+)
+def test_a_painter_that_doesnt_answer_in_time_is_cancelled_and_says_so(monkeypatch, outcome):
+    calls = painter_with(monkeypatch, outcome)
+    with pytest.raises(TimeoutError, match="the painter timed out"):
+        modal_app.painter_until(modal_app.time.monotonic() + 300)(b"kit")
+    assert calls[0].cancelled
+
+
+def test_a_painter_that_fails_is_cancelled_and_its_error_kept(monkeypatch):
+    calls = painter_with(monkeypatch, RuntimeError("CUDA error: an illegal memory access"), cancel_fails=True)
+    with pytest.raises(RuntimeError, match="illegal memory access"):  # not the failed cancel's error
+        modal_app.painter_until(modal_app.time.monotonic() + 300)(b"kit")
+    assert calls[0].cancelled
+
+
+def test_a_final_with_too_little_time_left_doesnt_ask_the_painter(monkeypatch):
+    calls = painter_with(monkeypatch)
+    with pytest.raises(TimeoutError, match="too little to paint"):
+        modal_app.painter_until(modal_app.time.monotonic() + modal_app.PAINT_MIN_WAIT - 5)(b"kit")
+    assert calls == []
+
+
+def test_each_job_gets_a_painter_with_a_deadline_inside_its_limit(monkeypatch):
+    warmed = []
+    monkeypatch.setattr(modal_app, "warm_painter", lambda: warmed.append(True))
+    calls = painter_with(monkeypatch)
+    runtime = SimpleNamespace()
+    modal_app.prepare_job(runtime, "trellis2", {"input": {"mode": "final", "paint": True}})
+    assert warmed == [True]
+    runtime.painter(b"kit")
+    budget = modal_app.TRELLIS2_TIMEOUT - modal_app.PAINT_MARGIN
+    assert budget - 5 < calls[0].waited <= budget
+    # A job not asking, or a final Pixal3D makes (it isn't painted), starts no H100
+    modal_app.prepare_job(runtime, "trellis2", {"input": {"mode": "preview"}})
+    modal_app.prepare_job(runtime, "pixal3d", {"input": {"mode": "final", "paint": True}})
+    assert warmed == [True] and callable(runtime.painter)
+    # The margin leaves the export after painting (projection, glass, gltfpack at 4096, upload) its time
+    assert modal_app.PAINT_MARGIN >= 120 and modal_app.TRELLIS2_TIMEOUT == 900
+
+
+def test_the_trellis2_class_uses_the_timeout_the_painter_deadline_assumes():
+    source = (WORKERS / "modal_app.py").read_text()
+    decorator = source[: source.index("class Trellis2:")].rsplit("@app.cls(", 1)[1]
+    assert "timeout=TRELLIS2_TIMEOUT," in decorator
 
 
 def test_a_run_asks_for_a_painted_final_only_when_told(tmp_path):

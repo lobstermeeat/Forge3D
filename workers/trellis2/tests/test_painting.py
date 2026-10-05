@@ -108,12 +108,24 @@ def test_the_hook_puts_the_painted_texture_in_the_material():
     assert painting.unpack_kit(sent[0])[2] == "watch"
 
 
+def a_png(size=64) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (size, size), (10, 20, 30)).save(buffer, "PNG")
+    return buffer.getvalue()
+
+
+KEPT_ONE = {"views": [{"accepted": True}, {"accepted": False}]}
+
+
 @pytest.mark.parametrize(
     "answer, reason",
     [
         (RuntimeError("the painter's GPU ran out of memory"), "RuntimeError: the painter's GPU ran out of memory"),
         ({"report": {}}, "not a texture"),
-        ({"texture": b"not a png"}, "UnidentifiedImageError"),
+        ({"texture": b"not a png", "report": KEPT_ONE}, "UnidentifiedImageError"),
+        # Every view failed its checks: paint_views sends back TRELLIS.2's texture, only scaled up
+        ({"texture": a_png(), "size": 64, "report": {"views": [{"accepted": False}] * 10}}, "kept none of its 10 views"),
+        ({"texture": a_png(), "size": 64}, "reported no views"),
     ],
 )
 def test_a_painter_that_fails_leaves_the_texture_alone(answer, reason):
@@ -128,6 +140,17 @@ def test_a_painter_that_fails_leaves_the_texture_alone(answer, reason):
     note = painting.hook(call, "watch")(glb, Mesh(cutout()))
     assert not note["applied"] and reason in note["reason"]
     np.testing.assert_array_equal(np.asarray(glb.visual.material.baseColorTexture), before)
+
+
+def test_a_final_whose_views_all_failed_is_made_unpainted_at_its_own_size():
+    """Not "applied": packed at the final's size, and the server offers its texture options."""
+    limits = []
+    runtime = PaintingRuntime(painter=lambda kit: {"texture": a_png(), "size": 64, "seconds": 50.0,
+                                                   "report": {"views": [{"accepted": False}] * 10}})
+    out = handle_job(job(paint=True, subject="a watch"), runtime, Storage(), lambda raw, limit: limits.append(limit) or raw)
+    assert "error" not in out and out["paint"]["applied"] is False
+    assert (out["paint"]["views"], out["paint"]["of"], out["paint"]["painter_s"]) == (0, 10, 50.0)
+    assert runtime.exported == [(32, 32)] and limits == [PRESETS["final"].texture_size]
 
 
 def test_a_final_without_a_cutout_is_not_painted():
@@ -219,8 +242,7 @@ def test_a_painter_that_fails_keeps_the_final_and_its_size():
 
 @pytest.mark.parametrize(
     "extra, message",
-    [({"paint": "yes"}, "paint must be true or false"), ({"paint": True, "subject": 5}, "subject must be a string"),
-     ({"paint": True, "subject": "x" * 201}, "at most 200")],
+    [({"paint": "yes"}, "paint must be true or false"), ({"paint": True, "subject": 5}, "subject must be a string")],
 )
 def test_bad_paint_requests_are_input_errors(extra, message):
     out = handle_job(job(**extra), PaintingRuntime(painter=painted_texture), Storage(), lambda raw, limit: raw)
@@ -234,3 +256,15 @@ def test_the_subject_is_tidied_and_defaults_to_object():
     assert parse_job({**image, "paint": True, "subject": "  a\tred\n sneaker "}, "x").paint == "a red sneaker"
     assert parse_job({**image, "paint": True}, "x").paint == "object"
     assert parse_job({**image, "paint": False}, "x").paint is None
+
+
+def test_a_long_prompt_is_cut_not_refused():
+    """The server takes prompts up to 500 characters; the painter's prompts use the first 200."""
+    from forge3d_worker.inputs import MAX_SUBJECT, parse_job
+
+    image = {"image_base64": base64.b64encode(png_bytes()).decode()}
+    prompt = "a red sports car with " + "very " * 90 + "shiny paint"  # 483 characters
+    subject = parse_job({**image, "paint": True, "subject": prompt}, "x").paint
+    assert subject == prompt[:MAX_SUBJECT].rstrip() and len(subject) <= MAX_SUBJECT
+    out = handle_job(job(paint=True, subject=prompt), PaintingRuntime(painter=painted_texture), Storage(), lambda raw, limit: raw)
+    assert "error" not in out and out["paint"]["applied"]

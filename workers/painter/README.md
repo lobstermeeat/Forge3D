@@ -23,6 +23,14 @@ colours, and asks for the same viewpoint, outline and parts, plain surfaces kept
 picture as a second reference (`PROMPT_PAINT` below, the first plan), the model copied the picture's viewpoint
 instead of the render's, and most views failed the painter's outline check (Phase 8, runs 4 and 5).
 
+A view's first try starts from pure noise, which paints the cleanest views; its second and third
+(`views.SKIPS`) start from Picture 1's own latents noised to the level of step 1 and then step 2 of the eight
+(`QwenPainter.paint(skip=...)`, noise 0.95 and 0.9 after the Lightning schedule's time shift), and run only the
+steps after it. From pure noise the model turns some objects to the angle catalogues show them at (run 7: the
+sneaker kept 3 of its 10 views, the watch 4, the controller 5); started part way it keeps Picture 1's viewpoint
+(run 10: 10, 10 and 10, outlines matching at a median IoU of 0.995 against 0.972 from pure noise). From step 3
+(noise 0.83) on it hardly changes the render.
+
 **In:** 1 to 3 PIL images. Picture 1 is the grey render, Picture 2 the reference picture, Picture 3 (optional)
 another reference, such as a view painted before (Qwen-Image-Edit-2509's model card: "optimal performance is
 currently achieved with 1 to 3 input images"). **Out:** an RGB 1024 x 1024 image that lines up pixel for pixel with
