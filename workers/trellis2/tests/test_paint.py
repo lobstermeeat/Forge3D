@@ -419,7 +419,7 @@ def test_paint_views_repaints_what_the_views_see():
     mesh = box()
     before = np.asarray(mesh.visual.material.baseColorTexture).copy()
     paint, calls = flat_painter(shift=(2, 1))
-    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=4, top=True, bottom=True, log=lambda _: None, **small())
+    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=4, top=True, bottom=True, max_recolour=1.0, log=lambda _: None, **small())
     report = result.report
     assert report["picture"]["applied"] is False
     assert report["accepted"] == 6 and len(result.views) == 6
@@ -504,7 +504,7 @@ def test_paint_views_scales_later_views_to_the_first():
         colours = iter([(40, 160, 220)] + [(20, 80, 110)] * 10)
         result = P.paint_views(
             mesh, no_picture(), paint, device="cpu", around=8, top=False, bottom=False, log=lambda _: None,
-            colour_model=model, **small(),
+            colour_model=model, max_recolour=1.0, **small(),
         )
         gains = {view.camera.name: view.gains for view in result.views}
         assert gains["a000"] is None  # nothing established before the first view
@@ -682,7 +682,7 @@ def test_tone_keeps_saturation_without_colour_in_common():
 def test_paint_views_says_what_the_joint_match_did():
     mesh = box()
     painter, _ = flat_painter()
-    result = P.paint_views(mesh, no_picture(), painter, device="cpu", around=4, top=False, bottom=False, log=lambda _: None, **small())
+    result = P.paint_views(mesh, no_picture(), painter, device="cpu", around=4, top=False, bottom=False, max_recolour=1.0, log=lambda _: None, **small())
     joint = result.report["joint_gains"]
     # No picture here: nothing to hold the views to
     assert joint["model"] == "tone" and joint["anchor"] == "none"
@@ -858,7 +858,7 @@ def test_paint_views_takes_the_glare_out_of_each_view():
     for glare in (True, False):
         result = P.paint_views(
             box(), no_picture(), glossy_painter(), device="cpu", around=4, top=False, bottom=False, glare=glare,
-            max_novelty=1.0, log=lambda _: None, **small(),
+            max_novelty=1.0, max_recolour=1.0, log=lambda _: None, **small(),
         )
         assert result.report["accepted"] == 4
         shares = [view.attempts[-1].get("glare") for view in result.views]
@@ -884,12 +884,18 @@ def test_paint_views_tells_the_editor_which_try_it_is_and_keeps_its_skip():
         out.info["skip"] = view["attempt"]  # as views.editor marks how far in it started
         return out
 
-    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=2, top=False, bottom=False, attempts=3, log=lambda _: None, **small())
+    result = P.paint_views(
+        mesh, no_picture(), paint, device="cpu", around=2, top=False, bottom=False, attempts=3, max_recolour=1.0,
+        log=lambda _: None, **small(),
+    )
     assert seen == [("a000", 0), ("a000", 1), ("a180", 0), ("a180", 1)]
     assert all(view.accepted and [a.get("skip") for a in view.attempts] == [0, 1] for view in result.views)
     # An editor that doesn't say leaves no skip in the report
     plain, _ = flat_painter()
-    result = P.paint_views(mesh, no_picture(), plain, device="cpu", around=2, top=False, bottom=False, log=lambda _: None, **small())
+    result = P.paint_views(
+        mesh, no_picture(), plain, device="cpu", around=2, top=False, bottom=False, max_recolour=1.0,
+        log=lambda _: None, **small(),
+    )
     assert all("skip" not in attempt for view in result.views for attempt in view.attempts)
 
 
@@ -914,3 +920,136 @@ def test_the_views_are_held_to_the_picture_only_where_it_sees_them_face_on():
     # Without the facing (an unapplied projection), the weight as it is
     unapplied = P.Picture(texture=texture, weight=picture.weight, azimuth=0.0, elevation=15.0, report={})
     assert torch.equal(unapplied.anchor_weight(), picture.weight)
+
+
+def test_robust_colour_leaves_out_a_reflection_in_the_view_that_sees_a_texel_best():
+    paint = torch.tensor([0.05, 0.12, 0.45])  # a blue car paint, linear
+    reflection = paint + 0.35  # a softbox reflected in it
+    n = 3
+    square = P.Samples(weight=torch.full((n,), 0.9), colour=torch.stack([reflection, paint, reflection]))
+    slant = P.Samples(weight=torch.full((n,), 0.3), colour=torch.stack([paint, paint, paint * 1.05]))
+    robust = P.robust_colour([square, slant], select=P.SELECT)
+    # Two views see each texel: the darker is the reference, so the square-on view's reflection is left out
+    assert torch.allclose(robust[0], paint, atol=1e-4)
+    assert torch.allclose(robust[1], paint, atol=1e-4)  # they agree: mostly the square-on view
+    # A view that sees the texel only at a slant (under ROBUST_ELIGIBLE of the best) isn't counted for the reference
+    glancing = P.Samples(weight=torch.full((n,), 0.1), colour=torch.stack([paint * 0.5] * n))
+    robust = P.robust_colour([square, glancing], select=P.SELECT)
+    assert torch.allclose(robust[0], reflection, atol=1e-3)  # only one counted: its own colour
+    # Three views: the median, so a ghost one view drew darker goes out as before
+    ghost = P.Samples(weight=torch.full((n,), 0.8), colour=torch.stack([paint * 0.3] * n))
+    third = P.Samples(weight=torch.full((n,), 0.7), colour=torch.stack([paint] * n))
+    robust = P.robust_colour([third, ghost, slant], select=P.SELECT)
+    assert torch.allclose(robust[1], paint, atol=1e-3)
+
+
+def test_deglare_takes_a_sheen_off_evenly_where_it_turns_the_hue_across_pure_red():
+    # A coral paint (a little more green than blue) under a broad studio sheen that turns it a little towards
+    # magenta, across pure red, where hard hue bins used to split: the sheen's pixels fell in a bin of their own,
+    # whose whiteness was the sheen's, and it stayed (run 8 and 11: the arcade machine's side in patches)
+    yy, xx = _grid()
+    generator = torch.Generator().manual_seed(3)
+    sheen = 0.25 * torch.exp(-((yy - 14) ** 2 + (xx - 16) ** 2) / (2 * 12.0**2))
+    tint = 0.01 + (torch.rand(64, 64, generator=generator) - 0.5) * 0.01 - 0.06 * sheen / 0.25
+    paint = torch.stack([torch.full((64, 64), 0.7), 0.06 + tint.clamp_min(0), 0.06 + (-tint).clamp_min(0)], -1)
+    view = projection._linear_to_srgb((_shaded(paint) + sheen[..., None]).clamp(0, 1))
+    out, _ = P.deglare(view, torch.ones(64, 64, dtype=torch.bool))
+    linear = projection._srgb_to_linear(out)
+    whiteness = linear.amin(-1) / (linear.amax(-1) - linear.amin(-1)).clamp_min(1e-4)
+    lit, unlit = sheen > 0.1, sheen < 0.005
+    assert float(whiteness[lit].mean()) < float(whiteness[unlit].mean()) + 0.03
+
+
+def test_deglare_fills_a_reflection_that_dims_the_paint_under_it_from_the_paint_round_it():
+    yy, xx = _grid()
+    paint = torch.tensor([0.05, 0.12, 0.45]).expand(64, 64, 3).clone()
+    softbox = ((yy - 30).abs() < 8) & ((xx - 34).abs() < 12)
+    # Under a softbox the clear coat reflects white and lets less of the paint through
+    glossy = torch.where(softbox[..., None], 0.55 * paint + 0.4, paint)
+    out, share = P.deglare(projection._linear_to_srgb(glossy), torch.ones(64, 64, dtype=torch.bool))
+    restored = projection._srgb_to_linear(out)
+    assert torch.allclose(restored[softbox], paint[softbox], atol=0.02)
+    assert torch.allclose(restored[~softbox], paint[~softbox], atol=1e-4)
+    assert abs(share - float(softbox.float().mean())) < 0.01
+
+
+def test_deglare_keeps_a_light_logo_where_the_render_has_a_grey_smudge():
+    # The iPhone's back: blue titanium with an apple the texture has only as a grey smudge, which the editing model
+    # draws cleanly in silver; a white reflection elsewhere goes
+    yy, xx = _grid()
+    blue = torch.tensor([0.08, 0.13, 0.3])
+    logo = ((yy - 32) ** 2 + (xx - 20) ** 2) < 8**2
+    reflection = ((yy - 32) ** 2 + (xx - 48) ** 2) < 8**2
+    silver = torch.tensor([0.55, 0.57, 0.6])
+    view = torch.where(logo[..., None], silver, blue.expand(64, 64, 3))
+    view = torch.where(reflection[..., None], blue + 0.35, view)
+    render = torch.where(logo[..., None], torch.tensor([0.12, 0.12, 0.13]), blue.expand(64, 64, 3))
+    out, _ = P.deglare(projection._linear_to_srgb(view), torch.ones(64, 64, dtype=torch.bool), projection._linear_to_srgb(render))
+    restored = projection._srgb_to_linear(out)
+    inside = ((yy - 32) ** 2 + (xx - 20) ** 2) < 5**2  # the logo away from the render's 5 x 5 at its edge
+    assert torch.allclose(restored[inside], view[inside], atol=1e-3)
+    assert torch.allclose(restored[reflection], blue.expand(64, 64, 3)[reflection], atol=0.02)
+
+
+def test_deglare_fills_a_reflections_white_core_but_not_a_silver_logo():
+    yy, xx = _grid()
+    blue = torch.tensor([0.06, 0.14, 0.45])
+    view = blue.expand(64, 64, 3).clone()
+    # A softbox: a light blue ring of reflected light round a white core (too grey to read a hue from)
+    ring = ((yy - 20) ** 2 + (xx - 44) ** 2) < 10**2
+    core = ((yy - 20) ** 2 + (xx - 44) ** 2) < 5**2
+    view[ring] = 0.6 * blue + 0.45
+    view[core] = torch.tensor([0.95, 0.96, 0.97])
+    # A silver logo with a blue tinge, which the texture (the render) doesn't have
+    logo = ((yy - 46) ** 2 + (xx - 18) ** 2) < 7**2
+    view[logo] = torch.tensor([0.5, 0.53, 0.58])
+    render = projection._linear_to_srgb(blue.expand(64, 64, 3).clone())
+    out, _ = P.deglare(projection._linear_to_srgb(view), torch.ones(64, 64, dtype=torch.bool), render)
+    restored = projection._srgb_to_linear(out)
+    assert torch.allclose(restored[ring], blue.expand(64, 64, 3)[ring], atol=0.02)  # the core with it
+    assert torch.allclose(restored[logo], view[logo], atol=0.02)
+
+
+def test_recolour_counts_parts_painted_in_other_colours_but_not_darker_glass_or_detail():
+    yy, xx = _grid(96)
+    mask = ((yy - 48).abs() < 40) & ((xx - 48).abs() < 40)
+    red = projection._linear_to_srgb(torch.tensor([0.55, 0.03, 0.03]))
+    render = torch.full((96, 96, 3), 0.92)
+    render[mask] = red
+    # A toe panel painted silver: a light grey where the render is red
+    silver = render.clone()
+    panel = mask & (xx < 30)
+    silver[panel] = 0.8
+    share = P.recolour(render, silver, mask)
+    assert abs(share - float(panel.sum()) / float(mask.sum())) < 0.06 and share > P.MAX_RECOLOUR
+    # The same red, darker and cleaner, with glass gone black and a thin white line: no change of paint
+    clean = render.clone()
+    clean[mask] = projection._linear_to_srgb(torch.tensor([0.45, 0.02, 0.025]))
+    clean[mask & (yy < 20)] = 0.05  # dark glass
+    clean[mask & ((xx - 60).abs() < 1)] = 0.95  # a line thinner than a cell
+    assert P.recolour(render, clean, mask, size=24) == 0.0
+    # Red turned blue
+    blue = render.clone()
+    blue[mask & (yy > 70)] = projection._linear_to_srgb(torch.tensor([0.03, 0.05, 0.5]))
+    assert P.recolour(render, blue, mask) > 0.1
+    # Too little of the object to judge
+    assert P.recolour(render, silver, mask & (yy < 12) & (xx < 12)) == 0.0
+
+
+def test_paint_views_leaves_out_a_view_that_repaints_a_side_in_another_colour():
+    mesh = box(colours={side: (200, 30, 30) for side in SIDES})
+    flat, _ = flat_painter((205, 35, 35))
+    tries = []
+
+    def paint(render, picture, neighbour, seed, view):
+        tries.append((view["name"], view["attempt"]))
+        if view["name"] == "a090" and view["attempt"] == 0:
+            return flat_painter((215, 215, 220))[0](render, picture, neighbour, seed, view)  # silver
+        return flat(render, picture, neighbour, seed, view)
+
+    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=4, top=False, bottom=False, attempts=2, log=lambda _: None, **small())
+    by_name = {view.camera.name: view for view in result.views}
+    first, second = by_name["a090"].attempts
+    assert first["recolour"] > P.MAX_RECOLOUR and second["recolour"] <= P.MAX_RECOLOUR
+    assert by_name["a090"].accepted and ("a090", 1) in tries
+    assert all(view.attempts[0]["recolour"] < 0.02 for name, view in by_name.items() if name != "a090")
