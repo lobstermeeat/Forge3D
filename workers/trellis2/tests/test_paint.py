@@ -731,3 +731,19 @@ def test_robust_colour_with_select_leaves_out_a_highlight_then_takes_the_best_vi
     robust = P.robust_colour(views, select=0.1)
     assert float(robust[0, 0]) < 0.25  # the highlight is left out though its view saw texel 0 best
     assert abs(float(robust[2, 0]) - 0.2) < 0.01  # texel 2: nearly all view 0, the best
+
+
+def test_the_prompts_colours_come_from_what_the_picture_saw_well():
+    coral = projection._srgb_to_linear(torch.tensor([235, 95, 85]) / 255)
+    maroon = projection._srgb_to_linear(torch.tensor([120, 20, 25]) / 255)
+    colour = torch.cat([coral.expand(300, 3), maroon.expand(700, 3)])
+    # The shaded side is most of the texels, but the picture saw it at a grazing angle
+    weight = torch.cat([torch.full((300,), 0.9), torch.full((700,), 0.1)])
+    picture = P.Picture(texture=torch.zeros(4, 4, 3), weight=weight, azimuth=0.0, elevation=15.0, report={}, colour=colour)
+    assert P.picture_colours(picture, no_picture()) == ["coral red"]
+    # Without the projection: the cutout's pixels, as before
+    cutout = np.zeros((32, 32, 4), np.uint8)
+    cutout[8:24, 8:24] = (120, 20, 25, 255)
+    unapplied = P.Picture(texture=torch.zeros(4, 4, 3), weight=torch.zeros(1000), azimuth=0.0, elevation=15.0, report={})
+    assert P.picture_colours(unapplied, Image.fromarray(cutout, "RGBA")) == ["dark red"]
+    assert P.colour_names(torch.zeros(0, 3)) == []

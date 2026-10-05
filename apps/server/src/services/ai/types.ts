@@ -99,6 +99,23 @@ export interface ModelOutput {
    * recipe on. Orainge's job API on Modal says; RunPod and older workers leave it out.
    */
   model?: string;
+  /**
+   * A final the painter was asked to paint (AI_PAINT=1): whether its texture was painted again
+   * from views round the model, and if not, why. Left out when it wasn't asked.
+   */
+  painted?: PaintNote;
+}
+
+/** How a final's painting went (workers/README.md, Job contracts: "paint"). */
+export interface PaintNote {
+  applied: boolean;
+  /** Why it wasn't painted (the final keeps TRELLIS.2's texture) */
+  reason?: string;
+  /** How many of the views round the model went into the texture, of how many */
+  views?: number;
+  of?: number;
+  /** The painted texture's side in pixels */
+  size?: number;
 }
 
 /**
@@ -151,7 +168,7 @@ export type WorkerJobState<T> =
  * The GPU workers the Studio uses: FLUX for the pictures, MV-Adapter for the picture's other
  * sides, TRELLIS.2 for the models.
  */
-export type WorkerKind = 'references' | 'multiview' | 'model';
+export type WorkerKind = 'references' | 'multiview' | 'model' | 'painter';
 
 /**
  * What the Studio's AI panel needs from the GPU workers. Every step is a job that is started
@@ -181,6 +198,11 @@ export interface StudioWorkers {
     views?: ModelView[];
     mode: GenerationQuality;
     seed?: number;
+    /**
+     * A final whose texture the painter paints again from views round the model (AI_PAINT=1):
+     * `subject` is what the object is, in the creator's words (empty for a photo).
+     */
+    paint?: { subject: string };
     requestId: string;
   }): Promise<string>;
   model(jobId: string): Promise<WorkerJobState<ModelOutput>>;

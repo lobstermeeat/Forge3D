@@ -91,6 +91,10 @@ TRELLIS2_GPU = "L40S"
 TRELLIS2_LOW_VRAM = "0"
 FLUX_GPU = "L40S"  # FLUX.1 [schnell] needs about 34 GB
 MULTIVIEW_GPU = "A10G"  # MV-Adapter on SDXL needs about 14 GB: a 24 GB A10G, about half an L40S's price
+# The painter (Phase 8: a final's texture painted again from ten views, when the server asks with "paint"):
+# Qwen-Image-Edit-2511 keeps 57.7 GB of bf16 weights resident and peaks near 63 GB, so an 80 GB H100, where a
+# view takes about 5 s
+PAINTER_GPU = "H100"
 
 app = modal.App(APP_NAME)
 models = modal.Volume.from_name("orainge-models", create_if_missing=True)
@@ -213,6 +217,18 @@ multiview_image = (
     .add_local_dir(WORKERS / "multiview" / "mvadapter", "/root/mvadapter")
 )
 
+# The painter: Qwen-Image-Edit-2511 with lightx2v's 8-step Lightning LoRA (workers/painter, both Apache-2.0), and
+# the painter's geometry from the TRELLIS.2 worker (paint.py, painting.py: torch, Pillow and trimesh only)
+painter_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install(*TORCH, index_url=TORCH_INDEX)
+    .pip_install_from_requirements(str(WORKERS / "painter" / "requirements.txt"))
+    .pip_install("trimesh==4.12.2")
+    .env({"HF_HUB_OFFLINE": "1", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"})
+    .add_local_dir(WORKERS / "trellis2" / "forge3d_worker", "/root/forge3d_worker")
+    .add_local_dir(WORKERS / "painter" / "painter_worker", "/root/painter_worker")
+)
+
 download_image = (
     modal.Image.debian_slim(python_version="3.11")
     .pip_install("huggingface_hub[hf_xet]>=0.34,<2")
@@ -222,6 +238,7 @@ download_image = (
     )
     .add_local_file(WORKERS / "multiview" / "scripts" / "download_weights.py", "/root/weights/multiview.py")
     .add_local_file(WORKERS / "pixal3d" / "scripts" / "download_weights.py", "/root/weights/pixal3d.py")
+    .add_local_file(WORKERS / "painter" / "scripts" / "download_weights.py", "/root/weights/painter.py")
 )
 
 api_image = (
@@ -514,6 +531,8 @@ class Trellis2:
         merge_tuning(LOCAL_TUNING, SHARED_TUNING)
         storage = storage_from_env()
         trellis2 = Trellis2Runtime(f"{MODELS}/TRELLIS.2-4B")
+        # A final with "paint" has its texture painted on the Painter's GPU (forge3d_worker/painting.py)
+        trellis2.painter = paint_on_painter
         pool = ModelPool(trellis2)
         handlers: dict[str, Callable[..., dict]] = {"trellis2": handle_job}
         final_model = os.environ.get("ORAINGE_FINAL_MODEL", FINAL_MODEL)
@@ -533,6 +552,8 @@ class Trellis2:
 
     @modal.method()
     def generate(self, job: dict) -> dict:
+        if wants_paint(job):
+            warm_painter()  # Qwen-Image-Edit-2511 loads while TRELLIS.2 makes the shape
         try:
             return run_job(self.handle, job)
         finally:
@@ -655,12 +676,82 @@ class GeometryViews:
         return run_job(self.handle, job)
 
 
+def wants_paint(job: dict) -> bool:
+    """Whether a job is a final the server asked to have painted (``"paint": true``)."""
+    payload = job.get("input") if isinstance(job, dict) else None
+    return isinstance(payload, dict) and payload.get("paint") is True and payload.get("mode", "final") == "final"
+
+
+def warm_painter() -> None:
+    """Starts a Painter container, if none is up, without waiting for it (a failure only costs time)."""
+    try:
+        Painter().warm.spawn()
+    except Exception as err:  # noqa: BLE001 - the final paints from cold, or not at all
+        print(f"[orainge] couldn't warm the painter: {type(err).__name__}: {err}")
+
+
+def paint_on_painter(kit: bytes) -> dict:
+    """Trellis2Runtime.painter: one kit (painting.pack_kit) painted on the Painter's GPU."""
+    return Painter().paint.remote(kit)
+
+
+@app.cls(
+    image=painter_image,
+    gpu=PAINTER_GPU,
+    cpu=8.0,
+    # The weights pass through RAM on their way to the GPU only in pieces (accelerate's device_map); the views,
+    # the texels of a 4096 texture and the PNG on the way back need a few GB
+    memory=65536,
+    volumes={MODELS: models},
+    # Ten views of about 5 s each, the bake and the colour match: a minute and a half; loading the 58 GB of
+    # weights takes one to two more from cold
+    timeout=600,
+    startup_timeout=900,
+    scaledown_window=120,
+    max_containers=2,
+)
+class Painter:
+    """
+    A final's texture painted again (Phase 8, forge3d_worker/painting.py): Qwen-Image-Edit-2511 turns renders of the
+    model from ten sides into product photos, which paint.py bakes back into the texture. The Trellis2 container
+    sends a kit and waits for the texture; nothing calls this from outside.
+    """
+
+    @modal.enter()
+    def load(self) -> None:
+        import torch
+        from painter_worker.qwen import QwenPainter
+
+        _require_weights("painter")
+        started = time.time()
+        self.painter = QwenPainter(f"{MODELS}/Qwen-Image-Edit-2511", f"{MODELS}/Qwen-Image-Edit-2511-Lightning")
+        print(
+            f"[painter] Qwen-Image-Edit-2511 on {torch.cuda.get_device_name()} in {time.time() - started:.0f} s, "
+            f"{self.painter.lora_layers} LoRA layers, {self.painter.steps} steps"
+        )
+
+    @modal.method()
+    def paint(self, kit: bytes) -> dict:
+        from forge3d_worker import painting
+        from painter_worker import views
+
+        result = painting.paint_kit(kit, lambda subject: views.editor(self.painter, subject), device="cuda")
+        print(f"[painter] painted {result['size']}x{result['size']} in {result['seconds']} s")
+        return result
+
+    @modal.method()
+    def warm(self) -> bool:
+        """Does nothing: calling it starts a container (load() runs first) before a final needs one."""
+        return True
+
+
 # In download order: Pixal3D's script reuses the TRELLIS.2 worker's DINOv3, BiRefNet and decoders
 WEIGHT_SCRIPTS = {
     "trellis2": "/root/weights/trellis2.py",
     "reference": "/root/weights/reference.py",
     "multiview": "/root/weights/multiview.py",
     "pixal3d": "/root/weights/pixal3d.py",
+    "painter": "/root/weights/painter.py",
 }
 
 
@@ -674,8 +765,8 @@ WEIGHT_SCRIPTS = {
 )
 def download_models(which: str = "all", force: bool = False) -> None:
     """
-    Downloads the pinned weights (about 119 GB, 44 GB of it Pixal3D's two sets) into the orainge-models
-    volume. CPU only.
+    Downloads the pinned weights (about 178 GB: 44 GB of it Pixal3D's two sets, 59 GB the painter's) into the
+    orainge-models volume. CPU only.
     """
     if which != "all" and which not in WEIGHT_SCRIPTS:
         raise SystemExit(f"--which must be all, {', '.join(WEIGHT_SCRIPTS)}")
@@ -725,10 +816,11 @@ def api():
     """
     from job_api import ModalCalls, app_for_token
 
-    trellis2, flux, multiview = Trellis2(), FluxSchnell(), MultiView()
+    trellis2, flux, multiview, painter = Trellis2(), FluxSchnell(), MultiView(), Painter()
     calls = ModalCalls(
         {"trellis2": trellis2.generate, "reference": flux.generate, "multiview": multiview.generate},
-        warm={"trellis2": trellis2.warm, "reference": flux.warm, "multiview": multiview.warm},
+        # "painter" takes no jobs of its own (finals call it); the server warms it while a creator works (AI_PAINT)
+        warm={"trellis2": trellis2.warm, "reference": flux.warm, "multiview": multiview.warm, "painter": painter.warm},
     )
     return app_for_token(os.environ.get("ORAINGE_WORKER_TOKEN"), calls)
 
@@ -764,11 +856,13 @@ def run_pipeline(
     pick: Optional[int] = None,
     pictures_only: bool = False,
     final_weights: Sequence[str] = (),
+    paint: bool = False,
 ) -> dict:
     """
     Prompt or image -> reference images -> preview GLB -> (optionally) final GLB, written into
     `folder`. Each finished step is recorded in progress.json, so running it again on the same
-    folder skips what is done and continues where it stopped.
+    folder skips what is done and continues where it stopped. With `paint` the final asks for the
+    painter, as the server does with AI_PAINT=1 (its step keeps the "paint" note).
 
     The reference picture the worker scored best goes on to 3D (the first, if it didn't score
     them) unless `pick` names another (1-4), the way a user picks one in the Studio.
@@ -881,6 +975,8 @@ def run_pipeline(
             }
             if state.get("seed") is not None:
                 job["seed"] = state["seed"]
+            if mode == "final" and paint:
+                job.update(paint=True, subject=prompt or "")
             result = checked(trellis({"input": job}))
             # The final reuses the preview's seed, so it refines the shape the preview showed
             state["seed"] = result["seed"]
@@ -907,6 +1003,8 @@ def run_pipeline(
                 step["views_used"] = result["views_used"]
             if result.get("projection"):  # finals: whether the picture was painted on, and why not
                 step["projection"] = result["projection"]
+            if result.get("paint"):  # finals asked to be painted: whether they were, and why not
+                step["paint"] = result["paint"]
             return step
 
         return work
@@ -940,6 +1038,7 @@ def make_model(
     seed: int = -1,
     pick: int = 0,
     pictures_only: bool = False,
+    paint: bool = False,
 ) -> dict:
     """The whole flow in the cloud; see run_pipeline. Results land in orainge-outputs/<run>/."""
     if not RUN_NAME.fullmatch(run):
@@ -959,6 +1058,7 @@ def make_model(
         pick=pick or None,
         pictures_only=pictures_only,
         final_weights=FINAL_WEIGHTS,
+        paint=paint,
     )
 
 
@@ -971,11 +1071,13 @@ def make(
     run: str = "",
     pick: int = 0,
     pictures_only: bool = False,
+    paint: bool = False,
 ) -> None:
     """
     Prompt or image to 3D in Modal's cloud. Start it with `modal run --detach` and it finishes
     even if this computer sleeps or goes offline; `--run NAME` continues an earlier run.
     `--pictures-only` stops at the four pictures; `--run NAME --pick 3` makes the third into 3D.
+    `--final --paint` has the final painted again from views round it (the painter, AI_PAINT=1).
     """
     if not (prompt or image or run):
         raise SystemExit("Give --prompt or --image, or --run NAME to continue a run")
@@ -999,6 +1101,7 @@ def make(
         seed=seed,
         pick=pick,
         pictures_only=pictures_only,
+        paint=paint,
     )
     # Still connected: copy the results here too
     target = pathlib.Path("orainge-outputs") / run

@@ -61,6 +61,17 @@ export function multiviewEnabled(env: Record<string, string | undefined> = proce
   return env['AI_MULTIVIEW']?.trim() === '1';
 }
 
+/**
+ * AI_PAINT=1: each final's texture is painted again from views round the model (Phase 8: the
+ * painter, an image-editing model on its own GPU, see workers/README.md) before the picture's
+ * projection, so the model looks like the pictured product from every side. Its finals take a
+ * minute or two longer and get no texture options (theirs would be TRELLIS.2's, unpainted). Off
+ * by default.
+ */
+export function paintEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env['AI_PAINT']?.trim() === '1';
+}
+
 /** The values of AI_TEXTURE_OPTIONS that turn texture options off, in any case */
 const OFF = new Set(['0', 'false', 'off', 'no']);
 
@@ -93,6 +104,7 @@ export function getStudio(): AIStudio {
       storage: getStorage(),
       multiview,
       textureOptions: textureOptionsEnabled(),
+      paint: paintEnabled(),
     });
   }
   return studio;

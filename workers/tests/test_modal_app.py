@@ -1,5 +1,7 @@
 """modal_app.py without Modal's servers: its pins, its shape and the per-job wrapper."""
 
+from types import SimpleNamespace
+
 import ast
 import base64
 import io
@@ -50,7 +52,8 @@ def test_defines_the_workers_the_api_and_the_helpers():
     assert isinstance(modal_app.FluxSchnell, modal.Cls)
     assert isinstance(modal_app.MultiView, modal.Cls)
     assert isinstance(modal_app.GeometryViews, modal.Cls)
-    assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d"]  # download order
+    assert isinstance(modal_app.Painter, modal.Cls)
+    assert list(modal_app.WEIGHT_SCRIPTS) == ["trellis2", "reference", "multiview", "pixal3d", "painter"]  # download order
     assert isinstance(modal_app.download_models, modal.Function)
     assert isinstance(modal_app.api, modal.Function)
     assert isinstance(modal_app.make_model, modal.Function)
@@ -465,6 +468,8 @@ class FakeWorkers:
             "pipeline": "512" if mode == "preview" else "1024_cascade",
             "timings": {"generate_s": 1.0},
         }
+        if mode == "final" and job["input"].get("paint"):  # the painter's note, when asked
+            result["paint"] = {"applied": True, "size": 4096, "views": 9, "of": 10}
         if mode == "final":  # the worker says whether it painted the picture onto the model
             result["projection"] = {"applied": False, "reason": "the silhouettes don't match well enough"}
             result["views_used"] = 0
@@ -1041,3 +1046,43 @@ def test_saving_the_kernel_caches_never_fails_a_job(tmp_path, monkeypatch, capsy
     monkeypatch.setattr(modal_app, "cache", BrokenCache())
     modal_app.share_caches()  # reported, not raised
     assert "kernel caches not saved: RuntimeError: volume unavailable" in capsys.readouterr().out
+
+
+def test_a_final_asking_to_be_painted_warms_the_painter_first(monkeypatch):
+    assert modal_app.wants_paint({"input": {"paint": True}})
+    assert modal_app.wants_paint({"input": {"mode": "final", "paint": True}})
+    assert not modal_app.wants_paint({"input": {"mode": "preview", "paint": True}})
+    assert not modal_app.wants_paint({"input": {"mode": "textures", "paint": True}})
+    assert not modal_app.wants_paint({"input": {"paint": "yes"}}) and not modal_app.wants_paint({"input": {}})
+    assert not modal_app.wants_paint({})
+
+    spawned = []
+
+    class Methods:
+        warm = SimpleNamespace(spawn=lambda: spawned.append("warm"))
+        paint = SimpleNamespace(remote=lambda kit: {"texture": b"png", "kit": kit})
+
+    monkeypatch.setattr(modal_app, "Painter", lambda: Methods)
+    modal_app.warm_painter()
+    assert spawned == ["warm"]
+    assert modal_app.paint_on_painter(b"kit") == {"texture": b"png", "kit": b"kit"}
+
+    def down():
+        raise RuntimeError("Modal is down")
+
+    monkeypatch.setattr(modal_app, "Painter", down)
+    modal_app.warm_painter()  # only costs time
+
+
+def test_a_run_asks_for_a_painted_final_only_when_told(tmp_path):
+    workers = FakeWorkers()
+    state = run(tmp_path / "run-p", workers, prompt="a yellow Lamborghini Huracan", final=True, paint=True)
+    preview, final = (call[1]["input"] for call in workers.calls if call[0] == "trellis")
+    assert "paint" not in preview and "subject" not in preview
+    assert (final["paint"], final["subject"]) == (True, "a yellow Lamborghini Huracan")
+    assert state["steps"]["final"]["paint"] == {"applied": True, "size": 4096, "views": 9, "of": 10}
+
+    workers = FakeWorkers()
+    state = run(tmp_path / "run-q", workers, prompt="a mug", final=True)
+    final = [call[1]["input"] for call in workers.calls if call[0] == "trellis"][-1]
+    assert "paint" not in final and "paint" not in state["steps"]["final"]
