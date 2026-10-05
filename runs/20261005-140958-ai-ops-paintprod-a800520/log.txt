@@ -1,0 +1,29 @@
+└── ✓ Created Function Trellis2.*.
+painter: already downloaded (--force to fetch again)
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-fHU4IHZVLqj46oNqxtgSlL
+== p8prod2-bmw
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod2-bmw: saving each step in the orainge-outputs volume under p8prod2-bmw/
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 43 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 50.3 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 50.3, "seconds": 54.7}
+Done: reference-580852416.png, reference-580852417.png, reference-580852418.png, reference-580852419.png, preview-988079484.glb, final-988079484.glb in orainge-outputs/p8prod2-bmw
+{"final": {"status": "done", "paint": {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 50.3, "seconds": 54.7}, "projection": {"applied": true, "reason": "applied", "iou": 0.9518, "colour": 0.3654, "coverage": 0.058, "pose": {"azimuth": 45.0, "elevation": 9.4, "roll": 2.0, "fov": 23.1, "scale": 1.008, "shift": [0.0012, 0.0031]}, "mode": "detail only", "decals": 341, "seconds": 1.641}, "timings": {"generate_s": 26.52, "export_s": 81.958, "compress_s": 2.828, "upload_s": 0.004}, "gpu_seconds": 111.3, "bytes": 2925184}}
+== p8prod2-jordan
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+╭─ Error ──────────────────────────────────────────────────────────────────────╮
+== p8prod2-coke
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod2-coke: saving each step in the orainge-outputs volume under p8prod2-coke/
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 36 s, 720 LoRA layers, 8 steps
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 48 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 57.6 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 10, "of": 10, "joint": "picture", "painter_s": 57.6, "seconds": 81.2}
+Done: reference-155860632.png, reference-155860633.png, reference-155860634.png, reference-155860635.png, preview-2071931765.glb, final-2071931765.glb in orainge-outputs/p8prod2-coke
+{"final": {"status": "done", "paint": {"applied": true, "size": 4096, "output": "robust", "views": 10, "of": 10, "joint": "picture", "painter_s": 57.6, "seconds": 81.2}, "projection": {"applied": true, "reason": "applied", "iou": 0.9708, "colour": 0.5001, "coverage": 0.0824, "pose": {"azimuth": 13.8, "elevation": 3.8, "roll": 0.5, "fov": 60.0, "scale": 1.016, "shift": [0.0, 0.0037]}, "mode": "detail only", "decals": 185, "seconds": 2.147}, "timings": {"generate_s": 12.571, "export_s": 108.227, "compress_s": 3.088, "upload_s": 0.005}, "gpu_seconds": 123.9, "bytes": 3365068}}
+exit status: 1
