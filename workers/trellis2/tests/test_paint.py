@@ -868,3 +868,49 @@ def test_paint_views_takes_the_glare_out_of_each_view():
         reds[glare] = max(int(cell(robust, k, inset=INNER // 4)[..., 0].max()) for k in (0, 1, 4, 5))
     assert reds[False] > 110  # baked in: a white patch on every side
     assert reds[True] < 70  # taken out: the paint's 40, give or take the blend
+
+
+def test_paint_views_tells_the_editor_which_try_it_is_and_keeps_its_skip():
+    mesh = box()
+    seen = []
+    flat, _ = flat_painter()
+
+    def paint(render, picture, neighbour, seed, view):
+        seen.append((view["name"], view["attempt"]))
+        if view["attempt"] == 0:  # the first try turns the object: left out
+            out = Image.fromarray(np.roll(np.asarray(render), shift=40, axis=1))
+        else:
+            out = flat(render, picture, neighbour, seed, view)
+        out.info["skip"] = view["attempt"]  # as views.editor marks how far in it started
+        return out
+
+    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=2, top=False, bottom=False, attempts=3, log=lambda _: None, **small())
+    assert seen == [("a000", 0), ("a000", 1), ("a180", 0), ("a180", 1)]
+    assert all(view.accepted and [a.get("skip") for a in view.attempts] == [0, 1] for view in result.views)
+    # An editor that doesn't say leaves no skip in the report
+    plain, _ = flat_painter()
+    result = P.paint_views(mesh, no_picture(), plain, device="cpu", around=2, top=False, bottom=False, log=lambda _: None, **small())
+    assert all("skip" not in attempt for view in result.views for attempt in view.attempts)
+
+
+def test_the_views_are_held_to_the_picture_only_where_it_sees_them_face_on():
+    from test_projection import VIEW, make_box, render_box
+
+    mesh = make_box()
+    geom = P.geometry(mesh, "cpu")
+    texture, _ = P.texture_of(mesh, "cpu")
+    tex = P.texels(geom, tuple(texture.shape[:2]))
+    picture = P.project_picture(mesh, render_box(VIEW), tex, texture, "cpu")
+    assert picture.report["applied"], picture.report
+    assert picture.facing is not None and picture.facing.shape == picture.weight.shape
+    held = picture.anchor_weight()
+    seen = picture.weight > 0.05
+    # Seen from 30 degrees round and 20 up: the front nearly face on, the side and the top at a slant
+    square = seen & (picture.facing > P.ANCHOR_FACING[1])
+    slant = seen & (picture.facing < P.ANCHOR_FACING[0])
+    assert int(square.sum()) > 100 and int(slant.sum()) > 100
+    assert torch.allclose(held[square], picture.weight[square]) and float(held[slant].abs().max()) == 0.0
+    assert bool((held <= picture.weight + 1e-6).all())
+    # Without the facing (an unapplied projection), the weight as it is
+    unapplied = P.Picture(texture=texture, weight=picture.weight, azimuth=0.0, elevation=15.0, report={})
+    assert torch.equal(unapplied.anchor_weight(), picture.weight)

@@ -177,6 +177,17 @@ STRATEGIES = {
     # Run 7: production's painter (forge3d_worker/painting.py): the prompt's colours and the colour match's anchor
     # from the picture with its shading taken out; give it --attempts 3 as production does
     "qie-v7": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096, "views_only": False},
+    # Run 9: as qie-v7, each view started from its render noised part way instead of from pure noise (QwenPainter's
+    # skip: 2 or 3 of the 8 Lightning steps taken as done, the render's latents at noise 0.9 or 0.83), so that the
+    # editing model keeps the render's viewpoint (run 7 lost 7 of the sneaker's 10 views and 6 of the watch's to it
+    # turning them to a catalogue angle)
+    "qie-s2": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096, "views_only": False, "skip": 2},
+    "qie-s3": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096, "views_only": False, "skip": 3},
+    # Run 10: skip 2 kept every viewpoint but cleaned up less than pure noise, skip 3 hardly changed the render. So:
+    # skip 1 on its own (noise 0.95), and production's candidate, each try further in (views.SKIPS: pure noise,
+    # then skip 1, then skip 2), which leaves views that pass at the first try as run 8 painted them
+    "qie-s1": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096, "views_only": False, "skip": 1},
+    "qie-v9": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096, "views_only": False, "skips": (0, 1, 2)},
 }
 # klein's shifted 4-step schedule (1 MP), and the schedules the "start" values ask for
 SCHEDULES = {0.91: None, 0.8: (1.0, 0.8, 0.6, 0.35)}
@@ -714,12 +725,18 @@ class QwenPaint:
                 images.append(square(reference))
             if use_neighbour:
                 images.append(square(neighbour))
-            painted = self.painter.paint(images, prompt, seed=int(seed), steps=steps)
+            skips = tuple(spec.get("skips") or (spec.get("skip", 0),))
+            attempt = int(view.get("attempt") or 0)
+            skip = int(skips[min(attempt, len(skips) - 1)])
+            painted = self.painter.paint(images, prompt, seed=int(seed), steps=steps, skip=skip)
             self.prompts.append(
                 {"view": view.get("name"), "seed": int(seed), "prompt": prompt, "pictures": len(images),
-                 "seconds": self.painter.last_seconds, "peak_gb": self.painter.last_peak_gb}
+                 "attempt": attempt, "skip": skip, "seconds": self.painter.last_seconds,
+                 "peak_gb": self.painter.last_peak_gb}
             )
-            return from_square(painted, render.size)
+            out = from_square(painted, render.size)
+            out.info["skip"] = skip
+            return out
 
         return paint
 
