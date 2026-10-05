@@ -319,6 +319,79 @@ def test_each_call_is_timed_and_checked():
         painter(FakePipeline(result_size=(512, 512))).paint([noise((64, 64))], "x", seed=1)
 
 
+def test_a_start_part_way_runs_the_rest_of_the_schedule():
+    sigmas, level = Q.start_schedule(8, 3)
+    assert sigmas == pytest.approx([0.625, 0.5, 0.375, 0.25, 0.125])
+    assert level == pytest.approx(3 * 0.625 / (1 + 2 * 0.625))  # 0.833 after the time shift
+    assert Q.start_schedule(8, 2)[1] == pytest.approx(0.9)
+    assert Q.start_schedule(8, 1, shift=1.0) == (pytest.approx([0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125]), 0.875)
+    for skip in (0, 8, -1):
+        with pytest.raises(ValueError, match="skip is 1 to 7"):
+            Q.start_schedule(8, skip)
+
+
+class FakeLatentPipeline(FakePipeline):
+    """FakePipeline with the parts of the real one that skip uses: preprocessing, the VAE's encoding, packing."""
+
+    _execution_device = "cpu"
+    latent_channels = 16
+
+    def __init__(self):
+        super().__init__()
+        self.image_processor = types.SimpleNamespace(preprocess=self._preprocess)
+        self.encoded = []
+
+    @staticmethod
+    def _preprocess(image, height, width):
+        assert image.size == (width, height)
+        array = torch.from_numpy(np.asarray(image.convert("RGB"), np.float32) / 127.5 - 1)
+        return array.permute(2, 0, 1)[None]
+
+    def _encode_vae_image(self, image, generator):
+        self.encoded.append((tuple(image.shape), image.dtype))
+        pooled = torch.nn.functional.avg_pool3d(image.float(), (1, 8, 8))  # (1, 3, 1, H / 8, W / 8)
+        return pooled.repeat(1, 6, 1, 1, 1)[:, : self.latent_channels].to(image.dtype)
+
+    @staticmethod
+    def _pack_latents(latents, batch_size, num_channels_latents, height, width):
+        latents = latents.view(batch_size, num_channels_latents, height // 2, 2, width // 2, 2)
+        latents = latents.permute(0, 2, 4, 1, 3, 5)
+        return latents.reshape(batch_size, (height // 2) * (width // 2), num_channels_latents * 4)
+
+
+@needs_torch
+def test_skip_starts_from_picture_1_noised():
+    fake = FakeLatentPipeline()
+    paint = painter(fake, dtype="float32")
+    render = noise((300, 200), seed=3)
+    paint.paint([render, noise((64, 64))], "Make it red", seed=5, skip=3)
+    call = fake.calls[-1]
+    assert call["num_inference_steps"] == 5 and call["sigmas"] == pytest.approx([0.625, 0.5, 0.375, 0.25, 0.125])
+    # Picture 1 as the pipeline sees it (the 1024 square), encoded once: 128 x 128 latents packed to 64 x 64 tokens
+    assert fake.encoded == [((1, 3, 1, 1024, 1024), torch.float32)]
+    latents = call["latents"]
+    assert tuple(latents.shape) == (1, 64 * 64, 64)
+    # (1 - level) x + level noise: the picture's share of it is what the level leaves
+    pixels = FakeLatentPipeline._preprocess(Q.to_square(render), 1024, 1024).unsqueeze(2)
+    clean = fake._pack_latents(fake._encode_vae_image(pixels, None), 1, 16, 128, 128)
+    level = Q.start_schedule(8, 3)[1]
+    rest = (latents - (1 - level) * clean) / level
+    assert abs(float(rest.std()) - 1) < 0.05 and abs(float(rest.mean())) < 0.05
+    # The same seed starts from the same latents; another seed doesn't
+    paint.paint([render], "Make it red", seed=5, skip=3)
+    paint.paint([render], "Make it red", seed=6, skip=3)
+    assert torch.equal(fake.calls[-2]["latents"], latents) and not torch.equal(fake.calls[-1]["latents"], latents)
+    # Without skip the pipeline draws its own noise, as before
+    paint.paint([render], "Make it red", seed=5)
+    assert "latents" not in fake.calls[-1] and "sigmas" not in fake.calls[-1]
+
+
+@needs_torch
+def test_skip_needs_the_lightning_recipe():
+    with pytest.raises(ValueError, match="Lightning"):
+        painter(FakeLatentPipeline(), scheduler=None).paint([noise((64, 64))], "x", seed=1, skip=3)
+
+
 # --- Loading, through a fake diffusers module -----------------------------------------------------------
 
 

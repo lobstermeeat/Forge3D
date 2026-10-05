@@ -102,16 +102,21 @@ photos:
 2. **Painting.** Qwen-Image-Edit-2511 (Apache-2.0, with lightx2v's 8-step Lightning LoRA, Apache-2.0) turns each
    render into a clean product photo of the same object from exactly the same viewpoint
    (`painter/painter_worker/views.py`: the render is its only picture; the prompt names the side and the
-   picture's main colours). Given the picture as well, it copied the picture's viewpoint instead (Phase 8, runs
-   4 and 5). Each painted view must keep the render's outline (silhouette IoU at least 0.9 after the best small
+   picture's main colours, read from the picture with its shading taken out and each paint named once, so the
+   arcade machine's shaded sides aren't asked for as a second, darker red). Given the picture as well, it
+   copied the picture's viewpoint instead (Phase 8, runs 4 and 5). Each painted view must keep the render's outline (silhouette IoU at least 0.9 after the best small
    shift and scale) and draw nothing the render doesn't have (`novelty`, at most 0.2); a view that fails gets
    up to three seeds, then is left out. A bottom view whose render is dark isn't painted (the model turned two
    cars' dark undersides into a second roof). Each view goes into the texture before the next is rendered, so
    the views agree.
-3. **Colour.** A view's brightness and saturation (never its hue, so grey stays grey) are matched to the other
+3. **Glare.** A painted view's glossy highlights come out before it's baked (`deglare`): a highlight adds white
+   to a paint where shading only darkens it, so per hue each pixel keeps the whiteness of its paint, or of the
+   render there (a cream decal the texture has stays cream), and loses the white above it. Without this the
+   views' studio reflections baked into the cartoon car's roof as a pale patch.
+4. **Colour.** A view's brightness and saturation (never its hue, so grey stays grey) are matched to the other
    views where they overlap and to the picture's own colour where the picture saw the surface well, with its
    shading taken out (`joint_tone`: one least-squares solve for all views, robust to details only one view drew).
-4. **Bake.** Each texel takes its colour mostly from the view that sees it most squarely (`select_weights`),
+5. **Bake.** Each texel takes its colour mostly from the view that sees it most squarely (`select_weights`),
    leaving out views whose brightness there disagrees with the others (a highlight one view drew), into a
    4096 × 4096 base colour on the final's own UV layout (the 2048 texture scaled up first: at 2048 the bake lost
    the wheel spokes and grille slats the views drew). Then the export carries on as for any final: the picture's
