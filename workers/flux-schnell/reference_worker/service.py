@@ -20,10 +20,16 @@ REQUEST_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 MAX_PROMPT = 500
 MAX_COUNT = 4
 
+# The angle comes first and as what the picture shows. The old template ("{prompt}. A single object, centered
+# ... three-quarter view from slightly above ...") got a three-quarter view in 19-25% of FLUX.1 [schnell]'s
+# pictures, which mostly drew products straight from the front or the side, as catalogues show them, so
+# image-to-3D had to make up the sides and back. This one got 69-75% on two sets of seeds (Phase 8, 28 prompts:
+# Phase 2's twenty and eight real products, 4 pictures each, labelled blind). Round things (a cup, a bottle, a
+# balloon) still come at eye level, and a phone shows its back.
 TEMPLATE = (
-    "{prompt}. A single object, centered and fully in frame, on a plain light gray background, "
-    "soft even studio lighting, three-quarter view from slightly above, sharp focus, "
-    "no text, no other objects"
+    "A studio product photo of {prompt}: an angled perspective shot from the front left corner, slightly above, "
+    "showing its front and its side. One whole object, fully in frame, on a plain light gray background, soft "
+    "even lighting, sharp focus, no text, no other objects"
 )
 
 
