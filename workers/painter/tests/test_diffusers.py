@@ -297,6 +297,37 @@ def test_a_tiny_pipeline_paints_on_the_cpu(tiny, tmp_path, monkeypatch):
 
 
 @needs_stack
+def test_skip_starts_from_the_latents_the_pipeline_makes_of_picture_1(tiny, tmp_path, monkeypatch):
+    import torch
+
+    folder, transformer = tiny
+    painter, _ = painter_with_lora(folder, transformer, tmp_path / Q.LORA_FOLDER)
+    pipe = painter.pipeline
+    made = {}
+    prepare = pipe.prepare_latents
+
+    def spy(*args, **options):
+        made["latents"], made["pictures"] = prepare(*args, **options)
+        return made["latents"], made["pictures"]
+
+    monkeypatch.setattr(pipe, "prepare_latents", spy)
+    render = Image.fromarray(np.random.default_rng(5).integers(0, 256, (SIDE, SIDE, 3), dtype=np.uint8))
+    result = painter.paint([render], "Make it red", seed=3, size=SIDE, steps=8, skip=3)
+    assert result.size == (SIDE, SIDE)
+    # Only the last five of the eight steps ran, at the Lightning schedule's own timesteps
+    sigmas, level = Q.start_schedule(8, 3)
+    assert pipe.scheduler.timesteps.tolist() == pytest.approx([1000 * 3 * s / (1 + 2 * s) for s in sigmas], abs=1e-3)
+    # The start: Picture 1's latents as the pipeline itself packed them (its only picture: all its tokens), noised
+    clean = made["pictures"]
+    generator = torch.Generator("cpu").manual_seed(3)
+    noise = torch.randn(tuple(clean.shape), generator=generator, dtype=torch.float32)
+    torch.testing.assert_close(made["latents"], (1 - level) * clean + level * noise, atol=1e-5, rtol=1e-5)
+    # Deterministic, as without skip
+    again = painter.paint([render], "Make it red", seed=3, size=SIDE, steps=8, skip=3)
+    assert again.tobytes() == result.tobytes()
+
+
+@needs_stack
 def test_a_lora_diffusers_would_leave_out_stops_the_load(tiny, tmp_path):
     folder, transformer = tiny
     path = tmp_path / "unprefixed.safetensors"

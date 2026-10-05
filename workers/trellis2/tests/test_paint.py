@@ -747,3 +747,170 @@ def test_the_prompts_colours_come_from_what_the_picture_saw_well():
     unapplied = P.Picture(texture=torch.zeros(4, 4, 3), weight=torch.zeros(1000), azimuth=0.0, elevation=15.0, report={})
     assert P.picture_colours(unapplied, Image.fromarray(cutout, "RGBA")) == ["dark red"]
     assert P.colour_names(torch.zeros(0, 3)) == []
+
+
+def test_shades_of_one_paint_are_named_once_by_the_lit_shade():
+    def lin(rgb, n):
+        return projection._srgb_to_linear(torch.tensor(rgb, dtype=torch.float32) / 255).expand(n, 3)
+
+    # The arcade machine: dark red sides in shade, coral front, a white screen
+    colours = torch.cat([lin((120, 20, 25), 450), lin((235, 95, 85), 350), lin((245, 245, 245), 200)])
+    assert P.colour_names(colours) == ["coral red", "white"]
+    # A navy suit with a little light catching it stays navy
+    suit = torch.cat([lin((20, 30, 90), 850), lin((75, 125, 180), 150)])
+    assert P.colour_names(suit) == ["navy blue"]
+    # Black and white are different paints, not shades
+    panda = torch.cat([lin((20, 20, 22), 500), lin((245, 245, 245), 500)])
+    assert sorted(P.colour_names(panda)) == ["black", "white"]
+
+
+# --- Glare --------------------------------------------------------------------------------------------
+
+
+def _grid(size=64):
+    return torch.meshgrid(torch.arange(float(size)), torch.arange(float(size)), indexing="ij")
+
+
+def _shaded(paint, size=64):
+    """A paint (linear RGB, or (size, size, 3) of them) on a (size, size) surface, shaded across it from 0.4 to 1."""
+    shade = torch.linspace(0.4, 1.0, size)[None, :, None].expand(size, size, 1)
+    return torch.as_tensor(paint, dtype=torch.float32) * shade
+
+
+def test_deglare_takes_a_highlight_off_a_paint_and_keeps_its_shading():
+    yy, xx = _grid()
+    paint = _shaded((0.02, 0.08, 0.5))
+    blob = ((yy - 32) ** 2 + (xx - 40) ** 2) < 8**2
+    glossy = paint + 0.3 * blob[..., None].float()  # a highlight adds white; shading only scales
+    mask = torch.ones(64, 64, dtype=torch.bool)
+    out, share = P.deglare(projection._linear_to_srgb(glossy), mask)
+    assert out.shape == glossy.shape
+    assert torch.allclose(projection._srgb_to_linear(out), paint, atol=0.01)
+    assert abs(share - float(blob.float().mean())) < 0.01
+
+
+def test_deglare_keeps_the_white_the_render_has():
+    yy, xx = _grid()
+    blue = torch.tensor([0.02, 0.08, 0.5])
+    paint = _shaded(blue)
+    stripe = ((xx >= 8) & (xx < 24))[..., None].float()
+    light = _shaded(blue + 0.3 * stripe)  # a lighter blue paint in a stripe, which the texture has
+    blob = ((yy - 32) ** 2 + (xx - 46) ** 2) < 7**2
+    view = projection._linear_to_srgb(light + 0.3 * blob[..., None].float())
+    render = projection._linear_to_srgb(light)
+    mask = torch.ones(64, 64, dtype=torch.bool)
+    inner = ((xx >= 11) & (xx < 21))  # the stripe 2 pixels in from its edges (see deglare's 5 x 5)
+    out, _ = P.deglare(view, mask, render)
+    restored = projection._srgb_to_linear(out)
+    assert torch.allclose(restored[inner], light[inner], atol=0.01)  # the stripe keeps its white
+    assert torch.allclose(restored[blob], paint[blob], atol=0.01)  # the highlight the render hasn't goes
+    # Without the render the stripe looks like a highlight too
+    alone, _ = P.deglare(view, mask)
+    assert torch.allclose(projection._srgb_to_linear(alone)[inner], paint[inner], atol=0.01)
+
+
+def test_deglare_leaves_greys_rare_hues_and_the_unmasked_alone():
+    yy, xx = _grid()
+    blob = ((yy - 32) ** 2 + (xx - 32) ** 2) < 8**2
+    mask = torch.ones(64, 64, dtype=torch.bool)
+    # A grey: white paint and a highlight look the same
+    grey = projection._linear_to_srgb(torch.full((64, 64, 3), 0.3) + 0.4 * blob[..., None].float())
+    out, share = P.deglare(grey, mask)
+    assert share == 0.0 and torch.allclose(out, grey, atol=1e-5)
+    # A red patch smaller than GLARE_PIXELS on the grey, with a highlight over it
+    linear = torch.full((64, 64, 3), 0.3)
+    patch = (yy >= 27) & (yy < 37) & (xx >= 27) & (xx < 37)
+    assert int(patch.sum()) < P.GLARE_PIXELS
+    linear[patch] = torch.tensor([0.5, 0.05, 0.03])
+    small = projection._linear_to_srgb(linear + 0.2 * (patch & (xx >= 32))[..., None].float())
+    out, share = P.deglare(small, mask)
+    assert share == 0.0 and torch.allclose(out, small, atol=1e-5)
+    # Outside the mask nothing changes
+    glossy = projection._linear_to_srgb(_shaded((0.02, 0.08, 0.5)) + 0.3 * blob[..., None].float())
+    out, share = P.deglare(glossy, ~blob)
+    assert share == 0.0 and torch.allclose(out, glossy, atol=1e-5)
+
+
+def glossy_painter(colour=(40, 160, 220), white=0.25):
+    """flat_painter's colour with a soft white highlight in the middle of the object (white added in linear light)."""
+    paint_linear = projection._srgb_to_linear(torch.tensor(colour, dtype=torch.float32) / 255).numpy()
+
+    def paint(render, picture, neighbour, seed, view):
+        array = np.asarray(render).astype(int)
+        background = np.round(np.asarray(P.BACKGROUND) * 255).astype(np.uint8)
+        mask = np.abs(array - background.astype(int)).max(-1) > 6
+        ys, xs = np.nonzero(mask)
+        yy, xx = np.mgrid[: mask.shape[0], : mask.shape[1]]
+        spread = 0.12 * (xs.max() - xs.min() + 1)
+        shine = white * np.exp(-((yy - ys.mean()) ** 2 + (xx - xs.mean()) ** 2) / (2 * spread**2))
+        lit = torch.from_numpy((paint_linear[None, None] + shine[..., None]).clip(0, 1)).float()
+        srgb = np.round(projection._linear_to_srgb(lit).numpy() * 255).astype(np.uint8)
+        out = np.empty(array.shape, np.uint8)
+        out[:] = background
+        out[mask] = srgb[mask]
+        return Image.fromarray(out, "RGB")
+
+    return paint
+
+
+def test_paint_views_takes_the_glare_out_of_each_view():
+    reds = {}
+    for glare in (True, False):
+        result = P.paint_views(
+            box(), no_picture(), glossy_painter(), device="cpu", around=4, top=False, bottom=False, glare=glare,
+            max_novelty=1.0, log=lambda _: None, **small(),
+        )
+        assert result.report["accepted"] == 4
+        shares = [view.attempts[-1].get("glare") for view in result.views]
+        assert all(share is not None and 0.0 < share < 0.5 for share in shares) if glare else shares == [None] * 4
+        robust = np.asarray(result.robust.convert("RGB"))
+        # The four sides the views see square on (+X, -X, +Z, -Z): the highlight's white shows in red
+        reds[glare] = max(int(cell(robust, k, inset=INNER // 4)[..., 0].max()) for k in (0, 1, 4, 5))
+    assert reds[False] > 110  # baked in: a white patch on every side
+    assert reds[True] < 70  # taken out: the paint's 40, give or take the blend
+
+
+def test_paint_views_tells_the_editor_which_try_it_is_and_keeps_its_skip():
+    mesh = box()
+    seen = []
+    flat, _ = flat_painter()
+
+    def paint(render, picture, neighbour, seed, view):
+        seen.append((view["name"], view["attempt"]))
+        if view["attempt"] == 0:  # the first try turns the object: left out
+            out = Image.fromarray(np.roll(np.asarray(render), shift=40, axis=1))
+        else:
+            out = flat(render, picture, neighbour, seed, view)
+        out.info["skip"] = view["attempt"]  # as views.editor marks how far in it started
+        return out
+
+    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=2, top=False, bottom=False, attempts=3, log=lambda _: None, **small())
+    assert seen == [("a000", 0), ("a000", 1), ("a180", 0), ("a180", 1)]
+    assert all(view.accepted and [a.get("skip") for a in view.attempts] == [0, 1] for view in result.views)
+    # An editor that doesn't say leaves no skip in the report
+    plain, _ = flat_painter()
+    result = P.paint_views(mesh, no_picture(), plain, device="cpu", around=2, top=False, bottom=False, log=lambda _: None, **small())
+    assert all("skip" not in attempt for view in result.views for attempt in view.attempts)
+
+
+def test_the_views_are_held_to_the_picture_only_where_it_sees_them_face_on():
+    from test_projection import VIEW, make_box, render_box
+
+    mesh = make_box()
+    geom = P.geometry(mesh, "cpu")
+    texture, _ = P.texture_of(mesh, "cpu")
+    tex = P.texels(geom, tuple(texture.shape[:2]))
+    picture = P.project_picture(mesh, render_box(VIEW), tex, texture, "cpu")
+    assert picture.report["applied"], picture.report
+    assert picture.facing is not None and picture.facing.shape == picture.weight.shape
+    held = picture.anchor_weight()
+    seen = picture.weight > 0.05
+    # Seen from 30 degrees round and 20 up: the front nearly face on, the side and the top at a slant
+    square = seen & (picture.facing > P.ANCHOR_FACING[1])
+    slant = seen & (picture.facing < P.ANCHOR_FACING[0])
+    assert int(square.sum()) > 100 and int(slant.sum()) > 100
+    assert torch.allclose(held[square], picture.weight[square]) and float(held[slant].abs().max()) == 0.0
+    assert bool((held <= picture.weight + 1e-6).all())
+    # Without the facing (an unapplied projection), the weight as it is
+    unapplied = P.Picture(texture=texture, weight=picture.weight, azimuth=0.0, elevation=15.0, report={})
+    assert torch.equal(unapplied.anchor_weight(), picture.weight)
