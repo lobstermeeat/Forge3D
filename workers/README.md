@@ -73,6 +73,15 @@ else. The real parts that come loose sit much closer: a fox's tail tip 0.9 % awa
 0.75 %, a balloon's pilot and burner up to 1.4 %; sprinkles, pearls and chopsticks touch the model
 (within 0.35 %). It takes 0.1 to 1.3 s per final on one CPU core.
 
+**Glass is see-through** (`trellis2/forge3d_worker/glass.py`, every textured export since Phase 8). TRELLIS.2
+predicts an opacity with the colour, which `to_glb` keeps in the texture's alpha; the export used to divide the
+colour by it and drop it, so glass came out opaque and up to four times brighter (the BMW's pale mint windows).
+Glass with something behind it (a car's windows over its cabin, a cup over its tea) is now a second primitive
+with its own BLEND material: a dark glossy tint, not metal, whose opacity follows TRELLIS.2's alpha. Other glass
+(lamp lenses) stays in the body, glossy and not metal, in its own colour; warm, saturated glass (tail lights,
+eyes) and matte low alpha (a dragon's skin) are left alone. The body stays OPAQUE, so nothing else is drawn as
+transparent. It never fails an export, and results say what it did (`glass`, Job contracts).
+
 **A generation's shape can be retextured** (for experiments: `Trellis2Runtime.retexture`). After
 `generate()`, `last_latent` holds the shape latent TRELLIS.2 sampled (a few MB, on the CPU), with the
 picture, its cutout and the seed. `retexture(sampler_params=…, seed=…, views=…)` samples only the
@@ -140,10 +149,11 @@ It runs on its own GPU: the `Painter` class in `modal_app.py` (an H100: the mode
 resident). The Trellis2 container sends it the final's mesh, picture and prompt as one kit and waits for the
 texture (`trellis2/forge3d_worker/painting.py`); a painter that fails or can't be reached costs the final only
 the wait, and the final keeps TRELLIS.2's texture. A final asks for it with `"paint": true` (Job contracts); the
-server does so with `AI_PAINT=1` (The Studio's AI panel). Painting takes 45 to 85 s on the H100 (median 58 s on
-the thirteen objects of run 10: about 4.3 s a try, ten views and the tries some need), the colour match and bake
-about a second more; loading the model from cold takes one to two minutes, which the server starts while the
-creator looks at the preview.
+server does so with `AI_PAINT=1` (The Studio's AI panel). Painting takes 44 to 89 s on the H100 (median 58 s on
+the thirteen objects of run 13: about 4.3 s a try, ten views and the tries some need), the colour match and bake
+about a second more; sending the kit to the painter and the texture back added 8 to 23 s in the staging runs
+below; loading the model from cold takes one to two minutes, which the server starts while the creator looks at
+the preview.
 
 **Phase 8's blind tests.** Thirteen objects (five of Phase 2's prompts and eight real products, the first the
 founder's own BMW prompt) were made as today's finals and then painted, on the same shapes. Each round, four
@@ -170,6 +180,11 @@ help, which the views clean up but keep (the shield's ghost lion on its back, th
 watch's ghost dial on its case back); glare in the picture itself (the BMW's roof); fine print (a watch dial, the
 Coca-Cola script), which comes out garbled or doubled; and the odd detail the editing model knows the product has
 but the picture doesn't show (the PS5 controller's light bar, lit blue).
+
+**Through the app's own path.** In a staging app, `make --final --paint` (the request the server makes with
+`AI_PAINT=1`) made the BMW, the sneaker and the Coca-Cola bottle from prompt to painted final with the code as
+shipped: 9, 10 and 10 of their ten views kept, the painting step 64, 93 and 103 s from the final's side, and each
+final done 121 to 157 s after it started.
 
 ## The recipe: Pixal3D finals, off by default
 
@@ -356,6 +371,11 @@ the picture's projection didn't fit). A final that couldn't be painted is made a
 `{ "applied": false, "reason": "TimeoutError: …" }` (or `"this worker has no painter"`, on RunPod and with the
 recipe on). The painting is part of `export_s`. A preset with `drop_floaters` adds `floaters`: how many pieces the model had,
 how many were dropped, their faces and share of the surface, and the largest of them.
+
+Every textured result (previews, finals, texture options) also carries `glass` (Glass is see-through, above):
+whether any glass was split off or made glossy (`applied`, `reason`), the see-through, opaque and coloured glass
+it found (`regions`, `faces`, `area_share` each), the see-through glass's `opacity` and `tint` when there is
+some, and `seconds`.
 
 A final made by the recipe has the same fields, with Pixal3D in its `credits`, and says what the recipe
 did. For example:
@@ -1067,7 +1087,7 @@ GiB-hour of memory, so about $2.30/h for a FLUX container and $2.50/h for a TREL
 | Cold start and 60 s idle, per container scaled up                                  | ~2 min          | ~$0.08      |
 | Six views (multiview, A10G at ~$1.30/h all-in)                                     | 46 s            | ~$0.02      |
 | Final by the recipe, when `ORAINGE_FINAL_MODEL=pixal3d`                            | 45–103 s        | ~$0.03–0.07 |
-| Painting a final, when `AI_PAINT=1` (H100 at $0.001097/s, ~$4.85/h with its 8 cores and 64 GiB) | 45–85 s (median 58 s) | ~$0.06–0.12 |
+| Painting a final, when `AI_PAINT=1` (H100 at $0.001097/s, ~$4.85/h with its 8 cores and 64 GiB) | 44–89 s (median 58 s) | ~$0.06–0.12 |
 | The painter's cold start and 120 s idle, per container scaled up                   | ~3–4 min        | ~$0.25–0.30 |
 | Pixal3D loading, when `ORAINGE_FINAL_MODEL=pixal3d` and a final starts a container | ~90 s           | ~$0.06      |
 
