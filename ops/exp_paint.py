@@ -6,19 +6,24 @@ For each object, the final as production makes it (the Trellis2 worker's handle_
 the picture's seed), exported two ways from the same to_glb mesh:
 
 - today: production's export as it is (unpremultiply, the picture's projection, smoothed normals, gltfpack);
-- painted: views round the mesh repainted by FLUX.2 [klein] 4B (Apache-2.0) from renders of its own texture
-  with the picture as the reference, checked against the render's outline, baked into the texture
+- painted: views round the mesh repainted by an image editor from renders of its own texture (with the
+  picture as a reference in some variants), checked against the render's outline, baked into the texture
   (paint.paint_views), then the same export from there (the picture's projection on top, smoothed normals,
-  gltfpack).
+  glass, gltfpack). The editors: FLUX.2 [klein] 4B (Apache-2.0; variants without a prefix) and
+  Qwen-Image-Edit-2511 with the 8-step Lightning LoRA (both Apache-2.0; the "qie-" variants).
 
-Two GPU classes in two images, so the TRELLIS.2 image isn't rebuilt: Shapes (TRELLIS.2 on an L40S) makes the
-final and today's export and keeps the to_glb mesh in the orainge-outputs volume under p8-paint/<name>/ (new
-paths only), so the painter can run again without remaking it; Painter (klein in bf16 on an L40S) paints and
-exports. klein's weights go to the orainge-models volume under p8-paint/ (a new folder). The BMW's picture is
-drawn again by the reference worker (FLUX.1 [schnell]) at its prompt and seed.
+Three GPU classes in three images, so the TRELLIS.2 image isn't rebuilt: Shapes (TRELLIS.2 on an L40S) makes the
+final and today's export (with see-through glass since Phase 8) and keeps the to_glb mesh, with to_glb's RGBA
+base colour for the glass, in the orainge-outputs volume under p8-paint/<name>/ (new paths only), so the painters
+can run again without remaking it; Painter (klein in bf16 on an L40S) and QwenPaint (Qwen-Image-Edit-2511 in
+bf16 on an H100, everything resident: 58 GB of weights) paint and export. klein's weights go to the
+orainge-models volume under p8-paint/, Qwen-Image-Edit-2511's are its folders Qwen-Image-Edit-2511 and
+Qwen-Image-Edit-2511-Lightning (ops/p8_download.py). The BMW's picture is drawn again by the reference worker
+(FLUX.1 [schnell]) at its prompt and seed.
 
     ORAINGE_APP_NAME=orainge-p8-paint modal run ops/exp_paint.py::check --only bmw
     ORAINGE_APP_NAME=orainge-p8-paint modal run ops/exp_paint.py::check --only bmw,04,06,08,12,13
+    ORAINGE_APP_NAME=orainge-p8-paint modal run ops/exp_paint.py::check --only bmw --variants qie-edit-view,qie-ref
 """
 
 from __future__ import annotations
@@ -53,6 +58,10 @@ CACHE_DIR = "p8-paint"
 # The founder's BMW: the prompt, the picked picture's FLUX.1 [schnell] seed and the final's TRELLIS.2 seed
 BMW = {"name": "bmw", "prompt": "make a bmw car m3 model blue", "picture_seed": 1627471494, "seed": 663008479}
 TEXTURE_SIZE = 2048  # the final preset's
+# Qwen-Image-Edit-2511 and its Lightning LoRA, as ops/p8_download.py put them in the models volume (the revisions
+# workers/painter/scripts/download_weights.py pins)
+QWEN_DIR = f"{prod.MODELS}/Qwen-Image-Edit-2511"
+QWEN_LORA_DIR = f"{prod.MODELS}/Qwen-Image-Edit-2511-Lightning"
 
 # The editing model's instructions. Run 1 (render, picture and the nearest painted view as three references, the
 # PROMPT_V1 below) kept the picture's viewpoint instead of the render's in 9 views of 10, so these keep the
@@ -93,6 +102,31 @@ EDIT_VIEW = (
     "logos or patterns that the render doesn't show. Soft, even, diffused studio lighting from all around, with "
     "no cast shadows and no strong reflections. Plain light grey background."
 )
+# The same asks for Qwen-Image-Edit-2511, which names its inputs "Picture 1", "Picture 2", ... in the prompt
+QIE_EDIT_VIEW = (
+    "Turn Picture 1, a rough 3D render of a {subject} seen {side}, into a clean, photorealistic studio product "
+    "photo of the same {subject} from exactly the same viewpoint. Keep the camera angle, framing, outline, "
+    "proportions and position of every part exactly as they are in Picture 1: do not move, add, remove or reshape "
+    "anything. Replace the blotchy, smeared surface with clean, crisp, realistic materials and fine details in the "
+    "same colours{colours}. Where Picture 1 shows a plain surface, keep it plain: do not invent screens, buttons, "
+    "doors, handles, text, logos or patterns that Picture 1 doesn't show. Soft, even, diffused studio lighting from "
+    "all around, with no cast shadows and no strong reflections. Plain light grey background."
+)
+QIE_REF = (
+    "Turn Picture 1, a rough 3D render of a {subject} seen {side}, into a clean, photorealistic studio product "
+    "photo of it from exactly the same viewpoint as Picture 1. Keep Picture 1's camera angle, framing, outline, "
+    "proportions and the position of every part exactly: do not move, add, remove or reshape anything. Picture 2 "
+    "is a photo of the same {subject} from another angle: use it only for the true colours, materials, logos and "
+    "fine details of the parts both pictures show, never for the viewpoint or the layout. Replace the blotchy, "
+    "smeared surface with clean, crisp, realistic materials{colours}. Where Picture 1 shows a plain surface that "
+    "Picture 2 doesn't, keep it plain. Soft, even, diffused studio lighting from all around, with no cast shadows "
+    "and no strong reflections. Plain light grey background."
+)
+QIE_NEIGHBOUR = (
+    " Picture 3 shows the same {subject} already finished from a nearby angle: match its colours, materials and "
+    "finish exactly."
+)
+
 # How each variant asks klein: "base" is Flux2KleinPipeline with the listed references (the render first);
 # "img2img" is Flux2KleinInpaintPipeline with the whole frame as the mask, which starts from the render's latent
 # noised to ``start`` (the render is also its first reference) with the picture as ``image_reference``. klein's
@@ -106,6 +140,10 @@ STRATEGIES = {
     "i2i-ref-91": {"pipeline": "img2img", "picture": 512 * 512, "start": 0.91, "prompt": EDIT_REF},
     "i2i-ref-80": {"pipeline": "img2img", "picture": 512 * 512, "start": 0.8, "prompt": EDIT_REF},
     "i2i-80": {"pipeline": "img2img", "picture": 0, "start": 0.8, "prompt": EDIT},
+    # Qwen-Image-Edit-2511 (QwenPaint): the render alone; with the picture; with the picture and the nearest view
+    "qie-edit-view": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW},
+    "qie-ref": {"model": "qwen", "picture": 768 * 768, "prompt": QIE_REF},
+    "qie-ref-nb": {"model": "qwen", "picture": 768 * 768, "neighbour": True, "prompt": QIE_REF, "neighbour_text": QIE_NEIGHBOUR},
 }
 # klein's shifted 4-step schedule (1 MP), and the schedules the "start" values ask for
 SCHEDULES = {0.91: None, 0.8: (1.0, 0.8, 0.6, 0.35)}
@@ -154,6 +192,33 @@ painter_image = (
     .add_local_dir(prod.WORKERS / "trellis2" / "forge3d_worker", "/root/forge3d_worker")
     .add_local_file(prod.WORKERS / "modal_app.py", "/root/modal_app.py")
 )
+qwen_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .apt_install("curl", "unzip")
+    .pip_install("torch==2.6.0", "torchvision==0.21.0", index_url="https://download.pytorch.org/whl/cu124")
+    # workers/painter/requirements.txt's pins, plus trimesh for the mesh
+    .pip_install(
+        "diffusers==0.37.1",
+        "transformers==4.57.6",
+        "tokenizers==0.22.2",
+        "huggingface_hub==0.36.2",
+        "accelerate==1.12.0",
+        "peft==0.18.1",
+        "safetensors==0.7.0",
+        "pillow==12.1.1",
+        "numpy<2.3",
+        "trimesh==4.12.2",
+    )
+    .run_commands(
+        "curl -fsSL -o /tmp/gltfpack.zip https://github.com/zeux/meshoptimizer/releases/download/"
+        f"v{prod.GLTFPACK_VERSION}/gltfpack-ubuntu.zip && unzip /tmp/gltfpack.zip -d /usr/local/bin"
+        " && chmod +x /usr/local/bin/gltfpack && rm /tmp/gltfpack.zip"
+    )
+    .env({"HF_HUB_OFFLINE": "1", "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"})
+    .add_local_dir(prod.WORKERS / "trellis2" / "forge3d_worker", "/root/forge3d_worker")
+    .add_local_dir(prod.WORKERS / "painter" / "painter_worker", "/root/painter_worker")
+    .add_local_file(prod.WORKERS / "modal_app.py", "/root/modal_app.py")
+)
 shapes_image = prod.trellis2_image.add_local_file(prod.WORKERS / "modal_app.py", "/root/modal_app.py")
 weights_image = prod.download_image.add_local_file(prod.WORKERS / "modal_app.py", "/root/modal_app.py")
 
@@ -177,7 +242,7 @@ def prompt_for(strategy: str, subject: str, neighbour: bool, view: dict | None =
     if names:
         listed = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
         colours = f" (its main colours are {listed})"
-    extra = NEIGHBOUR.format(subject=subject) if neighbour and spec.get("neighbour") else ""
+    extra = spec.get("neighbour_text", NEIGHBOUR).format(subject=subject) if neighbour and spec.get("neighbour") else ""
     text = spec["prompt"].format(subject=subject, side=view.get("side") or "from the front", colours=colours)
     return text + extra
 
@@ -294,6 +359,10 @@ class Shapes:
             cutout = getattr(mesh, CUTOUT, None)
             if cutout is not None:
                 captured["cutout"] = _png(cutout)
+            # to_glb's RGBA base colour: its alpha (TRELLIS.2's opacity) is what glass.split_glass reads
+            rgba = getattr(self.runtime, "last_rgba", None)
+            if rgba is not None:
+                captured["rgba"] = _png(rgba)
             captured["seconds"] = round(time.time() - started, 2)
             return {"kept": True}
 
@@ -334,6 +403,7 @@ class Shapes:
             "pipeline": result.get("pipeline"),
             "timings": result.get("timings"),
             "projection": result.get("projection"),
+            "glass": result.get("glass"),
             "seconds": seconds,
             "keep_s": captured["seconds"],
             "peak_gpu_gb": round(torch.cuda.max_memory_reserved() / 2**30, 1),
@@ -345,6 +415,8 @@ class Shapes:
         folder.mkdir(parents=True, exist_ok=True)
         (folder / "mesh.npz").write_bytes(captured["mesh"])
         (folder / "cutout.png").write_bytes(captured["cutout"])
+        if "rgba" in captured:
+            (folder / "rgba.png").write_bytes(captured["rgba"])
         (folder / "picture.png").write_bytes(picture)
         (folder / "today.glb").write_bytes(today)
         (folder / "meta.json").write_text(json.dumps(meta, indent=2))
@@ -435,85 +507,187 @@ class Painter:
 
     @modal.method()
     def paint(self, job: dict) -> dict:
+        return paint_job(self, job, self._editor, 4)
+
+
+def paint_job(owner, job: dict, make_editor, default_steps: int) -> dict:
+    """
+    One painting: the cached shape of ``job["name"]`` painted by ``make_editor(subject, variant, steps)``'s editor,
+    then exported as production exports (the picture's projection on top, smoothed normals, glass, gltfpack),
+    three ways (painted, robust, views only). ``owner`` is the painter class (gpu, load_seconds, calls, prompts).
+    """
+    import torch
+    from PIL import Image
+
+    from forge3d_worker import glass, paint, projection
+    from forge3d_worker.compress import pack_glb
+    from forge3d_worker.pipeline import shade
+
+    name, variant = job["name"], job.get("variant", "edit")
+    owner.calls += 1
+    prod.outputs.reload()
+    folder = pathlib.Path(prod.OUTPUTS) / CACHE_DIR / name
+    meta = json.loads((folder / "meta.json").read_text())
+    mesh = paint.unpack_mesh((folder / "mesh.npz").read_bytes())
+    cutout = Image.open(io.BytesIO((folder / "cutout.png").read_bytes()))
+    cutout.load()
+    subject = subject_of(meta.get("prompt") or "")
+    options = dict(job.get("options") or {})
+    steps = int(options.pop("steps", default_steps))
+    torch.cuda.reset_peak_memory_stats()
+    owner.prompts = []
+    clock = time.time()
+    result = paint.paint_views(mesh, cutout, make_editor(subject, variant, steps), device="cuda", **options)
+    paint_s = round(time.time() - clock, 1)
+
+    rgba = None
+    if (folder / "rgba.png").exists():
+        rgba = Image.open(io.BytesIO((folder / "rgba.png").read_bytes()))
+        rgba.load()
+    glass_reports = []
+
+    def export(texture, project: bool):
+        """Production's export from the painted texture: the picture's projection on top, smoothed normals, glass, gltfpack."""
+        started = time.time()
+        copy = paint.unpack_mesh((folder / "mesh.npz").read_bytes())
+        copy.visual.material.baseColorTexture = texture
+        report = None
+        if project:
+            _, report = projection.project_picture(copy, cutout)
+            torch.cuda.empty_cache()
+        glb = shade(copy, meta["voxel_size"])
+        if rgba is not None:
+            glb, glass_report = glass.split_glass(glb, rgba, meta["voxel_size"])
+            glass_reports.append(glass.summary(glass_report))
+        packed = pack_glb(glb.export(file_type="glb"), TEXTURE_SIZE)
+        return packed, report, copy.visual.material.baseColorTexture, round(time.time() - started, 1)
+
+    packed, report, final_texture, export_s = export(result.texture, True)
+    robust, robust_report, _, _ = export(result.robust or result.texture, True)
+    unprojected, _, _, _ = export(result.texture, False)
+
+    out = f"{name}/{variant}"
+    files = {
+        f"{out}/painted.glb": packed,
+        f"{out}/robust.glb": robust,
+        f"{out}/views-only.glb": unprojected,
+        f"{out}/sheet.jpg": _jpeg(paint.sheet(result.views, 320), 88),
+        f"{out}/texture-painted.jpg": _jpeg(result.texture, 90),
+        f"{out}/texture-final.jpg": _jpeg(final_texture, 90),
+        f"{out}/prompts.json": json.dumps(owner.prompts, indent=1).encode(),
+        f"{name}/reference.jpg": _jpeg(paint.picture_reference(cutout), 92),
+    }
+    for number, view in enumerate(result.views):
+        stem = f"{out}/views/{number:02d}-{view.camera.name}"
+        files[f"{stem}-render.jpg"] = _jpeg(view.render)
+        if view.painted is not None:
+            files[f"{stem}-painted.jpg"] = _jpeg(view.painted)
+    summary = {
+        "name": name,
+        "variant": variant,
+        "strategy": {k: v for k, v in STRATEGIES[variant].items() if k not in ("prompt", "neighbour_text")},
+        "prompt": prompt_for(variant, subject, False, {"side": "<side>", "colours": result.report.get("colours")}),
+        "subject": subject,
+        "options": {**options, "steps": steps},
+        "paint": result.report,
+        "projection": projection.summary(report),
+        "projection_robust": projection.summary(robust_report),
+        "projection_today": meta.get("projection"),
+        "glass": glass_reports[0] if glass_reports else None,
+        "seconds": {"paint_views": paint_s, "export": export_s, **result.report.get("timings", {})},
+        "peak_gpu_gb": round(torch.cuda.max_memory_reserved() / 2**30, 1),
+        "peak_allocated_gb": round(torch.cuda.max_memory_allocated() / 2**30, 1),
+        "gpu": owner.gpu,
+        "load_s": owner.load_seconds,
+        "call": owner.calls,
+        "container_s": round(time.time() - STARTED, 1),
+        "shape": meta,
+    }
+    print(f"[painter] {name} {variant}: {json.dumps({k: summary[k] for k in ('seconds', 'peak_gpu_gb', 'call')})}")
+    return {"summary": summary, "files": files}
+
+
+@app.cls(
+    image=qwen_image,
+    gpu="H100",
+    cpu=8.0,
+    memory=65536,
+    volumes={prod.MODELS: prod.models, prod.OUTPUTS: prod.outputs},
+    timeout=3600,
+    startup_timeout=1800,
+    scaledown_window=60,
+    max_containers=2,
+)
+class QwenPaint:
+    """Qwen-Image-Edit-2511 with the 8-step Lightning LoRA (workers/painter), bf16 on an H100, all resident."""
+
+    @modal.enter()
+    def load(self) -> None:
         import torch
+
+        from painter_worker.qwen import QwenPainter
+
+        started = time.time()
+        self.revision = _revision(QWEN_DIR)
+        self.painter = QwenPainter(QWEN_DIR, QWEN_LORA_DIR)
+        self.load_seconds = round(time.time() - started, 1)
+        self.gpu = torch.cuda.get_device_name()
+        self.calls = 0
+        self.prompts = []
+        print(
+            f"[painter] Qwen-Image-Edit-2511@{self.revision} on {self.gpu} in {self.load_seconds} s, "
+            f"{self.painter.lora_layers} LoRA layers, {self.painter.steps} steps"
+        )
+
+    def _editor(self, subject: str, strategy: str, steps: int):
         from PIL import Image
 
-        from forge3d_worker import paint, projection
-        from forge3d_worker.compress import pack_glb
-        from forge3d_worker.pipeline import shade
+        from forge3d_worker import paint as painting
+        from painter_worker.qwen import from_square
 
-        name, variant = job["name"], job.get("variant", "edit")
-        self.calls += 1
-        prod.outputs.reload()
-        folder = pathlib.Path(prod.OUTPUTS) / CACHE_DIR / name
-        meta = json.loads((folder / "meta.json").read_text())
-        mesh = paint.unpack_mesh((folder / "mesh.npz").read_bytes())
-        cutout = Image.open(io.BytesIO((folder / "cutout.png").read_bytes()))
-        cutout.load()
-        subject = subject_of(meta.get("prompt") or "")
-        options = dict(job.get("options") or {})
-        steps = int(options.pop("steps", 4))
-        torch.cuda.reset_peak_memory_stats()
-        self.prompts = []
-        clock = time.time()
-        result = paint.paint_views(mesh, cutout, self._editor(subject, variant, steps), device="cuda", **options)
-        paint_s = round(time.time() - clock, 1)
+        spec = STRATEGIES[strategy]
+        backdrop = tuple(int(round(255 * c)) for c in painting.BACKGROUND)
 
-        def export(texture, project: bool):
-            """Production's export from the painted texture: the picture's projection on top, smoothed normals, gltfpack."""
-            started = time.time()
-            copy = paint.unpack_mesh((folder / "mesh.npz").read_bytes())
-            copy.visual.material.baseColorTexture = texture
-            report = None
-            if project:
-                _, report = projection.project_picture(copy, cutout)
-                torch.cuda.empty_cache()
-            glb = shade(copy, meta["voxel_size"])
-            packed = pack_glb(glb.export(file_type="glb"), TEXTURE_SIZE)
-            return packed, report, copy.visual.material.baseColorTexture, round(time.time() - started, 1)
+        def square(image):
+            """On a square of the renders' own backdrop, centred as from_square() expects."""
+            image = image.convert("RGB")
+            side = max(image.size)
+            if image.width == image.height:
+                return image
+            canvas = Image.new("RGB", (side, side), backdrop)
+            canvas.paste(image, ((side - image.width) // 2, (side - image.height) // 2))
+            return canvas
 
-        packed, report, final_texture, export_s = export(result.texture, True)
-        robust, robust_report, _, _ = export(result.robust or result.texture, True)
-        unprojected, _, _, _ = export(result.texture, False)
+        def paint(render, picture, neighbour, seed, view):
+            reference = shrink(picture, spec["picture"]) if spec.get("picture") else None
+            use_neighbour = bool(spec.get("neighbour")) and neighbour is not None
+            prompt = prompt_for(strategy, subject, use_neighbour, view)
+            images = [square(render)]
+            if reference is not None:
+                images.append(square(reference))
+            if use_neighbour:
+                images.append(square(neighbour))
+            painted = self.painter.paint(images, prompt, seed=int(seed), steps=steps)
+            self.prompts.append(
+                {"view": view.get("name"), "seed": int(seed), "prompt": prompt, "pictures": len(images),
+                 "seconds": self.painter.last_seconds, "peak_gb": self.painter.last_peak_gb}
+            )
+            return from_square(painted, render.size)
 
-        out = f"{name}/{variant}"
-        files = {
-            f"{out}/painted.glb": packed,
-            f"{out}/robust.glb": robust,
-            f"{out}/views-only.glb": unprojected,
-            f"{out}/sheet.jpg": _jpeg(paint.sheet(result.views, 320), 88),
-            f"{out}/texture-painted.jpg": _jpeg(result.texture, 90),
-            f"{out}/texture-final.jpg": _jpeg(final_texture, 90),
-            f"{out}/prompts.json": json.dumps(self.prompts, indent=1).encode(),
-            f"{name}/reference.jpg": _jpeg(paint.picture_reference(cutout), 92),
-        }
-        for number, view in enumerate(result.views):
-            stem = f"{out}/views/{number:02d}-{view.camera.name}"
-            files[f"{stem}-render.jpg"] = _jpeg(view.render)
-            if view.painted is not None:
-                files[f"{stem}-painted.jpg"] = _jpeg(view.painted)
-        summary = {
-            "name": name,
-            "variant": variant,
-            "strategy": {k: v for k, v in STRATEGIES[variant].items() if k != "prompt"},
-            "prompt": prompt_for(variant, subject, False, {"side": "<side>", "colours": result.report.get("colours")}),
-            "subject": subject,
-            "options": {**options, "steps": steps},
-            "paint": result.report,
-            "projection": projection.summary(report),
-            "projection_robust": projection.summary(robust_report),
-            "projection_today": meta.get("projection"),
-            "seconds": {"paint_views": paint_s, "export": export_s, **result.report.get("timings", {})},
-            "peak_gpu_gb": round(torch.cuda.max_memory_reserved() / 2**30, 1),
-            "peak_allocated_gb": round(torch.cuda.max_memory_allocated() / 2**30, 1),
-            "gpu": self.gpu,
-            "load_s": self.load_seconds,
-            "call": self.calls,
-            "container_s": round(time.time() - STARTED, 1),
-            "shape": meta,
-        }
-        print(f"[painter] {name} {variant}: {json.dumps({k: summary[k] for k in ('seconds', 'peak_gpu_gb', 'call')})}")
-        return {"summary": summary, "files": files}
+        return paint
+
+    @modal.method()
+    def paint(self, job: dict) -> dict:
+        return paint_job(self, job, self._editor, self.painter.steps)
+
+
+def _revision(folder: str) -> str:
+    """The Hub commit snapshot_download recorded for a folder (its model_index.json's metadata), or "?"."""
+    try:
+        meta = pathlib.Path(folder) / ".cache" / "huggingface" / "download" / "model_index.json.metadata"
+        return meta.read_text().split()[0][:12]
+    except Exception:  # noqa: BLE001 - only for the log
+        return "?"
 
 
 def runs_by_number(volume: modal.Volume, prefix: str) -> dict[str, str]:
@@ -553,11 +727,14 @@ def check(
     min_iou: float = 0.9,
     max_novelty: float = 0.2,
     steps: int = 4,
+    qwen_steps: int = 8,
     bottom: bool = True,
 ) -> None:
     """
     Makes (or reuses) the shapes of ``only`` (bmw and Phase 2 numbers), then paints those in ``paint`` (all of
-    ``only`` when empty) once per variant in ``variants`` (STRATEGIES).
+    ``only`` when empty) once per variant in ``variants`` (STRATEGIES): klein's variants on Painter, the "qie-"
+    ones on QwenPaint, both at once. ``steps`` is klein's, ``qwen_steps`` Qwen-Image-Edit-2511's (8 with the
+    Lightning LoRA).
     """
     root = pathlib.Path(out)
     root.mkdir(parents=True, exist_ok=True)
@@ -566,7 +743,8 @@ def check(
     if unknown or not chosen:
         raise SystemExit(f"[paint] variants must be among {', '.join(STRATEGIES)}, not {unknown or variants!r}")
     print(f"[paint] app {prod.APP_NAME}: shapes {only}; paint {paint or only}; variants {chosen}")
-    weights = fetch_weights.spawn()
+    klein = [v for v in chosen if STRATEGIES[v].get("model", "klein") == "klein"]
+    weights = fetch_weights.spawn() if klein else None
     names = [n.strip().lower() for n in only.split(",") if n.strip()]
     pictures = runs_by_number(prod.outputs, "phase2")
     jobs, report = [], {"objects": {}}
@@ -620,9 +798,10 @@ def check(
                 report["objects"][job["name"]] = {"error": f"shape: {reason}"}
                 continue
             report["objects"][job["name"]] = {"shape": made["meta"]}
-    info = weights.get()
-    report["weights"] = info
-    print(f"[paint] weights: {json.dumps(info)}")
+    if weights is not None:
+        info = weights.get()
+        report["weights"] = info
+        print(f"[paint] klein's weights: {json.dumps(info)}")
 
     # Today's export and the picture, from the volume (kept by Shapes, this run or an earlier one)
     ready = [job for job in jobs if "error" not in report["objects"].get(job["name"], {})]
@@ -635,14 +814,36 @@ def check(
     }
     wanted = {n.strip().lower().zfill(2) if n.strip().lower() != "bmw" else "bmw" for n in (paint or only).split(",") if n.strip()}
     paint_jobs = [
-        {"name": job["name"], "variant": variant, "options": options}
+        {
+            "name": job["name"],
+            "variant": variant,
+            "options": {**options, "steps": qwen_steps} if STRATEGIES[variant].get("model") == "qwen" else options,
+        }
         for job in ready
         if job["name"] in wanted
         for variant in chosen
     ]
-    print(f"[paint] painting {len(paint_jobs)}: {json.dumps(options)}")
+    print(f"[paint] painting {len(paint_jobs)}: {json.dumps(options)}, Qwen-Image-Edit-2511 at {qwen_steps} steps")
+
+    # klein's and Qwen-Image-Edit-2511's paintings side by side, each on its own GPUs
+    from concurrent.futures import ThreadPoolExecutor
+
+    groups = {
+        "klein": [job for job in paint_jobs if STRATEGIES[job["variant"]].get("model", "klein") == "klein"],
+        "qwen": [job for job in paint_jobs if STRATEGIES[job["variant"]].get("model") == "qwen"],
+    }
+    runners = {"klein": lambda: Painter(), "qwen": lambda: QwenPaint()}
+
+    def run(model: str) -> list:
+        jobs_here = groups[model]
+        if not jobs_here:
+            return []
+        return list(zip(jobs_here, runners[model]().paint.map(jobs_here, return_exceptions=True, order_outputs=True)))
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = [pair for result in pool.map(run, list(groups)) for pair in result]
     failed = 0
-    for job, made in zip(paint_jobs, Painter().paint.map(paint_jobs, return_exceptions=True, order_outputs=True)):
+    for job, made in outcomes:
         entry = report["objects"].setdefault(job["name"], {}).setdefault("paint", {})
         if isinstance(made, BaseException):
             failed += 1
