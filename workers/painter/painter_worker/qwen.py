@@ -83,6 +83,9 @@ LIGHTNING_SCHEDULER = {
 }
 SCHEDULERS = ("lightning", "default")  # the LoRA's recipe, or the repository's scheduler and the model card's
 LIGHTNING_STEPS = 8
+# The Lightning scheduler's time shift: base_shift = max_shift = log 3, so mu = log 3 whatever the picture's size,
+# and a sigma s of the pipeline's linspace(1, 1 / steps, steps) runs at 3 s / (1 + 2 s)
+LIGHTNING_SHIFT = 3.0
 BASE_STEPS = 40  # Qwen-Image-Edit-2511's model card: 40 steps, true_cfg_scale 4, negative prompt " "
 BASE_TRUE_CFG = 4.0
 DTYPES = ("bfloat16", "float16", "float32")
@@ -135,6 +138,20 @@ def pipeline_size(width: int, height: int, area: int) -> tuple:
     new_width = math.sqrt(area * ratio)
     new_height = new_width / ratio
     return round(new_width / 32) * 32, round(new_height / 32) * 32
+
+
+def start_schedule(steps: int, skip: int, shift: float = LIGHTNING_SHIFT) -> tuple:
+    """
+    A paint that starts part way, from Picture 1 noised (``skip`` of the ``steps`` steps taken as done): the sigmas
+    to give the pipeline (its own linspace(1, 1 / steps, steps) without the first ``skip``) and the noise level
+    Picture 1's latents start at, the first of those after the scheduler's time shift by ``shift``.
+    """
+    steps, skip = int(steps), int(skip)
+    if not 0 < skip < steps:
+        raise ValueError(f"skip is 1 to {steps - 1} of {steps} steps, not {skip}")
+    sigmas = [1.0 - i * (1.0 - 1.0 / steps) / (steps - 1) for i in range(steps)][skip:]
+    first = sigmas[0]
+    return sigmas, shift * first / (1.0 + (shift - 1.0) * first)
 
 
 def check_size(size: int) -> None:
@@ -330,13 +347,17 @@ class QwenPainter:
         true_cfg_scale: Optional[float] = None,
         negative_prompt: Optional[str] = " ",
         size: int = SIZE,
+        skip: int = 0,
     ) -> Image.Image:
         """
         Repaints Picture 1 (the render) to look like the object in Pictures 2 and 3 (the references): 1 to 3 PIL
         images, each made an RGB size x size square (to_square()). Returns the size x size RGB result, which lines up pixel for pixel with Picture 1 as
         to_square() made it. The same pictures, prompt, seed and settings give the same result on the same GPU and
         software. steps and true_cfg_scale default to the recipe's; negative_prompt is used only when
-        true_cfg_scale > 1. last_seconds is how long the call took, last_peak_gb the GPU memory peak (on CUDA).
+        true_cfg_scale > 1. With ``skip`` (the Lightning recipe only) the output doesn't start from pure noise but
+        from Picture 1's latents noised to the level of step ``skip`` (start_schedule), and only the steps after it
+        run: Picture 1's layout and outline carry into the output. last_seconds is how long the call took,
+        last_peak_gb the GPU memory peak (on CUDA).
         """
         import torch
 
@@ -362,6 +383,13 @@ class QwenPainter:
             "num_images_per_prompt": 1,
             "output_type": "pil",
         }
+        if skip:
+            if self.scheduler != "lightning":
+                raise ValueError("skip needs the Lightning recipe's fixed time shift")
+            sigmas, level = start_schedule(steps, skip)
+            arguments["num_inference_steps"] = len(sigmas)
+            arguments["sigmas"] = sigmas
+            arguments["latents"] = self._started(arguments["image"][0], level, arguments["generator"])
         if true_cfg_scale > 1:
             # The pipeline runs CFG only with a negative prompt; without CFG it would only warn about one
             if negative_prompt is None:
@@ -378,3 +406,22 @@ class QwenPainter:
         if result.size != (size, size):
             raise RuntimeError(f"the pipeline returned {result.size[0]} x {result.size[1]}, not {size} x {size}")
         return result.convert("RGB")
+
+    def _started(self, picture: Image.Image, level: float, generator: Any) -> Any:
+        """
+        ``picture``'s packed latents as the pipeline makes Picture 1's (preprocessed, the VAE's mode, normalised,
+        packed), noised as the flow-matching scheduler noises: (1 - level) x + level noise, the noise drawn from
+        ``generator``.
+        """
+        import torch
+
+        pipe = self.pipeline
+        dtype = getattr(torch, self.dtype)
+        device = pipe._execution_device
+        pixels = pipe.image_processor.preprocess(picture, picture.height, picture.width).unsqueeze(2)
+        with torch.inference_mode():
+            latents = pipe._encode_vae_image(pixels.to(device=device, dtype=dtype), generator)
+        _, channels, _, height, width = latents.shape
+        packed = pipe._pack_latents(latents, 1, channels, height, width)
+        noise = torch.randn(tuple(packed.shape), generator=generator, device=generator.device, dtype=torch.float32)
+        return (1.0 - level) * packed + level * noise.to(device=packed.device, dtype=packed.dtype)
