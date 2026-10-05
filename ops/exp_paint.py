@@ -142,6 +142,8 @@ STRATEGIES = {
     "i2i-80": {"pipeline": "img2img", "picture": 0, "start": 0.8, "prompt": EDIT},
     # Qwen-Image-Edit-2511 (QwenPaint): the render alone; with the picture; with the picture and the nearest view
     "qie-edit-view": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW},
+    # The same, baked into a 4096 base colour (the 2048 one upsampled first, same layout) and shipped at 4096
+    "qie-edit-view-4k": {"model": "qwen", "picture": 0, "prompt": QIE_EDIT_VIEW, "texture": 4096},
     "qie-ref": {"model": "qwen", "picture": 768 * 768, "prompt": QIE_REF},
     "qie-ref-nb": {"model": "qwen", "picture": 768 * 768, "neighbour": True, "prompt": QIE_REF, "neighbour_text": QIE_NEIGHBOUR},
 }
@@ -534,6 +536,11 @@ def paint_job(owner, job: dict, make_editor, default_steps: int) -> dict:
     subject = subject_of(meta.get("prompt") or "")
     options = dict(job.get("options") or {})
     steps = int(options.pop("steps", default_steps))
+    # The base colour the views go into: the final's own (2048), or upsampled first, the UV layout unchanged
+    size = int(STRATEGIES[variant].get("texture") or TEXTURE_SIZE)
+    base = mesh.visual.material.baseColorTexture
+    if max(base.size) < size:
+        mesh.visual.material.baseColorTexture = base.resize((size, size), Image.Resampling.LANCZOS)
     torch.cuda.reset_peak_memory_stats()
     owner.prompts = []
     clock = time.time()
@@ -559,7 +566,7 @@ def paint_job(owner, job: dict, make_editor, default_steps: int) -> dict:
         if rgba is not None:
             glb, glass_report = glass.split_glass(glb, rgba, meta["voxel_size"])
             glass_reports.append(glass.summary(glass_report))
-        packed = pack_glb(glb.export(file_type="glb"), TEXTURE_SIZE)
+        packed = pack_glb(glb.export(file_type="glb"), size)
         return packed, report, copy.visual.material.baseColorTexture, round(time.time() - started, 1)
 
     packed, report, final_texture, export_s = export(result.texture, True)
@@ -588,7 +595,7 @@ def paint_job(owner, job: dict, make_editor, default_steps: int) -> dict:
         "strategy": {k: v for k, v in STRATEGIES[variant].items() if k not in ("prompt", "neighbour_text")},
         "prompt": prompt_for(variant, subject, False, {"side": "<side>", "colours": result.report.get("colours")}),
         "subject": subject,
-        "options": {**options, "steps": steps},
+        "options": {**options, "steps": steps, "texture_size": size},
         "paint": result.report,
         "projection": projection.summary(report),
         "projection_robust": projection.summary(robust_report),
