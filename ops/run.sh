@@ -2,19 +2,21 @@
 # What the "AI ops (Modal)" workflow runs when this is pushed (see .github/workflows/ai-ops.yml).
 # Files written to ops-out/ are saved with the log, and ops-out/private/ only encrypted (ops/seal.sh).
 #
-# ai-ops-paint: Phase 8, the view painter, in staging apps. Nothing is deployed; production's orainge-ai keeps
-# running what it runs.
+# ai-ops-paintskip: Phase 8, the view painter, in a staging app of its own. Nothing is deployed; production's
+# orainge-ai keeps running what it runs.
 #
-# Run 8: production's painter as run 7, with the views' glare taken out before they're baked and each paint named
-# once in the prompt, on run 6's thirteen shapes (for blind test 2 against today's finals).
+# Run 9: each view started from its render noised part way (QwenPainter's skip 2 and 3: qie-s2, qie-s3) on the
+# objects whose views the editing model turned to a catalogue angle in run 7 (the shield 06, the sneaker p2, the
+# controller p3, the watch p7), and two that went well (the BMW, the cartoon car 13). Run 8 (ai-ops-paint) is the
+# same painter without skip on the same shapes.
 set -euo pipefail
 mkdir -p ops-out/private
-export ORAINGE_APP_NAME=orainge-p8-paint
+export ORAINGE_APP_NAME=orainge-p8-skip
 status=0
-modal run ops/exp_paint.py::check --only bmw,04,06,08,12,13,p2,p3,p4,p5,p6,p7,p8 \
-  --variants qie-v7 --attempts 3 --out ops-out/private/paint8 \
-  >ops-out/private/modal-paint8.log 2>&1 || status=$?
-grep -aE "^\[paint\] (app|making|painting|done|[a-z0-9]+ qie)|^\[shapes\]|Traceback|Error|error" ops-out/private/modal-paint8.log |
+modal run ops/exp_paint.py::check --only bmw,06,13,p2,p3,p7 \
+  --variants qie-s2,qie-s3 --attempts 3 --out ops-out/private/paint9 \
+  >ops-out/private/modal-paint9.log 2>&1 || status=$?
+grep -aE "^\[paint\] (app|making|painting|done|[a-z0-9]+ qie)|^\[shapes\]|Traceback|Error|error" ops-out/private/modal-paint9.log |
   grep -avE "it/s\]|s/it\]" | cut -c1-300 | tail -80 || true
-du -sh ops-out/private/paint8 2>/dev/null || true
+du -sh ops-out/private/paint9 2>/dev/null || true
 exit $status
