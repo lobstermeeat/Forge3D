@@ -16,22 +16,24 @@ projection, which production then runs on top as always):
    azimuth, then a top and a bottom view. Each is a perspective camera framed tight on the object
    (``frame``): about a megapixel, sides a multiple of 16, the shape the editing model takes.
 3. View by view, nearest the picture first (``paint_views``): the current texture is rendered (``render``:
-   base colour lit from the camera, on a plain light grey); the editing model paints it, with the picture
-   and the painted view nearest to it as references; the painted object's outline is checked against the
-   render's (``object_mask``, then ``align``: the best small shift and scale, and the silhouette IoU after
-   it) and so are its edges (``novelty``: what it drew that the render doesn't have, such as a second front
-   on a plain back); a view under ``min_iou`` or over ``max_novelty`` is painted again with another seed,
-   then left out (and a bottom view whose render is dark isn't painted at all). Its brightness and
-   saturation are brought to what the picture and the views before it already say where they overlap
-   (``tone``); and it is baked (``view_samples``: depth-tested visibility, a power of the cosine, fades at
-   silhouettes and depth edges), so the next render shows it.
+   base colour lit from the camera, on a plain light grey); the editing model paints it (told which try it
+   is: production's starts later tries from the render itself, painter_worker/views.py); the painted
+   object's outline is checked against the render's (``object_mask``, then ``align``: the best small shift
+   and scale, and the silhouette IoU after it), and so are its edges (``novelty``: what it drew that the
+   render doesn't have, such as a second front on a plain back) and its paint (``recolour``: parts painted in
+   another colour, such as a sneaker's toe turned silver); a view under ``min_iou`` or over ``max_novelty`` or
+   ``max_recolour`` is tried again, then left out (and a bottom view whose render is dark isn't painted at
+   all). Its glossy highlights are taken out (``deglare``), its brightness and saturation brought to what
+   the picture and the views before it already say where they overlap (``tone``), and it is baked
+   (``view_samples``: depth-tested visibility, a power of the cosine, fades at silhouettes and depth edges),
+   so the next render shows it.
 4. Every view's own colours brought to agree by a tone solved for all of them together (``joint_tone``:
    brightness and saturation only, so a grey stays grey; held to the picture's own colour where the
-   picture saw the surface well), then blended into the original texture with each texel taken mostly
+   picture sees the surface face on), then blended into the original texture with each texel taken mostly
    from its best view (``select_weights``) (``compose``: the change carried into the gutters); also
-   robustly (``robust_colour``: only the views near the weighted median luminance count at a texel, so a
-   highlight or a ghost one view drew is left out). The caller exports from there as production does:
-   the picture's projection, smoothed normals, glass, gltfpack.
+   robustly (``robust_colour``: only the views near a reference luminance count at a texel, so a highlight
+   or a ghost one view drew is left out). The caller exports from there as production does: the picture's
+   projection, smoothed normals, glass, gltfpack.
 
 The editing model is the caller's: ``paint(render, picture, neighbour, seed, view) -> image``, where
 ``view`` says which side it shows (``describe``) and the picture's main colours (``main_colours``). The module runs

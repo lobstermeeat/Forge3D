@@ -31,9 +31,10 @@ from PIL import Image
 # have about 630 pixels per unit of the model where a 2048 atlas of TRELLIS.2's layout has 360 texels, so at
 # 2048 the bake loses detail the views drew (wheel spokes, grille slats); at 4096 (720) it keeps it
 SIZE = 4096
-# paint_views' options in production (its defaults otherwise: tone held to the picture, each texel mostly from its
-# best view, a dark bottom left alone). Three tries a view: run 6's sneaker, watch and guitar lost half their views
-# to the editing model turning them to a catalogue angle, which another seed often doesn't
+# paint_views' options in production (its defaults otherwise: glare out, tone held to the picture where it sees the
+# surface face on, each texel mostly from its best view, a dark bottom left alone). Three tries a view, the second
+# and third started from the render noised part way (views.SKIPS): from pure noise the editing model turned half of
+# run 7's sneaker, watch and controller views to a catalogue angle; started part way it keeps the render's
 OPTIONS: dict = {"attempts": 3}
 # Which of paint_views' textures is shipped: "robust" (views that disagree with the others at a texel left out,
 # so a highlight one view drew doesn't go in) or "plain"
