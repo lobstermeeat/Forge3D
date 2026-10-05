@@ -255,7 +255,7 @@ def _export_notes(runtime: Any) -> dict:
     apart it dropped (presets with drop_floaters). Each only when there is one.
     """
     notes = {}
-    for key, attribute in (("projection", "last_projection"), ("floaters", "last_cleanup")):
+    for key, attribute in (("projection", "last_projection"), ("floaters", "last_cleanup"), ("glass", "last_glass")):
         value = getattr(runtime, attribute, None)
         if isinstance(value, dict) and value:
             notes[key] = value
