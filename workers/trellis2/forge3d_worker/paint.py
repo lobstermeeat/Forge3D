@@ -1501,8 +1501,9 @@ def paint_views(
             for attempt in range(max(1, attempts)):
                 attempt_seed = seed + 100 * number + attempt
                 clock_paint = time.perf_counter()
-                painted = paint(view.render, reference, neighbour, attempt_seed, about)
+                painted = paint(view.render, reference, neighbour, attempt_seed, {**about, "attempt": attempt})
                 paint_s = round(time.perf_counter() - clock_paint, 3)
+                skip = painted.info.get("skip")  # how far into its schedule the editor started (views.editor)
                 if painted.size != camera.size:
                     painted = painted.convert("RGB").resize(camera.size, Image.Resampling.LANCZOS)
                 view.painted = painted.convert("RGB")
@@ -1511,6 +1512,8 @@ def paint_views(
                 fit = align(mask, shot.mask)
                 new = novelty(shot.image, warp(image, fit), shot.mask) if fit.iou >= min_iou else None
                 entry = {"seed": attempt_seed, "paint_s": paint_s, **fit.as_dict()}
+                if skip is not None:
+                    entry["skip"] = skip
                 if new is not None:
                     entry["novelty"] = round(new, 3)
                 view.attempts.append(entry)

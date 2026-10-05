@@ -11,6 +11,13 @@ picture's colours where the picture reaches, and the prompt names the picture's 
 
 ``editor(painter, subject)`` is that Painter for one object: each render is padded to a square on the renders'
 own light grey (the size QwenPainter needs, see qwen.py), painted at the view's seed, and cropped back.
+
+A view's later tries start part way (``skips``, QwenPainter's skip): from pure noise the model draws the cleanest
+views, but it turns some objects to the angle catalogues show them at (Phase 8, run 7: the sneaker kept 3 of its
+10 views, the watch 4, the controller 5), and those views fail paint_views' outline check. Started from the render
+noised to 0.9 (skip 2) it keeps the render's viewpoint (run 9: those four objects kept 9 or 10 of 10, outlines
+matching at IoU 0.96-1.0) and still cleans the surface up, though less than from pure noise; from 0.83 (skip 3) it
+hardly changes the render.
 """
 
 from __future__ import annotations
@@ -32,6 +39,8 @@ PROMPT = (
     "all around, with no cast shadows and no strong reflections. Plain light grey background."
 )
 MAX_SUBJECT = 200
+# The skip of each try at a view: the first from pure noise, then from the render noised part way (see above)
+SKIPS = (0, 1, 2)
 
 
 def subject_of(prompt: Optional[str]) -> str:
@@ -71,24 +80,40 @@ def square(image: Image.Image, backdrop: Sequence[int] = BACKDROP) -> Image.Imag
     return canvas
 
 
-def editor(painter: Any, prompt: Optional[str], *, steps: Optional[int] = None, template: str = PROMPT) -> Callable:
+def editor(
+    painter: Any,
+    prompt: Optional[str],
+    *,
+    steps: Optional[int] = None,
+    template: str = PROMPT,
+    skips: Sequence[int] = SKIPS,
+) -> Callable:
     """
-    paint_views' Painter for the object ``prompt`` describes (subject_of), on ``painter`` (a QwenPainter). It keeps
-    what it asked in ``asked`` (one entry per view: view, seed, prompt, seconds, peak GB).
+    paint_views' Painter for the object ``prompt`` describes (subject_of), on ``painter`` (a QwenPainter). Try n at
+    a view (paint_views' "attempt") starts at ``skips[n]`` (the last one for later tries; 0 is pure noise), which
+    the painted image carries in its info["skip"]. It keeps what it asked in ``asked`` (one entry per try: view,
+    attempt, skip, seed, prompt, seconds, peak GB).
     """
+    skips = tuple(int(skip) for skip in skips) or (0,)
     from .qwen import from_square
 
     subject = subject_of(prompt)
     asked: list = []
 
     def paint_view(render: Image.Image, picture: Any, neighbour: Any, seed: int, view: dict) -> Image.Image:
+        view = view or {}
         text = prompt_for(subject, view, template)
-        painted = painter.paint([square(render)], text, seed=int(seed), steps=steps)
+        attempt = int(view.get("attempt") or 0)
+        skip = skips[min(attempt, len(skips) - 1)]
+        options = {"skip": skip} if skip else {}
+        painted = painter.paint([square(render)], text, seed=int(seed), steps=steps, **options)
         asked.append(
-            {"view": (view or {}).get("name"), "seed": int(seed), "prompt": text,
+            {"view": view.get("name"), "attempt": attempt, "skip": skip, "seed": int(seed), "prompt": text,
              "seconds": getattr(painter, "last_seconds", None), "peak_gb": getattr(painter, "last_peak_gb", None)}
         )
-        return from_square(painted, render.size)
+        out = from_square(painted, render.size)
+        out.info["skip"] = skip
+        return out
 
     paint_view.asked = asked  # type: ignore[attr-defined]
     paint_view.subject = subject  # type: ignore[attr-defined]
