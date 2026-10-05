@@ -1,0 +1,49 @@
+ops-out/private/modal-paint10.log:[paint] app orainge-p8-skip: shapes bmw,04,06,08,12,13,p2,p3,p4,p5,p6,p7,p8; paint bmw,04,06,08,12,13,p2,p3,p4,p5,p6,p7,p8; variants ['qie-v9']
+ops-out/private/modal-paint10.log:[paint] making 1 shapes: p7
+ops-out/private/modal-paint10.log:[shapes] TRELLIS.2 on NVIDIA L40S in 103.9 s
+ops-out/private/modal-paint10.log:an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7fc5ad026b00>
+ops-out/private/modal-paint10.log:Traceback (most recent call last):
+ops-out/private/modal-paint10.log:RuntimeError: aclose(): asynchronous generator is already running
+ops-out/private/modal-paint10.log:an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7fc5ad143570>
+ops-out/private/modal-paint10.log:Traceback (most recent call last):
+ops-out/private/modal-paint10.log:RuntimeError: aclose(): asynchronous generator is already running
+ops-out/private/modal-paint10.log:[shapes] p7: {"name": "p7", "seed": 663008486, "prompt": "a Rolex Submariner watch", "source": "products", "voxel_size": 0.0009765625, "triangles": 99124, "pipeline": "1024_cascade", "timings": {"generate_s": 18.414, "export_s": 26.092, "compress_s": 1.163, "upload_
+ops-out/private/modal-paint10.log:Traceback (most recent call last):
+ops-out/private/modal-paint10.log:[paint] painting 13: {"around": 8, "elevation": 15.0, "attempts": 3, "min_iou": 0.9, "max_novelty": 0.2, "steps": 4, "bottom": true}, Qwen-Image-Edit-2511 at 8 steps
+ops-out/private/modal-paint10.log:an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7fc5ad143290>
+ops-out/private/modal-paint10.log:Traceback (most recent call last):
+ops-out/private/modal-paint10.log:RuntimeError: aclose(): asynchronous generator is already running
+ops-out/private/modal-paint10.log:an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7fc5a8bb4af0>
+ops-out/private/modal-paint10.log:Traceback (most recent call last):
+ops-out/private/modal-paint10.log:RuntimeError: aclose(): asynchronous generator is already running
+ops-out/private/modal-paint10.log:[paint] bmw qie-v9: 9 of 10 views in, IoU [0.9607, 0.9347, 0.9651, 0.995, 0.9439, 0.9457, 'a dark underside (median luminance 0.00)', 0.9293, 0.9171, 0.9434], {'paint_views': 44.5, 'export': 12.0, 'setup_s': 0.613, 'projection_s': 1.893, 'views_s': 41.02, 'joint_s':
+ops-out/private/modal-paint10.log:[paint] 04 qie-v9: 10 of 10 views in, IoU [0.9522, 0.944, 0.9462, 0.9973, 0.9607, 0.9332, 0.955, 0.9613, 0.98, 0.9573], {'paint_views': 54.1, 'export': 12.2, 'setup_s': 0.939, 'projection_s': 1.893, 'views_s': 50.027, 'joint_s': 0.797, 'compose_s': 0.085, 'total_s':
+ops-out/private/modal-paint10.log:[paint] 06 qie-v9: 10 of 10 views in, IoU [0.979, 0.9979, 0.9945, 0.9881, 0.9969, 0.9951, 0.994, 0.9969, 0.9965, 0.9971], {'paint_views': 69.2, 'export': 13.4, 'setup_s': 0.264, 'projection_s': 0.988, 'views_s': 66.79, 'joint_s': 0.54, 'compose_s': 0.083, 'total_s':
+ops-out/private/modal-paint10.log:[paint] 08 qie-v9: 10 of 10 views in, IoU [0.9867, 0.9724, 0.9752, 0.9861, 0.9985, 0.9969, 0.9967, 0.982, 0.9975, 0.9942], {'paint_views': 57.6, 'export': 15.8, 'setup_s': 0.308, 'projection_s': 0.831, 'views_s': 55.611, 'joint_s': 0.473, 'compose_s': 0.082, 'total_
+ops-out/private/modal-paint10.log:[paint] 12 qie-v9: 10 of 10 views in, IoU [0.9564, 0.9979, 0.9948, 0.9935, 0.9773, 0.9347, 0.9724, 0.9789, 0.9892, 0.9978], {'paint_views': 62.3, 'export': 14.5, 'setup_s': 0.275, 'projection_s': 0.974, 'views_s': 59.913, 'joint_s': 0.567, 'compose_s': 0.089, 'total
+ops-out/private/modal-paint10.log:[paint] 13 qie-v9: 9 of 10 views in, IoU [0.9252, 0.9105, 0.9339, 0.9956, 0.9062, 0.9333, 'a dark underside (median luminance 0.10)', 0.9982, 0.9185, 0.9118], {'paint_views': 50.2, 'export': 13.6, 'setup_s': 0.259, 'projection_s': 1.351, 'views_s': 47.797, 'joint_s'
+ops-out/private/modal-paint10.log:[paint] p2 qie-v9: 10 of 10 views in, IoU [0.9292, 0.9956, 0.9971, 0.9744, 0.9902, 0.9973, 0.9967, 0.9651, 0.9979, 0.9967], {'paint_views': 85.0, 'export': 12.1, 'setup_s': 0.242, 'projection_s': 1.624, 'views_s': 82.083, 'joint_s': 0.62, 'compose_s': 0.081, 'total_
+ops-out/private/modal-paint10.log:[paint] p3 qie-v9: 10 of 10 views in, IoU [0.9014, 0.9987, 0.9965, 0.9785, 0.9822, 0.9608, 0.9969, 0.9338, 0.9774, 0.9978], {'paint_views': 85.4, 'export': 12.0, 'setup_s': 0.26, 'projection_s': 1.706, 'views_s': 82.381, 'joint_s': 0.461, 'compose_s': 0.081, 'total_
+ops-out/private/modal-paint10.log:[paint] p4 qie-v9: 10 of 10 views in, IoU [0.9972, 0.9758, 0.9966, 0.9969, 0.9815, 0.9868, 0.9972, 0.9925, 0.9961, 0.9853], {'paint_views': 53.2, 'export': 12.4, 'setup_s': 0.253, 'projection_s': 0.768, 'views_s': 51.244, 'joint_s': 0.529, 'compose_s': 0.084, 'total
+ops-out/private/modal-paint10.log:[paint] p5 qie-v9: 9 of 10 views in, IoU [0.9191, 0.9243, 0.9234, 0.9939, 0.9501, 0.9133, 'a dark underside (median luminance 0.05)', 0.9967, 0.9252, 0.9282], {'paint_views': 46.3, 'export': 12.9, 'setup_s': 0.265, 'projection_s': 0.904, 'views_s': 44.202, 'joint_s'
+ops-out/private/modal-paint10.log:[paint] p6 qie-v9: 10 of 10 views in, IoU [0.9854, 0.99, 0.9862, 0.9989, 0.9887, 0.9913, 0.9963, 0.995, 0.9251, 0.995], {'paint_views': 58.0, 'export': 15.7, 'setup_s': 0.23, 'projection_s': 0.822, 'views_s': 55.854, 'joint_s': 0.686, 'compose_s': 0.079, 'total_s': 
+ops-out/private/modal-paint10.log:[paint] p7 qie-v9: 10 of 10 views in, IoU [0.9471, 0.9878, 0.9821, 0.9982, 0.9972, 0.967, 0.993, 0.9969, 0.9942, 0.9862], {'paint_views': 80.7, 'export': 12.2, 'setup_s': 0.268, 'projection_s': 0.254, 'views_s': 79.113, 'joint_s': 0.484, 'compose_s': 0.083, 'total_s
+ops-out/private/modal-paint10.log:[paint] p8 qie-v9: 9 of 10 views in, IoU [0.9945, 0.9897, 0.972, 0.9958, 0.9659, 0.9567, 0.9944, 0.9891, 0.9875, 'a dark underside (median luminance 0.07)'], {'paint_views': 60.8, 'export': 11.1, 'setup_s': 0.308, 'projection_s': 0.928, 'views_s': 58.694, 'joint_s':
+ops-out/private/modal-paint10.log:[paint] done: 13 of 13 paintings
+ops-out/private/modal-paint10s1.log:[paint] app orainge-p8-skip1: shapes 06,p2,p3,p7; paint 06,p2,p3,p7; variants ['qie-s1']
+ops-out/private/modal-paint10s1.log:[paint] painting 4: {"around": 8, "elevation": 15.0, "attempts": 3, "min_iou": 0.9, "max_novelty": 0.2, "steps": 4, "bottom": true}, Qwen-Image-Edit-2511 at 8 steps
+ops-out/private/modal-paint10s1.log:an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7f9c6fcb7ca0>
+ops-out/private/modal-paint10s1.log:Traceback (most recent call last):
+ops-out/private/modal-paint10s1.log:RuntimeError: aclose(): asynchronous generator is already running
+ops-out/private/modal-paint10s1.log:an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7f9c6fbc5cc0>
+ops-out/private/modal-paint10s1.log:Traceback (most recent call last):
+ops-out/private/modal-paint10s1.log:RuntimeError: aclose(): asynchronous generator is already running
+ops-out/private/modal-paint10s1.log:[paint] 06 qie-s1: 8 of 10 views in, IoU [0.9972, 0.9983, 0.9974, 0.9901, 0.9969, 0.9946, 0.993, 0.9978, 0.9982, 0.9969], {'paint_views': 62.2, 'export': 11.4, 'setup_s': 0.574, 'projection_s': 1.57, 'views_s': 59.239, 'joint_s': 0.338, 'compose_s': 0.077, 'total_
+ops-out/private/modal-paint10s1.log:[paint] p2 qie-s1: 10 of 10 views in, IoU [0.9287, 0.9713, 0.988, 0.9676, 0.9955, 0.9975, 0.9965, 0.9211, 0.9564, 0.9651], {'paint_views': 65.0, 'export': 13.7, 'setup_s': 0.704, 'projection_s': 2.426, 'views_s': 60.368, 'joint_s': 0.8, 'compose_s': 0.081, 'total_
+ops-out/private/modal-paint10s1.log:[paint] p3 qie-s1: 9 of 10 views in, IoU [0.956, 0.6517, 0.9981, 0.988, 0.9764, 0.9985, 0.9967, 0.9954, 0.9817, 0.9936], {'paint_views': 57.9, 'export': 9.9, 'setup_s': 0.347, 'projection_s': 1.91, 'views_s': 54.795, 'joint_s': 0.413, 'compose_s': 0.078, 'total_s'
+ops-out/private/modal-paint10s1.log:[paint] p7 qie-s1: 10 of 10 views in, IoU [0.9703, 0.9882, 0.9806, 0.998, 0.9967, 0.9645, 0.903, 0.9975, 0.9941, 0.9972], {'paint_views': 45.8, 'export': 13.4, 'setup_s': 0.406, 'projection_s': 0.348, 'views_s': 43.817, 'joint_s': 0.591, 'compose_s': 0.083, 'total
+ops-out/private/modal-paint10s1.log:[paint] done: 4 of 4 paintings
+ops-out/private/modal-paint10s1.log:Traceback (most recent call last):
+185M	ops-out/private/paint10
+58M	ops-out/private/paint10s1
+exit status: 0
