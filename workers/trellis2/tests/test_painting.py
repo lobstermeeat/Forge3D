@@ -70,7 +70,9 @@ def flat_editor(colour=(40, 160, 220)):
 
 def test_the_painter_paints_the_kit_at_its_size_and_sends_the_texture_back():
     editor, asked = flat_editor()
-    kit = painting.pack_kit(textured_box(), cutout(), "bmw car", {"around": 4, "top": False, "bottom": False, "pixels": 96 * 96})
+    # The stand-in editor paints the box blue all over: not what the paint-change check is for
+    options = {"around": 4, "top": False, "bottom": False, "pixels": 96 * 96, "max_recolour": 1.0}
+    kit = painting.pack_kit(textured_box(), cutout(), "bmw car", options)
     out = painting.paint_kit(kit, editor, size=128, device="cpu", log=lambda _: None)
     texture = Image.open(io.BytesIO(out["texture"]))
     assert texture.size == (128, 128) and out["size"] == 128
