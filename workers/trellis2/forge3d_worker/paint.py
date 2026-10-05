@@ -159,6 +159,17 @@ MAX_SATURATION = 1.5
 # BMW's wheel spokes and grille slats came out doubled where two views drew them a pixel or two apart; at 0.1
 # they keep the sharpness of one view, and the joint tone keeps the views' colours together where they meet
 SELECT = 0.1
+# Glare out of the painted views before they go in (run 6: the views' studio reflections went into the cartoon car's
+# roof as a white patch, and three of four reviewers preferred today's texture there). A glossy highlight adds white
+# to a paint; shading only scales it. So per hue (GLARE_BINS bins round the colour wheel) a pixel may keep the
+# whiteness (min channel over chroma, max - min) of its paint, the GLARE_QUANTILE of that hue's pixels, or of the
+# render there (what the texture already has: a cream decal stays cream), whichever is more; the white above it is
+# taken off. Greys (chroma under GLARE_CHROMA of the brightest channel) can't tell white paint from a highlight and
+# are left alone; so is a hue with fewer than GLARE_PIXELS pixels
+GLARE_BINS = 12
+GLARE_CHROMA = 0.15
+GLARE_QUANTILE = 0.35
+GLARE_PIXELS = 200
 # A bottom view whose render is this dark (median sRGB luminance over the object) isn't painted: the editing model
 # turned the dark underside of two cars into a second top, roof and windows (run 4 and 5), and a dark underside
 # has nothing to gain from it
@@ -583,6 +594,56 @@ def object_mask(
     return ~_flood(passable, edge)
 
 
+def _whiteness(linear: torch.Tensor) -> tuple:
+    """Linear colours (..., 3) as (brightest channel, darkest channel, chroma, hue bin of GLARE_BINS)."""
+    top = linear.amax(-1)
+    low = linear.amin(-1)
+    r, g, b = linear.unbind(-1)
+    hue = torch.atan2(math.sqrt(3) * (g - b), 2 * r - g - b)
+    bins = ((hue + math.pi) / (2 * math.pi) * GLARE_BINS).long().clamp(0, GLARE_BINS - 1)
+    return top, low, top - low, bins
+
+
+def deglare(image: torch.Tensor, mask: torch.Tensor, render: Optional[torch.Tensor] = None) -> tuple[torch.Tensor, float]:
+    """
+    A painted view (H, W, 3 sRGB) with the white its glossy highlights added taken out of the coloured pixels inside
+    ``mask`` (see GLARE_BINS), the whiteness the ``render`` (H, W, 3 sRGB, the same camera) has kept. Returns the view
+    and the share of the masked pixels it changed.
+    """
+    linear = projection._srgb_to_linear(image.clamp(0, 1))
+    top, low, chroma, bins = _whiteness(linear)
+    coloured = mask & (chroma > GLARE_CHROMA * top.clamp_min(1e-4)) & (top > 0.02)
+    ratio = low / chroma.clamp_min(1e-4)
+    render_ratio = render_bins = None
+    if render is not None:
+        r_top, r_low, r_chroma, render_bins = _whiteness(projection._srgb_to_linear(render.clamp(0, 1)))
+        render_ratio = torch.where(
+            r_chroma > GLARE_CHROMA * r_top.clamp_min(1e-4), r_low / r_chroma.clamp_min(1e-4), torch.full_like(r_low, 1e3)
+        )
+        # A grey in the render (its outline on the backdrop, its dark parts) has no hue to judge by and lets any
+        # whiteness stay. The render and the view can be a pixel or two apart, so each pixel takes the least white
+        # of the 5 x 5 round it: the render's greys don't shield the coloured pixels next to them (a rim highlight
+        # on the outline still goes), and a decal the render has keeps its white inside its edges
+        render_ratio = -F.max_pool2d(-render_ratio[None, None], 5, 1, 2)[0, 0]
+    out = linear
+    changed = torch.zeros_like(mask)
+    for k in range(GLARE_BINS):
+        where = coloured & (bins == k)
+        if int(where.sum()) < GLARE_PIXELS:
+            continue
+        values = ratio[where]
+        if values.numel() > GAIN_SAMPLES:
+            values = values[torch.linspace(0, values.numel() - 1, GAIN_SAMPLES, device=values.device).long()]
+        allowed = torch.full_like(ratio, float(torch.quantile(values, GLARE_QUANTILE)))
+        if render_ratio is not None:
+            allowed = torch.where(render_bins == k, torch.maximum(allowed, render_ratio.clamp(max=50.0)), allowed)
+        excess = (low - allowed * chroma).clamp_min(0) * where.float()
+        big = excess > 0.01
+        out = torch.where(big[..., None], (linear - excess[..., None]).clamp(0, 1), out)
+        changed |= big
+    return projection._linear_to_srgb(out), float(changed.sum()) / max(1, int(mask.sum()))
+
+
 def iou(a: torch.Tensor, b: torch.Tensor) -> float:
     """Intersection over union of two masks (bool, or float coverages: min over max)."""
     a, b = a.float(), b.float()
@@ -779,6 +840,22 @@ COLOUR_NAMES = {
 }
 
 
+# Shades of one paint: light falling off a surface takes a paint down its family, so a family is named once, by its
+# lightest shade that has at least SHADE_SHARE of the family's largest share (run 7: the arcade machine's coral
+# sides came out red while "dark red", its shaded side, was still among the prompt's colours). Greys aren't merged:
+# black and white parts are different paints
+COLOUR_FAMILIES = (
+    ("navy blue", "blue", "steel blue", "light blue"),
+    ("dark red", "red", "coral red"),
+    ("brown", "tan", "beige"),
+    ("dark green", "green"),
+    ("teal", "turquoise"),
+    ("purple", "lavender"),
+    ("gold", "yellow"),
+)
+SHADE_SHARE = 1 / 3
+
+
 def main_colours(cutout: Image.Image, *, count: int = 3, min_share: float = 0.1) -> list:
     """
     The picture's main colours by name (COLOUR_NAMES, nearest in CIELAB), most of the object first: those
@@ -812,9 +889,17 @@ def colour_names(
     nearest = torch.cdist(lab, lab_swatches).argmin(1)
     w = torch.ones(nearest.shape[0], device=linear.device) if weight is None else weight.float()
     shares = torch.zeros(len(names), device=linear.device).index_add_(0, nearest, w)
-    shares = shares / shares.sum().clamp_min(1e-9)
-    order = torch.argsort(shares, descending=True).tolist()
-    return [names[i] for i in order if float(shares[i]) >= min_share][:count]
+    share = dict(zip(names, (shares / shares.sum().clamp_min(1e-9)).tolist()))
+    for family in COLOUR_FAMILIES:  # darkest first
+        largest = max(share[name] for name in family)
+        if largest <= 0:
+            continue
+        keep = [name for name in family if share[name] >= SHADE_SHARE * largest][-1]
+        total = sum(share[name] for name in family)
+        for name in family:
+            share[name] = total if name == keep else 0.0
+    ranked = sorted(names, key=lambda name: -share[name])
+    return [name for name in ranked if share[name] >= min_share][:count]
 
 
 def picture_colours(picture: "Picture", cutout: Image.Image, *, sure: float = 0.3) -> list:
@@ -1322,6 +1407,7 @@ def paint_views(
     colour_model: str = "tone",
     anchor: str = "picture",
     select: float = SELECT,
+    glare: bool = True,
     device: Optional[Any] = None,
     log: Callable[[str], None] = print,
     **camera_options: Any,
@@ -1341,7 +1427,8 @@ def paint_views(
     (the picture's own colour where it saw the surface well), "paint" (the picture's paint as the projection
     left it, where it used the picture: run 5's) or "none" (the views only agree with each other). The final
     blend sharpens the views' weights by ``select`` (select_weights), so each texel takes mostly its best view.
-    A bottom view whose render is dark (DARK_BOTTOM) isn't painted. The mesh isn't changed. The result has the
+    With ``glare``, each painted view's highlights are taken out before it goes in (deglare). A bottom view whose
+    render is dark (DARK_BOTTOM) isn't painted. The mesh isn't changed. The result has the
     views blended by weight (``texture``) and robustly (``robust``).
     """
     if colour_model not in ("tone", "gains"):
@@ -1440,6 +1527,9 @@ def paint_views(
             image, mask, fit = chosen
             aligned = warp(image, fit).clamp(0, 1)
             aligned_mask = warp(mask.float()[..., None], fit)[..., 0] > 0.5
+            if glare:
+                aligned, glared = deglare(aligned, shot.mask & aligned_mask, shot.image)
+                view.attempts[-1]["glare"] = round(glared, 3)
             view.aligned = as_image(aligned)
             view.accepted = True
             samples = view_samples(geom, tex, camera, aligned, shot.mask & aligned_mask)
