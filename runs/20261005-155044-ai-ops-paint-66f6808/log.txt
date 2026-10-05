@@ -1,0 +1,24 @@
+[paint] app orainge-p8-paint: shapes bmw,04,06,08,12,13,p2,p3,p4,p5,p6,p7,p8; paint bmw,04,06,08,12,13,p2,p3,p4,p5,p6,p7,p8; variants ['qie-v9']
+[paint] painting 13: {"around": 8, "elevation": 15.0, "attempts": 3, "min_iou": 0.9, "max_novelty": 0.2, "steps": 4, "bottom": true}, Qwen-Image-Edit-2511 at 8 steps
+an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7ff6723c2fc0>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7ff6724b79c0>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+[paint] bmw qie-v9: 9 of 10 views in, IoU [0.9605, 0.9346, 0.9644, 0.9953, 0.9411, 0.9447, 'a dark underside (median luminance 0.00)', 0.927, 0.9176, 0.942], {'paint_views': 43.7, 'export': 9.8, 'setup_s': 0.481, 'projection_s': 1.519, 'views_s': 40.97, 'joint_s': 0.407, 'compose_s': 0.085, 'total_s
+[paint] 04 qie-v9: 10 of 10 views in, IoU [0.9525, 0.9391, 0.9449, 0.9974, 0.9598, 0.9359, 0.9547, 0.9601, 0.9823, 0.9614], {'paint_views': 52.1, 'export': 9.3, 'setup_s': 0.501, 'projection_s': 1.619, 'views_s': 48.938, 'joint_s': 0.653, 'compose_s': 0.092, 'total_s': 51.805}
+[paint] 06 qie-v9: 10 of 10 views in, IoU [0.977, 0.998, 0.995, 0.9882, 0.997, 0.9954, 0.9935, 0.9919, 0.9965, 0.9972], {'paint_views': 68.7, 'export': 11.2, 'setup_s': 0.189, 'projection_s': 0.659, 'views_s': 66.955, 'joint_s': 0.563, 'compose_s': 0.09, 'total_s': 68.455}
+[paint] 08 qie-v9: 10 of 10 views in, IoU [0.987, 0.9715, 0.9744, 0.986, 0.9986, 0.9959, 0.9967, 0.9821, 0.9974, 0.9905], {'paint_views': 57.6, 'export': 13.6, 'setup_s': 0.215, 'projection_s': 0.61, 'views_s': 55.821, 'joint_s': 0.593, 'compose_s': 0.087, 'total_s': 57.327}
+[paint] 12 qie-v9: 10 of 10 views in, IoU [0.9547, 0.9978, 0.9943, 0.9937, 0.978, 0.9292, 0.9739, 0.9799, 0.9887, 0.9954], {'paint_views': 61.8, 'export': 12.3, 'setup_s': 0.196, 'projection_s': 0.745, 'views_s': 59.997, 'joint_s': 0.565, 'compose_s': 0.096, 'total_s': 61.6}
+[paint] 13 qie-v9: 9 of 10 views in, IoU [0.9257, 0.9961, 0.9334, 0.9958, 0.9227, 0.9326, 'a dark underside (median luminance 0.10)', 0.9146, 0.9217, 0.9111], {'paint_views': 50.5, 'export': 11.6, 'setup_s': 0.436, 'projection_s': 1.167, 'views_s': 48.167, 'joint_s': 0.38, 'compose_s': 0.084, 'total
+[paint] p2 qie-v9: 10 of 10 views in, IoU [0.9291, 0.9956, 0.997, 0.9838, 0.9897, 0.9973, 0.9958, 0.9549, 0.97, 0.9695], {'paint_views': 89.0, 'export': 9.9, 'setup_s': 0.202, 'projection_s': 1.528, 'views_s': 86.444, 'joint_s': 0.494, 'compose_s': 0.086, 'total_s': 88.755}
+[paint] p3 qie-v9: 10 of 10 views in, IoU [0.908, 0.9987, 0.9954, 0.937, 0.9795, 0.986, 0.9971, 0.9691, 0.9964, 0.9979], {'paint_views': 84.4, 'export': 9.9, 'setup_s': 0.19, 'projection_s': 1.421, 'views_s': 82.012, 'joint_s': 0.446, 'compose_s': 0.086, 'total_s': 84.155}
+[paint] p4 qie-v9: 10 of 10 views in, IoU [0.9969, 0.9765, 0.9963, 0.997, 0.9823, 0.9869, 0.9973, 0.9933, 0.9964, 0.9824], {'paint_views': 53.5, 'export': 10.6, 'setup_s': 0.252, 'projection_s': 0.669, 'views_s': 51.668, 'joint_s': 0.536, 'compose_s': 0.09, 'total_s': 53.218}
+[paint] p5 qie-v9: 9 of 10 views in, IoU [0.919, 0.9243, 0.9214, 0.9944, 0.9528, 0.915, 'a dark underside (median luminance 0.05)', 0.9966, 0.9266, 0.9261], {'paint_views': 45.9, 'export': 10.8, 'setup_s': 0.228, 'projection_s': 0.735, 'views_s': 44.189, 'joint_s': 0.407, 'compose_s': 0.083, 'total_
+[paint] p6 qie-v9: 10 of 10 views in, IoU [0.9853, 0.9905, 0.9865, 0.9989, 0.99, 0.992, 0.9964, 0.9954, 0.9213, 0.9952], {'paint_views': 57.7, 'export': 13.0, 'setup_s': 0.166, 'projection_s': 0.575, 'views_s': 56.193, 'joint_s': 0.463, 'compose_s': 0.084, 'total_s': 57.481}
+[paint] p7 qie-v9: 10 of 10 views in, IoU [0.94, 0.9878, 0.9955, 0.9982, 0.9971, 0.9511, 0.9887, 0.997, 0.9946, 0.9801], {'paint_views': 80.3, 'export': 10.2, 'setup_s': 0.189, 'projection_s': 0.184, 'views_s': 79.085, 'joint_s': 0.483, 'compose_s': 0.089, 'total_s': 80.032}
+[paint] p8 qie-v9: 9 of 10 views in, IoU [0.9812, 0.9931, 0.9692, 0.9635, 0.9789, 0.993, 0.9742, 0.9848, 0.9739, 'a dark underside (median luminance 0.10)'], {'paint_views': 69.2, 'export': 9.3, 'setup_s': 0.384, 'projection_s': 0.955, 'views_s': 67.05, 'joint_s': 0.457, 'compose_s': 0.091, 'total_s
+[paint] done: 13 of 13 paintings
+180M	ops-out/private/paint13
+exit status: 0
