@@ -1,0 +1,35 @@
+lora: lightx2v/Qwen-Image-Edit-2511-Lightning at d74eba145674fd7e31b949324e148e21e7118abd ready in /models/Qwen-Image-Edit-2511-Lightning
+Stopping app - local entrypoint completed.
+Runner terminated.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-OPxUspgnALEj4drJtuv4oZ
+== p8prod-bmw
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod-bmw: saving each step in the orainge-outputs volume under p8prod-bmw/
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 59 s, 720 LoRA layers, 8 steps
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 40 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 67.4 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 7, "of": 10, "joint": "none", "painter_s": 67.4, "seconds": 83.5}
+Done: reference-1082602803.png, reference-1082602804.png, reference-1082602805.png, reference-1082602806.png, preview-1276070621.glb, final-1276070621.glb in orainge-outputs/p8prod-bmw
+{"final": {"status": "done", "paint": {"applied": true, "size": 4096, "output": "robust", "views": 7, "of": 10, "joint": "none", "painter_s": 67.4, "seconds": 83.5}, "projection": {"applied": false, "reason": "the silhouettes don't match well enough (IoU 0.919 < 0.93)", "iou": 0.9185, "colour": 0.3346, "pose": {"azimuth": 328.8, "elevation": -10.0, "roll": -1.0, "fov": 29.0, "scale": 1.003, "shift": [-0.0022, -0.0156]}, "seconds": 0.285}, "timings": {"generate_s": 32.195, "export_s": 109.584, "compress_s": 2.978, "upload_s": 0.004}, "gpu_seconds": 144.8, "bytes": 2953988}}
+== p8prod-jordan
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod-jordan: saving each step in the orainge-outputs volume under p8prod-jordan/
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 57 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 73.0 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 73.0, "seconds": 168.0}
+Done: reference-59174372.png, reference-59174373.png, reference-59174374.png, reference-59174375.png, preview-913935419.glb, final-913935419.glb in orainge-outputs/p8prod-jordan
+{"final": {"status": "done", "paint": {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 73.0, "seconds": 168.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9772, "colour": 0.6427, "coverage": 0.1167, "pose": {"azimuth": 65.0, "elevation": -3.8, "roll": -0.2, "fov": 17.3, "scale": 1.013, "shift": [0.0003, -0.0003]}, "mode": "detail only", "decals": 189, "seconds": 2.298}, "timings": {"generate_s": 13.707, "export_s": 189.805, "compress_s": 3.042, "upload_s": 0.003}, "gpu_seconds": 206.6, "bytes": 2374720}}
+== p8prod-coke
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod-coke: saving each step in the orainge-outputs volume under p8prod-coke/
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 60 s, 720 LoRA layers, 8 steps
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 46 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 59.4 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 59.4, "seconds": 105.7}
+Done: reference-1507300426.png, reference-1507300427.png, reference-1507300428.png, reference-1507300429.png, preview-1127206263.glb, final-1127206263.glb in orainge-outputs/p8prod-coke
+{"final": {"status": "done", "paint": {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 59.4, "seconds": 105.7}, "projection": {"applied": true, "reason": "applied", "iou": 0.9732, "colour": 0.5933, "coverage": 0.0751, "pose": {"azimuth": 1.9, "elevation": 2.3, "roll": 0.0, "fov": 60.0, "scale": 1.01, "shift": [-0.0002, 0.0019]}, "mode": "detail only", "decals": 120, "seconds": 1.269}, "timings": {"generate_s": 12.469, "export_s": 130.532, "compress_s": 3.022, "upload_s": 0.003}, "gpu_seconds": 146.0, "bytes": 2517084}}
+exit status: 0
