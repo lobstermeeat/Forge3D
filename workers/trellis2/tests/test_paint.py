@@ -868,3 +868,26 @@ def test_paint_views_takes_the_glare_out_of_each_view():
         reds[glare] = max(int(cell(robust, k, inset=INNER // 4)[..., 0].max()) for k in (0, 1, 4, 5))
     assert reds[False] > 110  # baked in: a white patch on every side
     assert reds[True] < 70  # taken out: the paint's 40, give or take the blend
+
+
+def test_paint_views_tells_the_editor_which_try_it_is_and_keeps_its_skip():
+    mesh = box()
+    seen = []
+    flat, _ = flat_painter()
+
+    def paint(render, picture, neighbour, seed, view):
+        seen.append((view["name"], view["attempt"]))
+        if view["attempt"] == 0:  # the first try turns the object: left out
+            out = Image.fromarray(np.roll(np.asarray(render), shift=40, axis=1))
+        else:
+            out = flat(render, picture, neighbour, seed, view)
+        out.info["skip"] = view["attempt"]  # as views.editor marks how far in it started
+        return out
+
+    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=2, top=False, bottom=False, attempts=3, log=lambda _: None, **small())
+    assert seen == [("a000", 0), ("a000", 1), ("a180", 0), ("a180", 1)]
+    assert all(view.accepted and [a.get("skip") for a in view.attempts] == [0, 1] for view in result.views)
+    # An editor that doesn't say leaves no skip in the report
+    plain, _ = flat_painter()
+    result = P.paint_views(mesh, no_picture(), plain, device="cpu", around=2, top=False, bottom=False, log=lambda _: None, **small())
+    assert all("skip" not in attempt for view in result.views for attempt in view.attempts)

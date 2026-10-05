@@ -37,8 +37,8 @@ class StandIn:
         self.calls = []
         self.last_seconds, self.last_peak_gb = 4.2, 61.0
 
-    def paint(self, images, prompt, *, seed, steps=None):
-        self.calls.append({"images": [im.size for im in images], "prompt": prompt, "seed": seed, "steps": steps})
+    def paint(self, images, prompt, *, seed, steps=None, **options):
+        self.calls.append({"images": [im.size for im in images], "prompt": prompt, "seed": seed, "steps": steps, **options})
         return images[0].resize((1024, 1024))
 
 
@@ -54,5 +54,25 @@ def test_the_editor_paints_each_view_at_its_seed_and_keeps_what_it_asked():
     assert "yellow lamborghini huracan seen from its right side" in painter.calls[0]["prompt"]
     assert paint_view.subject == "yellow lamborghini huracan"
     assert paint_view.asked == [
-        {"view": "a090", "seed": 300, "prompt": painter.calls[0]["prompt"], "seconds": 4.2, "peak_gb": 61.0}
+        {"view": "a090", "attempt": 0, "skip": 0, "seed": 300, "prompt": painter.calls[0]["prompt"],
+         "seconds": 4.2, "peak_gb": 61.0}
     ]
+    assert out.info["skip"] == 0
+
+
+def test_later_tries_start_part_way():
+    painter = StandIn()
+    paint_view = views.editor(painter, "a red Nike Air Jordan 1 sneaker")
+    render = Image.new("RGB", (64, 64), (200, 20, 20))
+    skips = []
+    for attempt in range(4):
+        out = paint_view(render, None, None, 10 + attempt, {"name": "a000", "attempt": attempt})
+        skips.append(out.info["skip"])
+    # The first from pure noise (no skip asked for), then further in; past the last, the last again
+    assert skips == [0, 1, 2, 2] and list(views.SKIPS) == [0, 1, 2]
+    assert "skip" not in painter.calls[0] and [call.get("skip") for call in painter.calls[1:]] == [1, 2, 2]
+    assert [entry["skip"] for entry in paint_view.asked] == [0, 1, 2, 2]
+    # A view without "attempt" is a first try; skips=(0,) never starts part way
+    plain = views.editor(painter, "mug", skips=(0,))
+    assert plain(render, None, None, 1, {"name": "a000", "attempt": 2}).info["skip"] == 0
+    assert paint_view(render, None, None, 1, {"name": "top"}).info["skip"] == 0
