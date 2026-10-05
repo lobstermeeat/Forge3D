@@ -5,16 +5,16 @@
 # ai-ops-paint: Phase 8, the view painter, in staging apps. Nothing is deployed; production's orainge-ai keeps
 # running what it runs.
 #
-# Run 7: production's painter (forge3d_worker/painting.py: the prompt's colours and the colour match's anchor from
-# the picture with its shading taken out, three tries a view) on run 6's thirteen shapes.
+# Run 8: production's painter as run 7, with the views' glare taken out before they're baked and each paint named
+# once in the prompt, on run 6's thirteen shapes (for blind test 2 against today's finals).
 set -euo pipefail
 mkdir -p ops-out/private
 export ORAINGE_APP_NAME=orainge-p8-paint
 status=0
 modal run ops/exp_paint.py::check --only bmw,04,06,08,12,13,p2,p3,p4,p5,p6,p7,p8 \
-  --variants qie-v7 --attempts 3 --out ops-out/private/paint7 \
-  >ops-out/private/modal-paint7.log 2>&1 || status=$?
-grep -aE "^\[paint\] (app|making|painting|done|[a-z0-9]+ qie)|^\[shapes\]|Traceback|Error|error" ops-out/private/modal-paint7.log |
+  --variants qie-v7 --attempts 3 --out ops-out/private/paint8 \
+  >ops-out/private/modal-paint8.log 2>&1 || status=$?
+grep -aE "^\[paint\] (app|making|painting|done|[a-z0-9]+ qie)|^\[shapes\]|Traceback|Error|error" ops-out/private/modal-paint8.log |
   grep -avE "it/s\]|s/it\]" | cut -c1-300 | tail -80 || true
-du -sh ops-out/private/paint7 2>/dev/null || true
+du -sh ops-out/private/paint8 2>/dev/null || true
 exit $status
