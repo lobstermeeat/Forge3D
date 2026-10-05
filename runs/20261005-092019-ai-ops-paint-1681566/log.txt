@@ -1,0 +1,252 @@
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.955, 'colour': 0.7039, 'coverage': 0.064, 'pose': {'azimuth': 0.0, 'elevation': 6.2, 'roll': 0.0, 'fov': 18.7, 'scale': 0.966, 'shift': [0.0081, -0.0012]}, 'mode': 'detail only', 'decals': 137, 'seconds': 0.833}
+[paint] top: attempt 2, {'seed': 301, 'paint_s': 10.501, 'iou_before': 0.2845, 'iou': 0.285, 'shift': [60.81, -10.94], 'scale': 1.0833}
+[paint] top: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a000: attempt 1, {'seed': 0, 'paint_s': 4.292, 'iou_before': 0.9867, 'iou': 0.9882, 'shift': [0.0, 0.94], 'scale': 1.0, 'novelty': 0.037}
+[paint] a045: attempt 1, {'seed': 100, 'paint_s': 4.404, 'iou_before': 0.9697, 'iou': 0.9697, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.077}
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 10.507, 'iou_before': 0.4331, 'iou': 0.4373, 'shift': [-64.24, 17.5], 'scale': 1.0833}
+[paint] a315: attempt 1, {'seed': 200, 'paint_s': 4.32, 'iou_before': 0.9769, 'iou': 0.9784, 'shift': [0.0, 0.94], 'scale': 1.0006, 'novelty': 0.073}
+[paint] top: attempt 1, {'seed': 300, 'paint_s': 4.282, 'iou_before': 0.9853, 'iou': 0.9853, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.097}
+[paint] a090: attempt 2, {'seed': 401, 'paint_s': 10.497, 'iou_before': 0.4331, 'iou': 0.4372, 'shift': [-64.24, 17.5], 'scale': 1.0833}
+[paint] a090: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 4.244, 'iou_before': 0.9985, 'iou': 0.9985, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.037}
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 4.289, 'iou_before': 0.9953, 'iou': 0.9953, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.019}
+[paint] bottom: attempt 1, {'seed': 600, 'paint_s': 4.313, 'iou_before': 0.9972, 'iou': 0.9972, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.098}
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 10.497, 'iou_before': 0.4814, 'iou': 0.5185, 'shift': [64.68, -35.0], 'scale': 1.0833}
+[paint] a135: attempt 1, {'seed': 700, 'paint_s': 4.277, 'iou_before': 0.9344, 'iou': 0.9349, 'shift': [0.0, 0.75], 'scale': 1.0, 'novelty': 0.255}
+[paint] a135: attempt 2, {'seed': 701, 'paint_s': 4.27, 'iou_before': 0.9527, 'iou': 0.9544, 'shift': [0.0, 1.0], 'scale': 1.0, 'novelty': 0.274}
+[paint] a135: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a270: attempt 2, {'seed': 501, 'paint_s': 10.504, 'iou_before': 0.4811, 'iou': 0.5148, 'shift': [64.68, -35.0], 'scale': 1.0833}
+[paint] a270: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a225: attempt 1, {'seed': 800, 'paint_s': 4.278, 'iou_before': 0.9947, 'iou': 0.9957, 'shift': [0.0, 0.5], 'scale': 1.0, 'novelty': 0.234}
+[paint] a225: attempt 2, {'seed': 801, 'paint_s': 4.273, 'iou_before': 0.9932, 'iou': 0.9932, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.208}
+[paint] a225: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a180: attempt 1, {'seed': 900, 'paint_s': 4.321, 'iou_before': 0.9957, 'iou': 0.9957, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.287}
+[paint] bottom: attempt 1, {'seed': 600, 'paint_s': 10.505, 'iou_before': 0.9921, 'iou': 0.9921, 'shift': [0.0, 0.0], 'scale': 1.0006, 'novelty': 0.01}
+[paint] a180: attempt 2, {'seed': 901, 'paint_s': 4.321, 'iou_before': 0.9669, 'iou': 0.9677, 'shift': [0.0, -0.94], 'scale': 1.0, 'novelty': 0.239}
+[paint] a180: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a135: attempt 1, {'seed': 700, 'paint_s': 10.512, 'iou_before': 0.7239, 'iou': 0.7254, 'shift': [0.0, 2.62], 'scale': 1.0013}
+[paint] a135: attempt 2, {'seed': 701, 'paint_s': 10.501, 'iou_before': 0.9916, 'iou': 0.994, 'shift': [0.0, 1.12], 'scale': 1.0025, 'novelty': 0.002}
+[painter] 08 qie-edit-view: {"seconds": {"paint_views": 58.4, "export": 6.5, "setup_s": 0.153, "projection_s": 0.861, "views_s": 57.324, "compose_s": 0.018, "total_s": 58.356}, "peak_gpu_gb": 59.1, "call": 5}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.955, 'colour': 0.7039, 'coverage': 0.064, 'pose': {'azimuth': 0.0, 'elevation': 6.2, 'roll': 0.0, 'fov': 18.7, 'scale': 0.966, 'shift': [0.0081, -0.0012]}, 'mode': 'detail only', 'decals': 137, 'seconds': 0.287}
+[paint] a225: attempt 1, {'seed': 800, 'paint_s': 10.493, 'iou_before': 0.8268, 'iou': 0.8333, 'shift': [6.88, 28.12], 'scale': 0.9608}
+[paint] a000: attempt 1, {'seed': 0, 'paint_s': 7.318, 'iou_before': 0.9222, 'iou': 0.9373, 'shift': [2.19, 16.56], 'scale': 0.9851, 'novelty': 0.057}
+[paint] a045: attempt 1, {'seed': 100, 'paint_s': 7.22, 'iou_before': 0.8021, 'iou': 0.8406, 'shift': [19.38, 33.44], 'scale': 0.9477}
+[paint] a225: attempt 2, {'seed': 801, 'paint_s': 10.489, 'iou_before': 0.827, 'iou': 0.8335, 'shift': [6.88, 28.12], 'scale': 0.9608}
+[paint] a225: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a045: attempt 2, {'seed': 101, 'paint_s': 7.232, 'iou_before': 0.7958, 'iou': 0.8314, 'shift': [10.0, 30.94], 'scale': 0.9394}
+[paint] a045: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a180: attempt 1, {'seed': 900, 'paint_s': 10.503, 'iou_before': 0.995, 'iou': 0.9962, 'shift': [0.0, 0.31], 'scale': 1.0013, 'novelty': 0.0}
+[paint] a315: attempt 1, {'seed': 200, 'paint_s': 7.228, 'iou_before': 0.7896, 'iou': 0.8437, 'shift': [-21.25, 33.44], 'scale': 0.9277}
+[paint] a315: attempt 2, {'seed': 201, 'paint_s': 7.237, 'iou_before': 0.9042, 'iou': 0.9055, 'shift': [0.0, 1.25], 'scale': 1.0, 'novelty': 0.033}
+[painter] 06 qie-ref-nb: {"seconds": {"paint_views": 176.8, "export": 4.4, "setup_s": 0.068, "projection_s": 0.304, "views_s": 176.381, "compose_s": 0.017, "total_s": 176.772}, "peak_gpu_gb": 59.1, "call": 5}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.955, 'colour': 0.7039, 'coverage': 0.064, 'pose': {'azimuth': 0.0, 'elevation': 6.2, 'roll': 0.0, 'fov': 18.7, 'scale': 0.966, 'shift': [0.0081, -0.0012]}, 'mode': 'detail only', 'decals': 137, 'seconds': 0.705}
+[paint] top: attempt 1, {'seed': 300, 'paint_s': 7.23, 'iou_before': 0.5936, 'iou': 0.5961, 'shift': [0.0, 15.31], 'scale': 1.0298}
+[paint] a000: attempt 1, {'seed': 0, 'paint_s': 7.023, 'iou_before': 0.92, 'iou': 0.9345, 'shift': [2.19, 15.31], 'scale': 0.9802, 'novelty': 0.057}
+[paint] top: attempt 2, {'seed': 301, 'paint_s': 7.233, 'iou_before': 0.6461, 'iou': 0.682, 'shift': [-3.75, 24.06], 'scale': 1.0473}
+[paint] top: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 7.194, 'iou_before': 0.5284, 'iou': 0.6095, 'shift': [-1.25, 40.96], 'scale': 0.9231}
+[paint] a045: attempt 1, {'seed': 100, 'paint_s': 10.482, 'iou_before': 0.7395, 'iou': 0.8281, 'shift': [15.0, 41.41], 'scale': 0.9231}
+[paint] a090: attempt 2, {'seed': 401, 'paint_s': 7.198, 'iou_before': 0.4877, 'iou': 0.5644, 'shift': [17.0, 40.96], 'scale': 0.9231}
+[paint] a090: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a045: attempt 2, {'seed': 101, 'paint_s': 10.47, 'iou_before': 0.7538, 'iou': 0.8237, 'shift': [-12.5, 32.5], 'scale': 0.9231}
+[paint] a045: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 7.232, 'iou_before': 0.4642, 'iou': 0.513, 'shift': [-2.19, 41.6], 'scale': 0.9459}
+[paint] a270: attempt 2, {'seed': 501, 'paint_s': 7.247, 'iou_before': 0.7104, 'iou': 0.7116, 'shift': [-1.25, -1.25], 'scale': 1.0}
+[paint] a270: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a315: attempt 1, {'seed': 200, 'paint_s': 10.493, 'iou_before': 0.8072, 'iou': 0.8522, 'shift': [-31.56, 35.62], 'scale': 0.9418}
+[paint] bottom: attempt 1, {'seed': 600, 'paint_s': 7.243, 'iou_before': 0.737, 'iou': 0.7833, 'shift': [-5.0, 40.94], 'scale': 0.9406}
+[paint] a315: attempt 2, {'seed': 201, 'paint_s': 10.491, 'iou_before': 0.6908, 'iou': 0.6605, 'shift': [-16.88, -26.25], 'scale': 1.0202}
+[paint] a315: left out (IoU under 0.9 or novelty over 0.2)
+[paint] bottom: attempt 2, {'seed': 601, 'paint_s': 7.25, 'iou_before': 0.676, 'iou': 0.7324, 'shift': [-3.44, 48.0], 'scale': 0.9644}
+[paint] bottom: left out (IoU under 0.9 or novelty over 0.2)
+[paint] top: attempt 1, {'seed': 300, 'paint_s': 10.462, 'iou_before': 0.6475, 'iou': 0.648, 'shift': [-0.31, 0.31], 'scale': 1.0019}
+[paint] a135: attempt 1, {'seed': 700, 'paint_s': 7.218, 'iou_before': 0.7531, 'iou': 0.7721, 'shift': [-19.0, 40.96], 'scale': 0.9441}
+[paint] a135: attempt 2, {'seed': 701, 'paint_s': 7.2, 'iou_before': 0.6275, 'iou': 0.6229, 'shift': [26.75, -40.96], 'scale': 1.0833}
+[paint] a135: left out (IoU under 0.9 or novelty over 0.2)
+[paint] top: attempt 2, {'seed': 301, 'paint_s': 10.48, 'iou_before': 0.6426, 'iou': 0.6426, 'shift': [0.0, 0.0], 'scale': 1.0}
+[paint] top: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a225: attempt 1, {'seed': 800, 'paint_s': 7.243, 'iou_before': 0.6196, 'iou': 0.6727, 'shift': [5.5, 40.96], 'scale': 0.9231}
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 10.433, 'iou_before': 0.6096, 'iou': 0.6714, 'shift': [1.25, 40.96], 'scale': 0.9506}
+[paint] a225: attempt 2, {'seed': 801, 'paint_s': 7.272, 'iou_before': 0.7491, 'iou': 0.7967, 'shift': [24.5, 40.96], 'scale': 0.926}
+[paint] a225: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a180: attempt 1, {'seed': 900, 'paint_s': 7.248, 'iou_before': 0.926, 'iou': 0.929, 'shift': [1.25, 0.94], 'scale': 1.005, 'novelty': 0.364}
+[paint] a090: attempt 2, {'seed': 401, 'paint_s': 10.438, 'iou_before': 0.5754, 'iou': 0.6231, 'shift': [-5.0, 40.96], 'scale': 0.9277}
+[paint] a090: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a180: attempt 2, {'seed': 901, 'paint_s': 7.235, 'iou_before': 0.9085, 'iou': 0.9136, 'shift': [0.0, -8.44], 'scale': 1.0031, 'novelty': 0.312}
+[paint] a180: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 10.466, 'iou_before': 0.4634, 'iou': 0.4883, 'shift': [0.31, 41.6], 'scale': 0.9894}
+[paint] a270: attempt 2, {'seed': 501, 'paint_s': 10.473, 'iou_before': 0.557, 'iou': 0.5889, 'shift': [12.5, 41.6], 'scale': 0.9608}
+[paint] a270: left out (IoU under 0.9 or novelty over 0.2)
+[painter] 08 qie-ref: {"seconds": {"paint_views": 139.7, "export": 6.5, "setup_s": 0.08, "projection_s": 0.313, "views_s": 139.176, "compose_s": 0.016, "total_s": 139.586}, "peak_gpu_gb": 58.9, "call": 6}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9471, 'colour': 0.0991, 'coverage': 0.1617, 'pose': {'azimuth': 0.0, 'elevation': 47.5, 'roll': 0.2, 'fov': 20.2, 'scale': 1.006, 'shift': [0.0034, -0.0006]}, 'mode': 'detail only', 'decals': 475, 'seconds': 0.317}
+[paint] bottom: attempt 1, {'seed': 600, 'paint_s': 10.487, 'iou_before': 0.7052, 'iou': 0.7557, 'shift': [9.69, 0.94], 'scale': 0.9447}
+[paint] a000: attempt 1, {'seed': 0, 'paint_s': 4.318, 'iou_before': 0.9541, 'iou': 0.9541, 'shift': [0.0, 0.0], 'scale': 1.0006, 'novelty': 0.0}
+[paint] top: attempt 1, {'seed': 100, 'paint_s': 4.326, 'iou_before': 0.9935, 'iou': 0.9967, 'shift': [0.44, 0.44], 'scale': 1.0019, 'novelty': 0.002}
+[paint] a045: attempt 1, {'seed': 200, 'paint_s': 4.329, 'iou_before': 0.7633, 'iou': 0.766, 'shift': [0.75, 0.75], 'scale': 1.0044}
+[paint] bottom: attempt 2, {'seed': 601, 'paint_s': 10.487, 'iou_before': 0.5331, 'iou': 0.5862, 'shift': [14.38, 45.94], 'scale': 0.9231}
+[paint] bottom: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a045: attempt 2, {'seed': 201, 'paint_s': 4.316, 'iou_before': 0.8612, 'iou': 0.8666, 'shift': [0.0, 1.5], 'scale': 1.0}
+[paint] a045: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a315: attempt 1, {'seed': 300, 'paint_s': 4.319, 'iou_before': 0.9941, 'iou': 0.9941, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.0}
+[paint] a135: attempt 1, {'seed': 700, 'paint_s': 10.472, 'iou_before': 0.418, 'iou': 0.4415, 'shift': [26.25, -40.96], 'scale': 1.0833}
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 4.311, 'iou_before': 0.9946, 'iou': 0.9946, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.005}
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 4.309, 'iou_before': 0.9261, 'iou': 0.9261, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.005}
+[paint] a135: attempt 2, {'seed': 701, 'paint_s': 10.452, 'iou_before': 0.3521, 'iou': 0.3795, 'shift': [27.75, -40.96], 'scale': 1.0833}
+[paint] a135: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a135: attempt 1, {'seed': 600, 'paint_s': 4.32, 'iou_before': 0.8555, 'iou': 0.8589, 'shift': [-0.75, 0.75], 'scale': 1.0044}
+[paint] a135: attempt 2, {'seed': 601, 'paint_s': 4.321, 'iou_before': 0.7944, 'iou': 0.7967, 'shift': [0.0, 0.38], 'scale': 1.0031}
+[paint] a135: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a225: attempt 1, {'seed': 700, 'paint_s': 4.322, 'iou_before': 0.906, 'iou': 0.9091, 'shift': [0.75, 0.75], 'scale': 1.0038, 'novelty': 0.0}
+[paint] a225: attempt 1, {'seed': 800, 'paint_s': 10.46, 'iou_before': 0.6331, 'iou': 0.6343, 'shift': [-13.5, -40.96], 'scale': 1.0833}
+[paint] a180: attempt 1, {'seed': 800, 'paint_s': 4.331, 'iou_before': 0.4926, 'iou': 0.5345, 'shift': [1.75, 16.19], 'scale': 1.0833}
+[paint] a180: attempt 2, {'seed': 801, 'paint_s': 4.326, 'iou_before': 0.91, 'iou': 0.9114, 'shift': [0.0, 0.0], 'scale': 1.0013, 'novelty': 0.001}
+[paint] a225: attempt 2, {'seed': 801, 'paint_s': 10.471, 'iou_before': 0.6722, 'iou': 0.6543, 'shift': [-8.0, -40.96], 'scale': 1.0833}
+[paint] a225: left out (IoU under 0.9 or novelty over 0.2)
+[paint] bottom: attempt 1, {'seed': 900, 'paint_s': 4.32, 'iou_before': 0.9939, 'iou': 0.9969, 'shift': [0.75, 0.38], 'scale': 1.0019, 'novelty': 0.016}
+[paint] a180: attempt 1, {'seed': 900, 'paint_s': 10.486, 'iou_before': 0.9781, 'iou': 0.9811, 'shift': [0.31, -0.31], 'scale': 1.0019, 'novelty': 0.247}
+[paint] a180: attempt 2, {'seed': 901, 'paint_s': 10.5, 'iou_before': 0.9412, 'iou': 0.9441, 'shift': [0.0, -5.0], 'scale': 0.9969, 'novelty': 0.302}
+[paint] a180: left out (IoU under 0.9 or novelty over 0.2)
+[painter] 12 qie-edit-view: {"seconds": {"paint_views": 58.1, "export": 6.6, "setup_s": 0.193, "projection_s": 0.345, "views_s": 57.44, "compose_s": 0.019, "total_s": 57.998}, "peak_gpu_gb": 59.3, "call": 7}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9471, 'colour': 0.0991, 'coverage': 0.1617, 'pose': {'azimuth': 0.0, 'elevation': 47.5, 'roll': 0.2, 'fov': 20.2, 'scale': 1.006, 'shift': [0.0034, -0.0006]}, 'mode': 'detail only', 'decals': 475, 'seconds': 0.458}
+[paint] a000: attempt 1, {'seed': 0, 'paint_s': 7.225, 'iou_before': 0.9802, 'iou': 0.982, 'shift': [0.0, 0.0], 'scale': 1.0019, 'novelty': 0.002}
+[painter] 08 qie-ref-nb: {"seconds": {"paint_views": 197.9, "export": 5.0, "setup_s": 0.075, "projection_s": 0.729, "views_s": 196.999, "compose_s": 0.014, "total_s": 197.818}, "peak_gpu_gb": 58.9, "call": 6}
+[paint] top: attempt 1, {'seed': 100, 'paint_s': 7.219, 'iou_before': 0.9965, 'iou': 0.9965, 'shift': [0.0, 0.0], 'scale': 1.0006, 'novelty': 0.0}[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9471, 'colour': 0.0991, 'coverage': 0.1617, 'pose': {'azimuth': 0.0, 'elevation': 47.5, 'roll': 0.2, 'fov': 20.2, 'scale': 1.006, 'shift': [0.0034, -0.0006]}, 'mode': 'detail only', 'decals
+[paint] a000: attempt 1, {'seed': 0, 'paint_s': 7.029, 'iou_before': 0.9894, 'iou': 0.9894, 'shift': [0.0, 0.0], 'scale': 1.0006, 'novelty': 0.001}
+[paint] a045: attempt 1, {'seed': 200, 'paint_s': 7.255, 'iou_before': 0.9929, 'iou': 0.9938, 'shift': [0.0, 0.0], 'scale': 1.0013, 'novelty': 0.0}
+[paint] a315: attempt 1, {'seed': 300, 'paint_s': 7.245, 'iou_before': 0.9939, 'iou': 0.9939, 'shift': [0.0, 0.0], 'scale': 1.0006, 'novelty': 0.0}
+[paint] top: attempt 1, {'seed': 100, 'paint_s': 10.511, 'iou_before': 0.9444, 'iou': 0.9574, 'shift': [0.88, -2.62], 'scale': 1.0215, 'novelty': 0.016}
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 7.227, 'iou_before': 0.9945, 'iou': 0.9945, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.006}
+[paint] a045: attempt 1, {'seed': 200, 'paint_s': 10.517, 'iou_before': 0.993, 'iou': 0.9939, 'shift': [0.0, 0.0], 'scale': 1.0013, 'novelty': 0.0}
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 7.229, 'iou_before': 0.2648, 'iou': 0.3116, 'shift': [4.38, -45.6], 'scale': 0.9231}
+[paint] a270: attempt 2, {'seed': 501, 'paint_s': 7.237, 'iou_before': 0.2445, 'iou': 0.2909, 'shift': [-1.88, -45.6], 'scale': 0.9231}
+[paint] a270: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a315: attempt 1, {'seed': 300, 'paint_s': 10.517, 'iou_before': 0.8723, 'iou': 0.8767, 'shift': [-0.75, 0.75], 'scale': 1.005}
+[paint] a135: attempt 1, {'seed': 600, 'paint_s': 7.249, 'iou_before': 0.9935, 'iou': 0.9942, 'shift': [0.0, 0.0], 'scale': 1.0013, 'novelty': 0.0}
+[paint] a315: attempt 2, {'seed': 301, 'paint_s': 10.515, 'iou_before': 0.9923, 'iou': 0.9933, 'shift': [0.0, 0.0], 'scale': 1.0013, 'novelty': 0.0}
+[paint] a225: attempt 1, {'seed': 700, 'paint_s': 7.249, 'iou_before': 0.9937, 'iou': 0.9946, 'shift': [0.0, 0.0], 'scale': 1.0013, 'novelty': 0.0}
+[paint] a180: attempt 1, {'seed': 800, 'paint_s': 7.25, 'iou_before': 0.4882, 'iou': 0.504, 'shift': [-58.19, 3.06], 'scale': 1.0833}
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 10.5, 'iou_before': 0.2476, 'iou': 0.2877, 'shift': [1.25, -46.2], 'scale': 0.9231}
+[paint] a180: attempt 2, {'seed': 801, 'paint_s': 7.256, 'iou_before': 0.8549, 'iou': 0.888, 'shift': [1.31, -9.19], 'scale': 1.0107}
+[paint] a180: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a090: attempt 2, {'seed': 401, 'paint_s': 10.521, 'iou_before': 0.2476, 'iou': 0.2877, 'shift': [1.25, -46.2], 'scale': 0.9231}
+[paint] a090: left out (IoU under 0.9 or novelty over 0.2)
+[paint] bottom: attempt 1, {'seed': 900, 'paint_s': 7.259, 'iou_before': 0.5647, 'iou': 0.5645, 'shift': [3.0, 0.38], 'scale': 0.9981}
+[paint] bottom: attempt 2, {'seed': 901, 'paint_s': 7.25, 'iou_before': 0.6752, 'iou': 0.7464, 'shift': [6.0, -17.62], 'scale': 0.9231}
+[paint] bottom: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 10.481, 'iou_before': 0.2436, 'iou': 0.2829, 'shift': [-0.62, -45.6], 'scale': 0.9231}
+[paint] a270: attempt 2, {'seed': 501, 'paint_s': 10.508, 'iou_before': 0.2439, 'iou': 0.2832, 'shift': [-0.62, -45.6], 'scale': 0.9231}
+[paint] a270: left out (IoU under 0.9 or novelty over 0.2)
+[painter] 12 qie-ref: {"seconds": {"paint_views": 96.1, "export": 6.6, "setup_s": 0.077, "projection_s": 0.488, "views_s": 95.418, "compose_s": 0.019, "total_s": 96.001}, "peak_gpu_gb": 59.2, "call": 8}
+[paint] a135: attempt 1, {'seed': 600, 'paint_s': 10.511, 'iou_before': 0.9931, 'iou': 0.9939, 'shift': [0.0, 0.0], 'scale': 1.0013, 'novelty': 0.0}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9763, 'colour': 0.5096, 'coverage': 0.0763, 'pose': {'azimuth': 35.0, 'elevation': 10.0, 'roll': -1.8, 'fov': 29.7, 'scale': 1.009, 'shift': [0.0, -0.0022]}, 'mode': 'detail only', 'decals': 511, 'seconds': 0.311}
+[paint] a000: attempt 1, {'seed': 0, 'paint_s': 4.468, 'iou_before': 0.924, 'iou': 0.9284, 'shift': [-2.5, 5.31], 'scale': 1.0119, 'novelty': 0.017}
+[paint] a045: attempt 1, {'seed': 100, 'paint_s': 4.322, 'iou_before': 0.9026, 'iou': 0.9088, 'shift': [0.0, 5.62], 'scale': 1.0138, 'novelty': 0.03}
+[paint] a225: attempt 1, {'seed': 700, 'paint_s': 10.512, 'iou_before': 0.9935, 'iou': 0.9944, 'shift': [0.0, 0.0], 'scale': 1.0013, 'novelty': 0.0}
+[paint] a315: attempt 1, {'seed': 200, 'paint_s': 4.304, 'iou_before': 0.9274, 'iou': 0.9326, 'shift': [1.25, 6.56], 'scale': 1.0113, 'novelty': 0.072}
+[paint] top: attempt 1, {'seed': 300, 'paint_s': 4.32, 'iou_before': 0.8914, 'iou': 0.8933, 'shift': [0.94, 1.56], 'scale': 1.0038}
+[paint] a180: attempt 1, {'seed': 800, 'paint_s': 10.499, 'iou_before': 0.5786, 'iou': 0.5969, 'shift': [-32.81, -16.19], 'scale': 1.0833}
+[paint] top: attempt 2, {'seed': 301, 'paint_s': 4.307, 'iou_before': 0.9901, 'iou': 0.9918, 'shift': [0.0, 0.62], 'scale': 1.0013, 'novelty': 0.013}
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 4.31, 'iou_before': 0.9144, 'iou': 0.9176, 'shift': [-0.31, 2.5], 'scale': 1.0075, 'novelty': 0.057}
+[paint] a180: attempt 2, {'seed': 801, 'paint_s': 10.496, 'iou_before': 0.7487, 'iou': 0.786, 'shift': [0.88, -15.31], 'scale': 1.0202}
+[paint] a180: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 4.309, 'iou_before': 0.9386, 'iou': 0.9411, 'shift': [0.62, 0.94], 'scale': 1.0031, 'novelty': 0.036}
+[paint] bottom: attempt 1, {'seed': 600, 'paint_s': 4.31, 'iou_before': 0.9088, 'iou': 0.9095, 'shift': [0.0, 1.25], 'scale': 1.0, 'novelty': 0.127}
+[paint] a135: attempt 1, {'seed': 700, 'paint_s': 4.308, 'iou_before': 0.7533, 'iou': 0.7777, 'shift': [-15.0, 31.25], 'scale': 0.9231}
+[paint] bottom: attempt 1, {'seed': 900, 'paint_s': 10.521, 'iou_before': 0.6753, 'iou': 0.6774, 'shift': [6.38, 3.0], 'scale': 0.9827}
+[paint] a135: attempt 2, {'seed': 701, 'paint_s': 4.311, 'iou_before': 0.9118, 'iou': 0.9144, 'shift': [0.0, 1.56], 'scale': 1.0031, 'novelty': 0.116}
+[paint] a225: attempt 1, {'seed': 800, 'paint_s': 4.315, 'iou_before': 0.9148, 'iou': 0.9188, 'shift': [-0.75, 3.0], 'scale': 1.0044, 'novelty': 0.001}
+[paint] bottom: attempt 2, {'seed': 901, 'paint_s': 10.511, 'iou_before': 0.3511, 'iou': 0.3964, 'shift': [4.12, -60.0], 'scale': 0.9231}
+[paint] bottom: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a180: attempt 1, {'seed': 900, 'paint_s': 4.318, 'iou_before': 0.945, 'iou': 0.9468, 'shift': [0.0, 1.25], 'scale': 1.0031, 'novelty': 0.014}
+[painter] 12 qie-ref-nb: {"seconds": {"paint_views": 155.8, "export": 5.0, "setup_s": 0.104, "projection_s": 0.315, "views_s": 155.31, "compose_s": 0.018, "total_s": 155.748}, "peak_gpu_gb": 59.2, "call": 7}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9763, 'colour': 0.5096, 'coverage': 0.0763, 'pose': {'azimuth': 35.0, 'elevation': 10.0, 'roll': -1.8, 'fov': 29.7, 'scale': 1.009, 'shift': [0.0, -0.0022]}, 'mode': 'detail only', 'decals': 511, 'seconds': 0.279}
+[painter] 13 qie-edit-view: {"seconds": {"paint_views": 54.1, "export": 6.4, "setup_s": 0.079, "projection_s": 0.34, "views_s": 53.547, "compose_s": 0.019, "total_s": 53.985}, "peak_gpu_gb": 59.2, "call": 9}
+[paint] picture: {'applied': True, 'reason': 'applied', 'iou': 0.9763, 'colour': 0.5096, 'coverage': 0.0763, 'pose': {'azimuth': 35.0, 'elevation': 10.0, 'roll': -1.8, 'fov': 29.7, 'scale': 1.009, 'shift': [0.0, -0.0022]}, 'mode': 'detail only', 'decals': 511, 'seconds': 0.305}
+[paint] a000: attempt 1, {'seed': 0, 'paint_s': 7.046, 'iou_before': 0.8499, 'iou': 0.9222, 'shift': [-14.69, 31.56], 'scale': 1.0019, 'novelty': 0.027}
+[paint] a000: attempt 1, {'seed': 0, 'paint_s': 7.431, 'iou_before': 0.8508, 'iou': 0.9234, 'shift': [-14.69, 31.56], 'scale': 1.0019, 'novelty': 0.025}
+[paint] a045: attempt 1, {'seed': 100, 'paint_s': 7.026, 'iou_before': 0.7356, 'iou': 0.7594, 'shift': [42.0, 11.62], 'scale': 1.0833}
+[paint] a045: attempt 2, {'seed': 101, 'paint_s': 7.037, 'iou_before': 0.7375, 'iou': 0.7604, 'shift': [42.38, 5.25], 'scale': 1.0833}
+[paint] a045: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a045: attempt 1, {'seed': 100, 'paint_s': 10.85, 'iou_before': 0.7212, 'iou': 0.7462, 'shift': [40.88, -11.62], 'scale': 1.0833}
+[paint] a315: attempt 1, {'seed': 200, 'paint_s': 7.021, 'iou_before': 0.7499, 'iou': 0.7686, 'shift': [17.5, 27.81], 'scale': 0.9231}
+[paint] a045: attempt 2, {'seed': 101, 'paint_s': 10.825, 'iou_before': 0.7216, 'iou': 0.7465, 'shift': [47.25, -11.62], 'scale': 1.0833}
+[paint] a045: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a315: attempt 2, {'seed': 201, 'paint_s': 7.027, 'iou_before': 0.7583, 'iou': 0.7668, 'shift': [-5.62, 15.94], 'scale': 0.9626}
+[paint] a315: left out (IoU under 0.9 or novelty over 0.2)
+[paint] top: attempt 1, {'seed': 300, 'paint_s': 7.036, 'iou_before': 0.6704, 'iou': 0.7157, 'shift': [-7.19, 40.0], 'scale': 0.9231}
+[paint] a315: attempt 1, {'seed': 200, 'paint_s': 10.821, 'iou_before': 0.7773, 'iou': 0.7919, 'shift': [26.88, 23.12], 'scale': 0.9347}
+[paint] top: attempt 2, {'seed': 301, 'paint_s': 7.033, 'iou_before': 0.7003, 'iou': 0.7066, 'shift': [-8.75, 21.88], 'scale': 0.9548}
+[paint] top: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a315: attempt 2, {'seed': 201, 'paint_s': 10.83, 'iou_before': 0.7709, 'iou': 0.787, 'shift': [29.69, 24.69], 'scale': 0.9295}
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 7.029, 'iou_before': 0.7621, 'iou': 0.7694, 'shift': [12.81, -5.0], 'scale': 1.0305}
+[paint] a315: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a090: attempt 2, {'seed': 401, 'paint_s': 7.023, 'iou_before': 0.7554, 'iou': 0.7635, 'shift': [14.38, -2.5], 'scale': 1.0382}
+[paint] a090: left out (IoU under 0.9 or novelty over 0.2)
+[paint] top: attempt 1, {'seed': 300, 'paint_s': 10.833, 'iou_before': 0.7483, 'iou': 0.751, 'shift': [-1.88, 8.75], 'scale': 0.9876}
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 7.03, 'iou_before': 0.6435, 'iou': 0.657, 'shift': [4.38, 23.44], 'scale': 0.9729}
+[paint] a270: attempt 2, {'seed': 501, 'paint_s': 7.027, 'iou_before': 0.7598, 'iou': 0.7616, 'shift': [0.0, 0.0], 'scale': 1.005}
+[paint] a270: left out (IoU under 0.9 or novelty over 0.2)
+[paint] top: attempt 2, {'seed': 301, 'paint_s': 10.842, 'iou_before': 0.7496, 'iou': 0.7527, 'shift': [-2.5, 12.19], 'scale': 0.9808}
+[paint] top: left out (IoU under 0.9 or novelty over 0.2)
+[paint] bottom: attempt 1, {'seed': 600, 'paint_s': 7.033, 'iou_before': 0.5921, 'iou': 0.6289, 'shift': [-10.0, 43.0], 'scale': 0.9324}
+[paint] a090: attempt 1, {'seed': 400, 'paint_s': 10.837, 'iou_before': 0.737, 'iou': 0.7513, 'shift': [33.44, -19.38], 'scale': 1.0618}
+[paint] bottom: attempt 2, {'seed': 601, 'paint_s': 7.027, 'iou_before': 0.9975, 'iou': 0.9975, 'shift': [0.0, 0.0], 'scale': 1.0, 'novelty': 0.005}
+[paint] a135: attempt 1, {'seed': 700, 'paint_s': 7.046, 'iou_before': 0.7475, 'iou': 0.7239, 'shift': [24.38, -40.31], 'scale': 1.0833}
+[paint] a090: attempt 2, {'seed': 401, 'paint_s': 10.842, 'iou_before': 0.7372, 'iou': 0.7516, 'shift': [35.94, -21.25], 'scale': 1.0565}
+[paint] a090: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a135: attempt 2, {'seed': 701, 'paint_s': 7.068, 'iou_before': 0.7922, 'iou': 0.7286, 'shift': [-13.12, -40.31], 'scale': 1.0833}
+[paint] a135: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a270: attempt 1, {'seed': 500, 'paint_s': 10.842, 'iou_before': 0.6971, 'iou': 0.7014, 'shift': [12.5, 2.5], 'scale': 0.995}
+[paint] a225: attempt 1, {'seed': 800, 'paint_s': 7.07, 'iou_before': 0.6153, 'iou': 0.6636, 'shift': [-18.38, 52.56], 'scale': 0.9231}
+[paint] a225: attempt 2, {'seed': 801, 'paint_s': 7.076, 'iou_before': 0.6972, 'iou': 0.7144, 'shift': [52.56, -13.5], 'scale': 1.0833}
+[paint] a225: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a270: attempt 2, {'seed': 501, 'paint_s': 10.847, 'iou_before': 0.6967, 'iou': 0.7015, 'shift': [12.5, 2.5], 'scale': 0.995}
+[paint] a270: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a180: attempt 1, {'seed': 900, 'paint_s': 7.081, 'iou_before': 0.7241, 'iou': 0.726, 'shift': [1.25, 3.75], 'scale': 1.0119}
+[paint] bottom: attempt 1, {'seed': 600, 'paint_s': 10.837, 'iou_before': 0.5832, 'iou': 0.5879, 'shift': [30.62, 42.69], 'scale': 0.9548}
+[paint] a180: attempt 2, {'seed': 901, 'paint_s': 7.032, 'iou_before': 0.6669, 'iou': 0.7042, 'shift': [38.75, 42.19], 'scale': 1.0}
+[paint] a180: left out (IoU under 0.9 or novelty over 0.2)
+[paint] bottom: attempt 2, {'seed': 601, 'paint_s': 10.847, 'iou_before': 0.573, 'iou': 0.5966, 'shift': [12.19, 43.0], 'scale': 0.9243}
+[paint] bottom: left out (IoU under 0.9 or novelty over 0.2)
+[painter] 13 qie-ref: {"seconds": {"paint_views": 135.7, "export": 4.7, "setup_s": 0.071, "projection_s": 0.303, "views_s": 135.304, "compose_s": 0.016, "total_s": 135.694}, "peak_gpu_gb": 58.9, "call": 8}
+[paint] a135: attempt 1, {'seed': 700, 'paint_s': 10.837, 'iou_before': 0.9184, 'iou': 0.9206, 'shift': [0.0, -0.62], 'scale': 1.0025, 'novelty': 0.327}
+[paint] a135: attempt 2, {'seed': 701, 'paint_s': 10.852, 'iou_before': 0.742, 'iou': 0.7403, 'shift': [24.69, -42.38], 'scale': 1.0833}
+[paint] a135: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a225: attempt 1, {'seed': 800, 'paint_s': 10.845, 'iou_before': 0.7114, 'iou': 0.7461, 'shift': [52.56, -31.5], 'scale': 1.0833}
+[paint] a225: attempt 2, {'seed': 801, 'paint_s': 10.855, 'iou_before': 0.6969, 'iou': 0.7355, 'shift': [28.5, -38.25], 'scale': 1.0833}
+[paint] a225: left out (IoU under 0.9 or novelty over 0.2)
+[paint] a180: attempt 1, {'seed': 900, 'paint_s': 10.877, 'iou_before': 0.9225, 'iou': 0.9347, 'shift': [10.0, 5.0], 'scale': 1.0, 'novelty': 0.181}
+[painter] 13 qie-ref-nb: {"seconds": {"paint_views": 193.9, "export": 6.3, "setup_s": 0.096, "projection_s": 0.334, "views_s": 193.394, "compose_s": 0.015, "total_s": 193.839}, "peak_gpu_gb": 58.9, "call": 10}
+an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7fe07e47be10>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7fe07e52ddf0>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+[paint] bmw edit-view: 9 of 10 views in, IoU [0.9718, 0.9267, 0.9277, 0.9911, 0.9274, 0.9524, 0.7714, 0.9142, 0.9166, 0.9304], {'paint_views': 36.6, 'export': 4.6, 'setup_s': 0.89, 'projection_s': 1.784, 'views_s': 33.533, 'compose_s': 0.034, 'total_s': 36.242}
+[paint] 04 edit-view: 9 of 10 views in, IoU [0.96, 0.9621, 0.9779, 0.9966, 0.9933, 0.9944, 0.9965, 0.9892, 0.9599, 0.9944], {'paint_views': 34.3, 'export': 4.3, 'setup_s': 0.873, 'projection_s': 1.848, 'views_s': 30.741, 'compose_s': 0.038, 'total_s': 33.501}
+[paint] 06 edit-view: 8 of 10 views in, IoU [0.9686, 0.9961, 0.9919, 0.985, 0.9918, 0.9938, 0.98, 0.9941, 0.9953, 0.9838], {'paint_views': 36.2, 'export': 4.9, 'setup_s': 0.885, 'projection_s': 1.93, 'views_s': 33.069, 'compose_s': 0.033, 'total_s': 35.919}
+[paint] 08 edit-view: 10 of 10 views in, IoU [0.9904, 0.9853, 0.9624, 0.992, 0.992, 0.9959, 0.9734, 0.9957, 0.9933, 0.9943], {'paint_views': 28.8, 'export': 5.8, 'setup_s': 0.085, 'projection_s': 0.863, 'views_s': 27.767, 'compose_s': 0.035, 'total_s': 28.75}
+[paint] 12 edit-view: 10 of 10 views in, IoU [0.9807, 0.9955, 0.9716, 0.9726, 0.9467, 0.9811, 0.9449, 0.9762, 0.9822, 0.9174], {'paint_views': 28.4, 'export': 5.8, 'setup_s': 0.085, 'projection_s': 0.897, 'views_s': 27.333, 'compose_s': 0.039, 'total_s': 28.353}
+[paint] 13 edit-view: 10 of 10 views in, IoU [0.9123, 0.9231, 0.9312, 0.9862, 0.9073, 0.9237, 0.9621, 0.9159, 0.9095, 0.9234], {'paint_views': 35.0, 'export': 6.1, 'setup_s': 0.081, 'projection_s': 1.019, 'views_s': 33.792, 'compose_s': 0.037, 'total_s': 34.929}
+[paint] bmw qie-edit-view: 9 of 10 views in, IoU [0.9601, 0.9349, 0.9648, 0.9951, 0.9336, 0.9429, 0.9937, 0.9275, 0.917, 0.942], {'paint_views': 51.7, 'export': 5.3, 'setup_s': 0.517, 'projection_s': 1.44, 'views_s': 49.696, 'compose_s': 0.019, 'total_s': 51.673}
+[paint] bmw qie-ref: 1 of 10 views in, IoU [0.6913, 0.4626, 0.5418, 0.5876, 0.7287, 0.6245, 0.994, 0.547, 0.9074, 0.6701], {'paint_views': 144.8, 'export': 4.1, 'setup_s': 0.343, 'projection_s': 1.466, 'views_s': 142.911, 'compose_s': 0.014, 'total_s': 144.734}
+[paint] bmw qie-ref-nb: 0 of 10 views in, IoU [0.6951, 0.4616, 0.5324, 0.5819, 0.7515, 0.6229, 0.9927, 0.6815, 0.7618, 0.7018], {'paint_views': 146.5, 'export': 5.4, 'setup_s': 0.081, 'projection_s': 0.32, 'views_s': 146.022, 'compose_s': 0.007, 'total_s': 146.431}
+[paint] 04 qie-edit-view: 10 of 10 views in, IoU [0.9701, 0.9945, 0.9968, 0.9971, 0.9945, 0.9957, 0.9691, 0.9969, 0.9845, 0.9723], {'paint_views': 43.8, 'export': 3.8, 'setup_s': 0.083, 'projection_s': 0.346, 'views_s': 43.315, 'compose_s': 0.019, 'total_s': 43.764}
+[paint] 04 qie-ref: 1 of 10 views in, IoU [0.8863, 0.7885, 0.87, 0.8113, 0.7907, 0.8464, 0.5659, 0.8381, 0.891, 0.9604], {'paint_views': 139.7, 'export': 4.8, 'setup_s': 0.077, 'projection_s': 0.369, 'views_s': 139.123, 'compose_s': 0.014, 'total_s': 139.581}
+[paint] 04 qie-ref-nb: 1 of 10 views in, IoU [0.8939, 0.8583, 0.8697, 0.8154, 0.7785, 0.8457, 0.6156, 0.8991, 0.8879, 0.9402], {'paint_views': 135.3, 'export': 3.5, 'setup_s': 0.073, 'projection_s': 0.32, 'views_s': 134.822, 'compose_s': 0.014, 'total_s': 135.227}
+[paint] 06 qie-edit-view: 6 of 10 views in, IoU [0.9726, 0.998, 0.9972, 0.2463, 0.4631, 0.4629, 0.3437, 0.9963, 0.9983, 0.9972], {'paint_views': 61.1, 'export': 4.2, 'setup_s': 0.086, 'projection_s': 0.995, 'views_s': 59.989, 'compose_s': 0.017, 'total_s': 61.088}
+[paint] 06 qie-ref: 4 of 10 views in, IoU [0.9964, 0.6629, 0.4849, 0.2437, 0.3811, 0.4436, 0.9929, 0.9968, 0.6272, 0.9969], {'paint_views': 119.4, 'export': 5.6, 'setup_s': 0.11, 'projection_s': 1.222, 'views_s': 117.946, 'compose_s': 0.017, 'total_s': 119.296}
+[paint] 06 qie-ref-nb: 5 of 10 views in, IoU [0.9968, 0.7374, 0.9727, 0.285, 0.4372, 0.5148, 0.9921, 0.994, 0.8335, 0.9962], {'paint_views': 176.8, 'export': 4.4, 'setup_s': 0.068, 'projection_s': 0.304, 'views_s': 176.381, 'compose_s': 0.017, 'total_s': 176.772}
+[paint] 08 qie-edit-view: 7 of 10 views in, IoU [0.9882, 0.9697, 0.9784, 0.9853, 0.9985, 0.9953, 0.9972, 0.9544, 0.9932, 0.9677], {'paint_views': 58.4, 'export': 6.5, 'setup_s': 0.153, 'projection_s': 0.861, 'views_s': 57.324, 'compose_s': 0.018, 'total_s': 58.356}
+[paint] 08 qie-ref: 2 of 10 views in, IoU [0.9373, 0.8314, 0.9055, 0.682, 0.5644, 0.7116, 0.7324, 0.6229, 0.7967, 0.9136], {'paint_views': 139.7, 'export': 6.5, 'setup_s': 0.08, 'projection_s': 0.313, 'views_s': 139.176, 'compose_s': 0.016, 'total_s': 139.586}
+[paint] 08 qie-ref-nb: 1 of 10 views in, IoU [0.9345, 0.8237, 0.6605, 0.6426, 0.6231, 0.5889, 0.5862, 0.3795, 0.6543, 0.9441], {'paint_views': 197.9, 'export': 5.0, 'setup_s': 0.075, 'projection_s': 0.729, 'views_s': 196.999, 'compose_s': 0.014, 'total_s': 197.818}
+[paint] 12 qie-edit-view: 8 of 10 views in, IoU [0.9541, 0.9967, 0.8666, 0.9941, 0.9946, 0.9261, 0.7967, 0.9091, 0.9114, 0.9969], {'paint_views': 58.1, 'export': 6.6, 'setup_s': 0.193, 'projection_s': 0.345, 'views_s': 57.44, 'compose_s': 0.019, 'total_s': 57.998}
+[paint] 12 qie-ref: 7 of 10 views in, IoU [0.982, 0.9965, 0.9938, 0.9939, 0.9945, 0.2909, 0.9942, 0.9946, 0.888, 0.7464], {'paint_views': 96.1, 'export': 6.6, 'setup_s': 0.077, 'projection_s': 0.488, 'views_s': 95.418, 'compose_s': 0.019, 'total_s': 96.001}
+[paint] 12 qie-ref-nb: 6 of 10 views in, IoU [0.9894, 0.9574, 0.9939, 0.9933, 0.2877, 0.2832, 0.9939, 0.9944, 0.786, 0.3964], {'paint_views': 155.8, 'export': 5.0, 'setup_s': 0.104, 'projection_s': 0.315, 'views_s': 155.31, 'compose_s': 0.018, 'total_s': 155.748}
+[paint] 13 qie-edit-view: 10 of 10 views in, IoU [0.9284, 0.9088, 0.9326, 0.9918, 0.9176, 0.9411, 0.9095, 0.9144, 0.9188, 0.9468], {'paint_views': 54.1, 'export': 6.4, 'setup_s': 0.079, 'projection_s': 0.34, 'views_s': 53.547, 'compose_s': 0.019, 'total_s': 53.985}
+[paint] 13 qie-ref: 2 of 10 views in, IoU [0.9222, 0.7604, 0.7668, 0.7066, 0.7635, 0.7616, 0.9975, 0.7286, 0.7144, 0.7042], {'paint_views': 135.7, 'export': 4.7, 'setup_s': 0.071, 'projection_s': 0.303, 'views_s': 135.304, 'compose_s': 0.016, 'total_s': 135.694}
+[paint] 13 qie-ref-nb: 2 of 10 views in, IoU [0.9234, 0.7465, 0.787, 0.7527, 0.7516, 0.7015, 0.5966, 0.7403, 0.7355, 0.9347], {'paint_views': 193.9, 'export': 6.3, 'setup_s': 0.096, 'projection_s': 0.334, 'views_s': 193.394, 'compose_s': 0.015, 'total_s': 193.839}
+[paint] done: 24 of 24 paintings
+214M	ops-out/private/paint4
+exit status: 0
