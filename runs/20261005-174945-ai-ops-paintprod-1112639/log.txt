@@ -1,0 +1,25 @@
+└── ✓ Created Function Trellis2.*.
+painter: already downloaded (--force to fetch again)
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/lobstermeeat/main/ap-6PyruwopPdmrlbutx8paxl
+== p8prod4-bmw
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod4-bmw: saving each step in the orainge-outputs volume under p8prod4-bmw/
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 36 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 49.4 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 49.4, "seconds": 57.2}
+Done: reference-1182015272.png, reference-1182015273.png, reference-1182015274.png, reference-1182015275.png, preview-10015133.glb, final-10015133.glb in orainge-outputs/p8prod4-bmw
+{"final": {"status": "done", "error": null, "paint": {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "picture", "painter_s": 49.4, "seconds": 57.2}, "projection": {"applied": true, "reason": "applied", "iou": 0.9747, "colour": 0.49, "coverage": 0.0503, "pose": {"azimuth": 337.5, "elevation": 0.0, "roll": 1.0, "fov": 37.9, "scale": 1.005, "shift": [0.0019, -0.0034]}, "mode": "detail only", "decals": 612, "seconds": 1.356}, "glass": null, "timings": {"generate_s": 22.905, "export_s": 85.912, "compress_s": 3.451, "upload_s": 0.004}, "gpu_seconds": 112.3, "bytes": 2683432}}
+== p8prod4-long
+[orainge] results: inline; set ORAINGE_R2_SECRET for R2
+[orainge] finals: trellis2 (ORAINGE_FINAL_MODEL=pixal3d for the other)
+[orainge] p8prod4-long: saving each step in the orainge-outputs volume under p8prod4-long/
+Token indices sequence length is longer than the specified maximum sequence length for this model (111 > 77). Running this sequence through the model will result in indexing errors
+[painter] Qwen-Image-Edit-2511 on NVIDIA H100 80GB HBM3 in 38 s, 720 LoRA layers, 8 steps
+[painter] painted 4096x4096 in 92.9 s
+[forge3d] paint: {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "none", "painter_s": 92.9, "seconds": 102.1}
+Done: reference-898828963.png, reference-898828964.png, reference-898828965.png, reference-898828966.png, preview-1053045219.glb, final-1053045219.glb in orainge-outputs/p8prod4-long
+{"final": {"status": "done", "error": null, "paint": {"applied": true, "size": 4096, "output": "robust", "views": 9, "of": 10, "joint": "none", "painter_s": 92.9, "seconds": 102.1}, "projection": {"applied": false, "reason": "ambiguous camera: a view 27 degrees away fits as well but sees a different shape", "iou": 0.9731, "colour": 0.532, "pose": {"azimuth": 100.0, "elevation": 7.3, "roll": 0.1, "fov": 2.5, "scale": 0.999, "shift": [-0.0012, 0.0012]}, "seconds": 0.256}, "glass": null, "timings": {"generate_s": 30.63, "export_s": 135.537, "compress_s": 3.756, "upload_s": 0.006}, "gpu_seconds": 169.9, "bytes": 3347672}}
+exit status: 0
