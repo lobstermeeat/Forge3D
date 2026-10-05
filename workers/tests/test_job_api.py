@@ -23,6 +23,7 @@ AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
 class FakeCalls:
     workers = ("trellis2", "reference")
+    warmable = ("trellis2", "reference", "painter")
 
     def __init__(self):
         self.spawned = []
@@ -262,9 +263,12 @@ def test_warm_starts_a_container_without_waiting_for_it(client, calls):
     assert calls.spawned == [] and calls.waits == []
 
     assert client.post("/hunyuan/warm", headers=AUTH).status_code == 404
+    # The painter takes no jobs here (finals call it) but can be warmed
+    assert client.post("/painter/warm", headers=AUTH).json() == {"status": "WARMING"}
+    assert client.post("/painter/run", headers=AUTH, json={"input": {}}).status_code == 404
     calls.down = True
     assert client.post("/reference/warm", headers=AUTH).status_code == 503
-    assert calls.warmed == ["trellis2", "reference"]
+    assert calls.warmed == ["trellis2", "reference", "painter"]
 
 
 # ModalCalls: the translation from Modal's function calls and errors
@@ -434,7 +438,7 @@ def test_the_deployed_api_warms_each_worker_with_its_own_class(monkeypatch):
     assert modal_app.api.local().workers == ("trellis2", "reference", "multiview")
 
     spawned = []
-    for cls in ("Trellis2", "FluxSchnell", "MultiView"):
+    for cls in ("Trellis2", "FluxSchnell", "MultiView", "Painter"):
         methods = SimpleNamespace(
             generate=FakeMethod(f"{cls}.generate", spawned), warm=FakeMethod(f"{cls}.warm", spawned)
         )
@@ -443,6 +447,8 @@ def test_the_deployed_api_warms_each_worker_with_its_own_class(monkeypatch):
     for worker in calls.workers:
         calls.warm(worker)
         calls.spawn(worker, {"input": {}})
+    assert calls.warmable == ("trellis2", "reference", "multiview", "painter")
+    calls.warm("painter")
     assert spawned == [
         ("Trellis2.warm",),
         ("Trellis2.generate", {"input": {}}),
@@ -450,4 +456,5 @@ def test_the_deployed_api_warms_each_worker_with_its_own_class(monkeypatch):
         ("FluxSchnell.generate", {"input": {}}),
         ("MultiView.warm",),
         ("MultiView.generate", {"input": {}}),
+        ("Painter.warm",),
     ]

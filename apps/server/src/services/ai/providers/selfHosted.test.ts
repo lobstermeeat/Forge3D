@@ -4,6 +4,7 @@ import {
   createAIOrchestrator,
   createStudioWorkers,
   multiviewEnabled,
+  paintEnabled,
   textureOptionsEnabled,
 } from '../index';
 import {
@@ -817,6 +818,88 @@ describe('SelfHostedProvider', () => {
     expect(textureOptionsEnabled({ AI_TEXTURE_OPTIONS: ' NO ' })).toBe(false);
     // The mock workers make them too, so development works end to end
     expect(createStudioWorkers({ AI_WORKERS_MOCK: '1' })!.startTextures).toBeTypeOf('function');
+  });
+
+  it('asks for a painted final with what the object is, and passes on how the painting went', async () => {
+    const api = fakeJobApi([
+      { id: 'fc-final', status: 'IN_QUEUE' },
+      { id: 'fc-preview', status: 'IN_QUEUE' },
+      {
+        id: 'fc-final',
+        status: 'COMPLETED',
+        output: {
+          ...trellisOutput,
+          paint: { applied: true, size: 4096, views: 9, of: 10, seconds: 88.1 },
+        },
+      },
+      {
+        id: 'fc-unpainted',
+        status: 'COMPLETED',
+        output: { ...trellisOutput, paint: { applied: false, reason: 'TimeoutError: too slow' } },
+      },
+      {
+        id: 'fc-odd',
+        status: 'COMPLETED',
+        output: { ...trellisOutput, paint: { applied: 'yes' } },
+      },
+      { status: 'WARMING' },
+    ]);
+    const provider = createSelfHostedProvider(
+      { AI_WORKERS_URL: 'https://w.modal.run', AI_WORKERS_TOKEN: 'worker-token' },
+      api.fetchImpl,
+    )!;
+    const image = Buffer.from('picture');
+    const paint = { subject: 'a yellow Lamborghini Huracan' };
+    await provider.startModel({ image, mode: 'final', seed: 77, paint, requestId: 'gen-8' });
+    // A preview is never painted, so the worker isn't even asked
+    await provider.startModel({ image, mode: 'preview', paint, requestId: 'gen-8' });
+    expect(api.calls[0]!.body).toEqual({
+      input: {
+        image_base64: image.toString('base64'),
+        mode: 'final',
+        seed: 77,
+        paint: true,
+        subject: 'a yellow Lamborghini Huracan',
+        request_id: 'gen-8',
+      },
+    });
+    expect(api.calls[1]!.body).toEqual({
+      input: { image_base64: image.toString('base64'), mode: 'preview', request_id: 'gen-8' },
+    });
+
+    const painted = await provider.model('fc-final');
+    expect(painted.status === 'done' && painted.output.painted).toEqual({
+      applied: true,
+      size: 4096,
+      views: 9,
+      of: 10,
+    });
+    const unpainted = await provider.model('fc-unpainted');
+    expect(unpainted.status === 'done' && unpainted.output.painted).toEqual({
+      applied: false,
+      reason: 'TimeoutError: too slow',
+    });
+    // A note it can't read is left out rather than guessed at
+    const odd = await provider.model('fc-odd');
+    expect(odd.status === 'done' && 'painted' in odd.output).toBe(false);
+
+    // The painter takes no jobs from here, but can be started ahead of a final
+    await provider.warm('painter');
+    expect(api.calls.at(-1)).toEqual({
+      url: 'https://w.modal.run/painter/warm',
+      method: 'POST',
+      body: undefined,
+      auth: 'Bearer worker-token',
+    });
+  });
+
+  it('paints finals only with AI_PAINT=1', () => {
+    expect(paintEnabled({})).toBe(false);
+    expect(paintEnabled({ AI_PAINT: '' })).toBe(false);
+    expect(paintEnabled({ AI_PAINT: '0' })).toBe(false);
+    expect(paintEnabled({ AI_PAINT: 'true' })).toBe(false);
+    expect(paintEnabled({ AI_PAINT: '1' })).toBe(true);
+    expect(paintEnabled({ AI_PAINT: ' 1\n' })).toBe(true);
   });
 
   it('turns the views step on only with AI_MULTIVIEW=1', () => {

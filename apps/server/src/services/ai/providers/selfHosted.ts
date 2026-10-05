@@ -7,6 +7,7 @@ import type {
   GenerationResult,
   ModelOutput,
   ModelView,
+  PaintNote,
   ReferenceImage,
   ReferenceImageProvider,
   ReferencesOutput,
@@ -42,6 +43,8 @@ interface Trellis2Output {
   pipeline?: unknown;
   /** The model that made it, "trellis2" or "pixal3d" (Orainge's job API on Modal only) */
   model?: unknown;
+  /** A final asked to be painted: { applied, reason?, views?, of?, size? } */
+  paint?: unknown;
   error?: string;
 }
 
@@ -108,8 +111,13 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
     /**
      * canWarm: the host can start a GPU ahead of a job (Orainge's job API on Modal; not RunPod).
      * multiview: the endpoint of the worker that draws a picture from 6 sides.
+     * painter: the painter's endpoint, only ever warmed (finals call the painter themselves).
      */
-    private readonly options: { canWarm?: boolean; multiview?: JobEndpoint | null } = {},
+    private readonly options: {
+      canWarm?: boolean;
+      multiview?: JobEndpoint | null;
+      painter?: JobEndpoint | null;
+    } = {},
   ) {
     this.supportedTypes = reference ? ['image-to-3d', 'text-to-3d'] : ['image-to-3d'];
     this.prompts = reference !== null;
@@ -167,6 +175,7 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
     views?: ModelView[];
     mode: GenerationQuality;
     seed?: number;
+    paint?: { subject: string };
     requestId: string;
   }): Promise<string> {
     return this.trellis2.run({
@@ -174,6 +183,10 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
       ...(input.views?.length ? { views: inlineViews(input.views) } : {}),
       mode: input.mode,
       seed: input.seed,
+      // Only a final is painted; the worker ignores it for a preview
+      ...(input.paint && input.mode === 'final'
+        ? { paint: true, subject: input.paint.subject }
+        : {}),
       request_id: input.requestId,
     });
   }
@@ -191,6 +204,7 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
         ...(viewsUsed === undefined ? {} : { viewsUsed }),
         ...(typeof output.pipeline === 'string' ? { pipeline: output.pipeline } : {}),
         ...(typeof output.model === 'string' ? { model: output.model } : {}),
+        ...(paintNote(output.paint) ?? {}),
       };
     });
   }
@@ -260,6 +274,8 @@ export class SelfHostedProvider implements AIProvider, ReferenceImageProvider, S
   private endpoint(kind: WorkerKind): JobEndpoint | null {
     if (kind === 'model') return this.trellis2;
     if (kind === 'references') return this.reference;
+    // Warmed only: finals call the painter themselves
+    if (kind === 'painter') return this.options.painter ?? null;
     return this.options.multiview ?? null;
   }
 
@@ -403,6 +419,25 @@ function inlineViews(views: ModelView[]) {
   }));
 }
 
+/** A final's "paint" note as the worker reports it, or nothing when it has none (or a malformed one). */
+function paintNote(raw: unknown): { painted: PaintNote } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const note = raw as Record<string, unknown>;
+  if (typeof note['applied'] !== 'boolean') return null;
+  const views = finite(note['views']);
+  const of = finite(note['of']);
+  const size = finite(note['size']);
+  return {
+    painted: {
+      applied: note['applied'],
+      ...(typeof note['reason'] === 'string' ? { reason: note['reason'] } : {}),
+      ...(views === undefined ? {} : { views }),
+      ...(of === undefined ? {} : { of }),
+      ...(size === undefined ? {} : { size }),
+    },
+  };
+}
+
 function workerFile(asset: StoredAsset): WorkerFile {
   if (asset.url) return { url: asset.url };
   if (asset.base64) return { data: Buffer.from(asset.base64, 'base64') };
@@ -442,7 +477,11 @@ export function createSelfHostedProvider(
     return new SelfHostedProvider(
       new JobEndpoint(`${workersUrl}/trellis2`, token, fetchImpl),
       new JobEndpoint(`${workersUrl}/reference`, token, fetchImpl),
-      { canWarm: true, multiview: new JobEndpoint(`${workersUrl}/multiview`, token, fetchImpl) },
+      {
+        canWarm: true,
+        multiview: new JobEndpoint(`${workersUrl}/multiview`, token, fetchImpl),
+        painter: new JobEndpoint(`${workersUrl}/painter`, token, fetchImpl),
+      },
     );
   }
   const apiKey = env['RUNPOD_API_KEY'];
