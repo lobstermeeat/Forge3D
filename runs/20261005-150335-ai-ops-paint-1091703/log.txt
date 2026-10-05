@@ -1,0 +1,37 @@
+[paint] app orainge-p8-paint: shapes bmw,04,06,08,12,13,p2,p3,p4,p5,p6,p7,p8; paint bmw,04,06,08,12,13,p2,p3,p4,p5,p6,p7,p8; variants ['qie-v9']
+[paint] making 1 shapes: p8
+[shapes] TRELLIS.2 on NVIDIA L40S in 91.3 s
+an error occurred during closing of asynchronous generator <async_generator object _Function._map at 0x7f45cebcb670>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7f45cebc3350>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7f45cecb3570>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+[shapes] p8: {"name": "p8", "seed": 663008487, "prompt": "a cherry red Gibson Les Paul guitar", "source": "products", "voxel_size": 0.0009765625, "triangles": 96612, "pipeline": "1024_cascade", "timings": {"generate_s": 10.952, "export_s": 21.347, "compress_s": 1.126, "upload_s": 0.0}, "projection":
+[paint] painting 13: {"around": 8, "elevation": 15.0, "attempts": 3, "min_iou": 0.9, "max_novelty": 0.2, "steps": 4, "bottom": true}, Qwen-Image-Edit-2511 at 8 steps
+an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7f45cecb3290>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7f45cca115a0>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+[paint] bmw qie-v9: 9 of 10 views in, IoU [0.9604, 0.9343, 0.9649, 0.9952, 0.9409, 0.9449, 'a dark underside (median luminance 0.00)', 0.9267, 0.9176, 0.9427], {'paint_views': 43.6, 'export': 9.9, 'setup_s': 0.509, 'projection_s': 1.493, 'views_s': 40.781, 'joint_s': 0.465, 'compose_s': 0.085, 'tota
+[paint] 04 qie-v9: 10 of 10 views in, IoU [0.952, 0.9377, 0.9442, 0.9982, 0.9659, 0.944, 0.9551, 0.9616, 0.9978, 0.9676], {'paint_views': 56.7, 'export': 10.8, 'setup_s': 0.601, 'projection_s': 1.889, 'views_s': 53.174, 'joint_s': 0.576, 'compose_s': 0.092, 'total_s': 56.332}
+[paint] 06 qie-v9: 10 of 10 views in, IoU [0.9586, 0.998, 0.995, 0.9883, 0.9969, 0.9956, 0.9945, 0.9929, 0.9965, 0.9972], {'paint_views': 68.1, 'export': 11.0, 'setup_s': 0.188, 'projection_s': 0.676, 'views_s': 66.459, 'joint_s': 0.513, 'compose_s': 0.09, 'total_s': 67.925}
+[paint] 08 qie-v9: 10 of 10 views in, IoU [0.9865, 0.9726, 0.9748, 0.9859, 0.9985, 0.9942, 0.9968, 0.9967, 0.9974, 0.998], {'paint_views': 62.4, 'export': 18.0, 'setup_s': 0.247, 'projection_s': 0.909, 'views_s': 60.046, 'joint_s': 0.672, 'compose_s': 0.087, 'total_s': 61.962}
+[paint] 12 qie-v9: 10 of 10 views in, IoU [0.955, 0.9978, 0.9944, 0.9938, 0.9773, 0.9401, 0.9737, 0.9803, 0.9886, 0.9978], {'paint_views': 61.4, 'export': 11.6, 'setup_s': 0.183, 'projection_s': 0.721, 'views_s': 59.575, 'joint_s': 0.605, 'compose_s': 0.095, 'total_s': 61.179}
+[paint] 13 qie-v9: 9 of 10 views in, IoU [0.9258, 0.9085, 0.9333, 0.9958, 0.9126, 0.931, 'a dark underside (median luminance 0.10)', 0.9982, 0.9205, 0.9101], {'paint_views': 51.0, 'export': 13.7, 'setup_s': 0.225, 'projection_s': 1.392, 'views_s': 48.541, 'joint_s': 0.384, 'compose_s': 0.084, 'total
+[paint] p2 qie-v9: 10 of 10 views in, IoU [0.929, 0.9957, 0.9971, 0.972, 0.9913, 0.9974, 0.9966, 0.9567, 0.9973, 0.9958], {'paint_views': 84.3, 'export': 9.8, 'setup_s': 0.186, 'projection_s': 1.359, 'views_s': 81.947, 'joint_s': 0.453, 'compose_s': 0.086, 'total_s': 84.032}
+[paint] p3 qie-v9: 10 of 10 views in, IoU [0.9039, 0.9987, 0.9956, 0.9201, 0.9957, 0.9618, 0.997, 0.9352, 0.984, 0.998], {'paint_views': 81.5, 'export': 12.4, 'setup_s': 0.269, 'projection_s': 1.696, 'views_s': 78.667, 'joint_s': 0.489, 'compose_s': 0.086, 'total_s': 81.208}
+[paint] p4 qie-v9: 10 of 10 views in, IoU [0.9971, 0.9766, 0.9963, 0.997, 0.9826, 0.9872, 0.9971, 0.9925, 0.9964, 0.9844], {'paint_views': 53.1, 'export': 10.5, 'setup_s': 0.188, 'projection_s': 0.65, 'views_s': 51.389, 'joint_s': 0.536, 'compose_s': 0.09, 'total_s': 52.852}
+[paint] p5 qie-v9: 9 of 10 views in, IoU [0.9185, 0.9247, 0.9221, 0.9947, 0.9545, 0.9144, 'a dark underside (median luminance 0.05)', 0.9966, 0.9254, 0.9292], {'paint_views': 47.1, 'export': 15.1, 'setup_s': 0.244, 'projection_s': 0.926, 'views_s': 45.001, 'joint_s': 0.427, 'compose_s': 0.084, 'tota
+[paint] p6 qie-v9: 10 of 10 views in, IoU [0.9851, 0.9893, 0.9874, 0.9989, 0.9888, 0.9911, 0.9961, 0.9953, 0.9238, 0.9951], {'paint_views': 57.4, 'export': 13.2, 'setup_s': 0.176, 'projection_s': 0.638, 'views_s': 55.855, 'joint_s': 0.428, 'compose_s': 0.083, 'total_s': 57.179}
+[paint] p7 qie-v9: 10 of 10 views in, IoU [0.9463, 0.9878, 0.9803, 0.9983, 0.997, 0.9727, 0.9925, 0.9972, 0.9861, 0.9974], {'paint_views': 77.2, 'export': 12.3, 'setup_s': 0.216, 'projection_s': 0.257, 'views_s': 75.824, 'joint_s': 0.486, 'compose_s': 0.089, 'total_s': 76.872}
+[paint] p8 qie-v9: 9 of 10 views in, IoU [0.9814, 0.993, 0.9641, 0.9641, 0.9892, 0.9931, 0.9808, 0.9857, 0.9721, 'a dark underside (median luminance 0.10)'], {'paint_views': 68.4, 'export': 8.9, 'setup_s': 0.209, 'projection_s': 1.165, 'views_s': 66.276, 'joint_s': 0.452, 'compose_s': 0.09, 'total_s
+[paint] done: 13 of 13 paintings
+Traceback (most recent call last):
+183M	ops-out/private/paint12
+exit status: 0
