@@ -1614,6 +1614,7 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
     seen = visible.float() * fades * _smoothstep(0.0, 0.15, cos_face)
     old_lin = _srgb_to_linear(model.texture.view(-1, 3)[flat])
     new_lin = _srgb_to_linear(sample(picture.rgb.permute(2, 0, 1)))
+    picture_texels = new_lin  # the picture's own colour, before its exposure is brought to the texture's (debug)
 
     # The texture's roughness and metallic at each texel (the same atlas, at its own resolution)
     rows = torch.div(flat, tex_w, rounding_mode="floor").float()
@@ -1659,6 +1660,7 @@ def _bake(model: _Model, picture: _Picture, mapping: _Mapping, zbuf: torch.Tenso
         debug.update(
             weight=detail_weight, flat=flat, xy=xy, zbuf=zbuf, outline=outline, edge_fade=edge_fade,
             misfit_fade=misfit_fade, cos=cos, visible=visible, highlight=highlight, texture_size=(tex_h, tex_w),
+            picture_linear=picture_texels,
         )
     if coverage < MIN_COVERAGE:
         raise _Skip(f"too little of the model faces the camera ({coverage:.1%} of texels)")

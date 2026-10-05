@@ -21,14 +21,17 @@ projection, which production then runs on top as always):
    render's (``object_mask``, then ``align``: the best small shift and scale, and the silhouette IoU after
    it) and so are its edges (``novelty``: what it drew that the render doesn't have, such as a second front
    on a plain back); a view under ``min_iou`` or over ``max_novelty`` is painted again with another seed,
-   then left out. Its colour is scaled
-   to what the picture and the views before it already say where they overlap (``gains``); and it is
-   baked (``view_samples``: depth-tested visibility, a power of the cosine, fades at silhouettes and depth
-   edges), so the next render shows it.
-4. The views blended by weight into the original texture (``compose``), the change carried into the
-   gutters; also robustly (``robust_colour``: only the views near the weighted median luminance count at a
-   texel, so a highlight or a ghost one view drew is left out). The caller exports from there as production
-   does: the picture's projection, smoothed normals, gltfpack.
+   then left out (and a bottom view whose render is dark isn't painted at all). Its brightness and
+   saturation are brought to what the picture and the views before it already say where they overlap
+   (``tone``); and it is baked (``view_samples``: depth-tested visibility, a power of the cosine, fades at
+   silhouettes and depth edges), so the next render shows it.
+4. Every view's own colours brought to agree by a tone solved for all of them together (``joint_tone``:
+   brightness and saturation only, so a grey stays grey; held to the picture's own colour where the
+   picture saw the surface well), then blended into the original texture with each texel taken mostly
+   from its best view (``select_weights``) (``compose``: the change carried into the gutters); also
+   robustly (``robust_colour``: only the views near the weighted median luminance count at a texel, so a
+   highlight or a ghost one view drew is left out). The caller exports from there as production does:
+   the picture's projection, smoothed normals, glass, gltfpack.
 
 The editing model is the caller's: ``paint(render, picture, neighbour, seed, view) -> image``, where
 ``view`` says which side it shows (``describe``) and the picture's main colours (``main_colours``). The module runs
@@ -141,6 +144,25 @@ GAIN_SAMPLES = 400_000
 JOINT_SCALE = 0.15
 JOINT_ROBUST = 4
 JOINT_PRIOR = 0.01
+# Tone instead of per-channel gains (run 5: anchored to the picture's paint, which in the projection's "detail
+# only" mode is TRELLIS.2's own pale colour with the picture's detail on it, the per-channel gains turned the
+# BMW's grey wheels bronze while pulling its blue towards that paint). A view's colour c changes only in
+# brightness and saturation, c -> g (Y + s (c - Y)) with Y its luminance, so a grey stays grey whatever the
+# paint colours do; and the anchor is the picture's own colour where the picture saw the surface well, not the
+# paint. Saturation counts only where both colours have a relative chroma (|c - Y| / Y) of at least MIN_CHROMA
+# and are brighter than CHROMA_LUMA, and changes at most MAX_SATURATION either way
+MIN_CHROMA = 0.08
+CHROMA_LUMA = 0.02
+MAX_SATURATION = 1.5
+# The final blend takes each texel mostly from its best view: the views' weights sharpened by a softmax over their
+# logs at SELECT (weights to the power 1 / SELECT, normalised). Run 5 in the lab: blended by cos^4 alone, the
+# BMW's wheel spokes and grille slats came out doubled where two views drew them a pixel or two apart; at 0.1
+# they keep the sharpness of one view, and the joint tone keeps the views' colours together where they meet
+SELECT = 0.1
+# A bottom view whose render is this dark (median sRGB luminance over the object) isn't painted: the editing model
+# turned the dark underside of two cars into a second top, roof and windows (run 4 and 5), and a dark underside
+# has nothing to gain from it
+DARK_BOTTOM = 0.12
 
 
 def _device(device: Optional[Any]) -> torch.device:
@@ -875,6 +897,69 @@ def gains(
     return torch.exp(median).clamp(1 / max_gain, max_gain)
 
 
+def _joint_solve(
+    log: torch.Tensor,
+    usable: torch.Tensor,
+    weight: torch.Tensor,
+    log_anchor: torch.Tensor,
+    anchored: torch.Tensor,
+    limits: Sequence[float],
+    *,
+    scale: float,
+    rounds: int,
+    prior: float,
+) -> torch.Tensor:
+    """
+    Per-view offsets (K, C) for K views' values ``log`` (K, N, C, log units), solved together: per channel they
+    minimise
+
+        sum over view pairs i, j and texels t of  min(w_i, w_j) u_i u_j (l_i + g_i - l_j - g_j)^2
+      + sum over views i and texels t of          anchored_i (l_i + g_i - l_anchor)^2
+      + prior * (each view's total weight) * g_i^2
+
+    where ``weight`` (K, N) is each view's weight w, ``usable`` (K, N, C) u says where a view's value counts, and
+    ``anchored`` (K, N, C) is how much each view's value is held to ``log_anchor`` (N, C). After the first solve,
+    ``rounds`` more re-weight each term by Cauchy's weight on its residual (``scale`` log units), so a detail one
+    view drew and another didn't hardly pulls the result. Offsets stay within ``limits`` (C, log units) either
+    way; a view that overlaps nothing keeps 0.
+    """
+    count, _, channels = log.shape
+    device = log.device
+    usable = usable.float()
+    limit = torch.tensor(list(limits), device=device, dtype=torch.float32)
+    totals = weight.sum(1).double()  # (K,)
+    gains = torch.zeros((count, channels), device=device)
+    for round_number in range(max(0, rounds) + 1):
+        matrix = torch.zeros((channels, count, count), device=device, dtype=torch.float64)
+        rhs = torch.zeros((channels, count), device=device, dtype=torch.float64)
+        for i in range(count):
+            # Pairs: view i against every view j (both orders appear, so each pair counts once per order)
+            both = torch.minimum(weight[i][None], weight)[..., None] * usable[i][None] * usable  # (K, N, C)
+            both[i] = 0
+            difference = log[i][None] - log  # (K, N, C): l_i - l_j
+            if round_number:
+                residual = difference + (gains[i][None, None] - gains[:, None])  # with the current offsets
+                both = both * _cauchy_weight(residual, scale)
+            pair = both.sum(1).double()  # (K, C): S_ij per channel
+            matrix[:, i, i] += pair.sum(0)
+            matrix[:, i, :] -= pair.T
+            rhs[:, i] -= (both * difference).sum(1).sum(0).double()
+            del both, difference
+            # The anchor
+            to_anchor = log[i] - log_anchor  # (N, C)
+            a = anchored[i]
+            if round_number:
+                a = a * _cauchy_weight(to_anchor + gains[i][None], scale)
+            matrix[:, i, i] += a.sum(0).double()
+            rhs[:, i] -= (a * to_anchor).sum(0).double()
+        # Pull towards no change, in proportion to each view's weight (and a little for views overlapping nothing)
+        ridge = prior * totals + 1e-6
+        matrix += torch.diag_embed(ridge.expand(channels, -1))
+        solved = torch.linalg.solve(matrix, rhs[..., None])[..., 0].T.float()  # (K, C)
+        gains = torch.maximum(torch.minimum(solved, limit), -limit)
+    return gains
+
+
 def joint_gains(
     samples: Sequence[Samples],
     anchor: torch.Tensor,
@@ -886,19 +971,11 @@ def joint_gains(
     prior: float = JOINT_PRIOR,
 ) -> torch.Tensor:
     """
-    Per-view, per-channel gains (K, 3) for K views' ``samples`` (colour in linear light), solved together: they
-    minimise, per channel, on log colour l,
-
-        sum over view pairs i, j and texels t of  min(w_i, w_j) (l_i + g_i - l_j - g_j)^2
-      + sum over views i and texels t of          w_i a (l_i + g_i - l_anchor)^2
-      + prior * (each view's total weight) * g_i^2
-
-    where a is ``anchor_weight`` (N,), how sure the ``anchor`` colour (N, 3, linear: the picture's paint) is.
-    Texels near black in either colour don't count. After the first solve, ``rounds`` more re-weight each term
-    by Cauchy's weight on its residual (``scale`` log units), so a detail one view drew and another didn't
-    hardly pulls the gains. The views then agree where they overlap, without a seam where one view's exposure
-    differed, and as a whole match the picture. Gains stay within ``max_gain`` either way; a view that overlaps
-    nothing keeps 1.
+    Per-view, per-channel gains (K, 3) for K views' ``samples`` (colour in linear light), solved together on log
+    colour (``_joint_solve``): the views agree where they overlap, without a seam where one view's exposure
+    differed, and as a whole match the ``anchor`` colour (N, 3, linear) where ``anchor_weight`` (N,) says it is
+    sure. Texels near black in either colour don't count. Gains stay within ``max_gain`` either way; a view that
+    overlaps nothing keeps 1.
     """
     count = len(samples)
     device = anchor.device
@@ -906,44 +983,99 @@ def joint_gains(
         return torch.ones((0, 3), device=device)
     eps = 1e-4
     weight = torch.stack([s.weight for s in samples])  # (K, N)
-    log = torch.log(torch.stack([s.colour for s in samples]) + eps)  # (K, N, 3)
-    lit = torch.stack([projection._luma(s.colour) > 0.004 for s in samples])  # (K, N)
-    log_anchor = torch.log(anchor + eps)  # (N, 3)
-    anchored = (anchor_weight * (projection._luma(anchor) > 0.004).float())[None] * weight * lit.float()  # (K, N)
-    gains = torch.zeros((count, 3), device=device)
-    for round_number in range(max(0, rounds) + 1):
-        matrix = torch.zeros((3, count, count), device=device, dtype=torch.float64)
-        rhs = torch.zeros((3, count), device=device, dtype=torch.float64)
-        totals = torch.zeros(count, device=device, dtype=torch.float64)
-        for i in range(count):
-            # Pairs: view i against every view j (both orders appear, so each pair counts once per order)
-            both = torch.minimum(weight[i][None], weight) * (lit[i][None] & lit).float()  # (K, N)
-            both[i] = 0
-            difference = log[i][None] - log  # (K, N, 3): l_i - l_j
-            if round_number:
-                residual = difference + (gains[i][None, None] - gains[:, None])  # with the current gains
-                both = both[..., None] * _cauchy_weight(residual, scale)  # (K, N, 3)
-            else:
-                both = both[..., None].expand(-1, -1, 3)
-            pair = both.sum(1).double()  # (K, 3): S_ij per channel
-            matrix[:, i, i] += pair.sum(0)
-            matrix[:, i, :] -= pair.T
-            rhs[:, i] -= (both * difference).sum(1).sum(0).double()
-            # The anchor
-            to_anchor = log[i] - log_anchor  # (N, 3)
-            a = anchored[i][:, None].expand(-1, 3)
-            if round_number:
-                a = a * _cauchy_weight(to_anchor + gains[i][None], scale)
-            matrix[:, i, i] += a.sum(0).double()
-            rhs[:, i] -= (a * to_anchor).sum(0).double()
-            totals[i] = float(weight[i].sum())
-        # Pull towards no change, in proportion to each view's weight (and a little for views overlapping nothing)
-        ridge = prior * totals + 1e-6
-        matrix += torch.diag_embed(ridge.expand(3, -1))
-        solved = torch.linalg.solve(matrix, rhs[..., None])[..., 0].T.float()  # (K, 3)
-        limit = math.log(max_gain)
-        gains = solved.clamp(-limit, limit)
-    return torch.exp(gains)
+    colour = torch.stack([s.colour for s in samples])  # (K, N, 3)
+    lit = (projection._luma(colour) > 0.004).float()[..., None].expand(-1, -1, 3)  # (K, N, 3)
+    anchored = (anchor_weight * (projection._luma(anchor) > 0.004).float())[None, :, None] * weight[..., None] * lit
+    found = _joint_solve(
+        torch.log(colour + eps), lit, weight, torch.log(anchor + eps), anchored, [math.log(max_gain)] * 3,
+        scale=scale, rounds=rounds, prior=prior,
+    )
+    return torch.exp(found)
+
+
+def tone_features(colour: torch.Tensor, eps: float = 1e-4) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Colours (..., 3, linear) as (..., 2): log luminance and log relative chroma (|c - Y| / Y), with where each
+    counts (..., 2, bool): luminance off black; chroma at least MIN_CHROMA on a colour brighter than CHROMA_LUMA.
+    """
+    luma = projection._luma(colour)
+    chroma = (colour - luma[..., None]).norm(dim=-1) / luma.clamp_min(eps)
+    features = torch.stack([torch.log(luma + eps), torch.log(chroma + eps)], -1)
+    usable = torch.stack([luma > 0.004, (chroma >= MIN_CHROMA) & (luma > CHROMA_LUMA)], -1)
+    return features, usable
+
+
+def apply_tone(colour: torch.Tensor, tone: torch.Tensor) -> torch.Tensor:
+    """``colour`` (N, 3, linear) with a tone (2,: gain g, saturation s) applied: g (Y + s (c - Y)), clamped."""
+    luma = projection._luma(colour)[..., None]
+    return (tone[0] * (luma + tone[1] * (colour - luma))).clamp(0, 1)
+
+
+def joint_tone(
+    samples: Sequence[Samples],
+    anchor: torch.Tensor,
+    anchor_weight: torch.Tensor,
+    *,
+    max_gain: float = MAX_GAIN,
+    max_saturation: float = MAX_SATURATION,
+    scale: float = JOINT_SCALE,
+    rounds: int = JOINT_ROBUST,
+    prior: float = JOINT_PRIOR,
+) -> torch.Tensor:
+    """
+    Per-view tones (K, 2: brightness gain, saturation scale; apply_tone) for K views' ``samples``, solved together
+    as joint_gains solves gains, on tone_features instead of log colour: the views agree in brightness and
+    saturation where they overlap, and match the ``anchor`` colour (N, 3, linear: the picture's own) where
+    ``anchor_weight`` (N,) says it is sure. Hues are left as each view painted them, so a grey stays grey.
+    """
+    count = len(samples)
+    device = anchor.device
+    if count == 0:
+        return torch.ones((0, 2), device=device)
+    weight = torch.stack([s.weight for s in samples])  # (K, N)
+    features, usable = zip(*(tone_features(s.colour) for s in samples))
+    features, usable = torch.stack(features), torch.stack(usable).float()  # (K, N, 2)
+    anchor_features, anchor_usable = tone_features(anchor)
+    anchored = anchor_weight[None, :, None] * weight[..., None] * usable * anchor_usable.float()[None]
+    found = _joint_solve(
+        features, usable, weight, anchor_features, anchored, [math.log(max_gain), math.log(max_saturation)],
+        scale=scale, rounds=rounds, prior=prior,
+    )
+    return torch.exp(found)
+
+
+def tone(
+    colour: torch.Tensor,
+    established: torch.Tensor,
+    weight: torch.Tensor,
+    *,
+    max_gain: float = MAX_GAIN,
+    max_saturation: float = MAX_SATURATION,
+    min_texels: int = GAIN_TEXELS,
+) -> Optional[torch.Tensor]:
+    """
+    The tone (2,: gain, saturation; apply_tone) that brings a view's colours (N, 3, linear) to the established
+    ones, as ``gains`` does per channel: weighted medians of the log ratios of luminance and of relative chroma
+    over the texels with ``weight`` > 0 (saturation over those with chroma in both; 1 without enough of them).
+    None from fewer than ``min_texels`` texels.
+    """
+    mine, mine_ok = tone_features(colour)
+    theirs, theirs_ok = tone_features(established)
+    found = []
+    for channel, limit in ((0, max_gain), (1, max_saturation)):
+        use = (weight > 0) & mine_ok[:, channel] & theirs_ok[:, channel]
+        if int(use.sum()) < min_texels:
+            if channel == 0:
+                return None
+            found.append(torch.ones((), device=colour.device))
+            continue
+        ratio = (theirs[:, channel] - mine[:, channel])[use]
+        w = weight[use]
+        if ratio.shape[0] > GAIN_SAMPLES:
+            keep = torch.linspace(0, ratio.shape[0] - 1, GAIN_SAMPLES, device=ratio.device).long()
+            ratio, w = ratio[keep], w[keep]
+        found.append(torch.exp(projection._wquantile(ratio, w, 0.5)).clamp(1 / limit, limit))
+    return torch.stack(found)
 
 
 def _cauchy_weight(residual: torch.Tensor, scale: float) -> torch.Tensor:
@@ -972,11 +1104,12 @@ class Blend:
         return projection._smoothstep(0.0, full_weight, self.total)
 
 
-def robust_colour(samples: Sequence[Samples], tolerance: float = ROBUST_TOLERANCE) -> torch.Tensor:
+def robust_colour(samples: Sequence[Samples], tolerance: float = ROBUST_TOLERANCE, select: float = 0.0) -> torch.Tensor:
     """
     The views' colour at each texel (N, 3, linear), blended by weight over the views whose luminance lies
     within ``tolerance`` (log) of the weighted median of all of them: a highlight or a ghost that only one
-    view drew doesn't go in. Where one view has all the weight, it is that view's colour.
+    view drew doesn't go in. Where one view has all the weight, it is that view's colour. With ``select``, the
+    views kept are blended by their weights sharpened (select_weights), so each texel takes mostly the best of them.
     """
     weight = torch.stack([s.weight for s in samples])  # (K, N)
     colour = torch.stack([s.colour for s in samples])  # (K, N, 3)
@@ -988,10 +1121,25 @@ def robust_colour(samples: Sequence[Samples], tolerance: float = ROBUST_TOLERANC
     index = (cumulative < half).sum(0, keepdim=True).clamp(max=len(samples) - 1)
     median = torch.gather(sorted_luma, 0, index)  # (1, N)
     keep = weight * ((luma - median).abs() <= tolerance).float()
+    if select > 0:
+        keep = select_weights(keep, select)
+        weight = select_weights(weight, select)
     total = keep.sum(0)
     robust = (keep[..., None] * colour).sum(0) / total.clamp_min(1e-9)[:, None]
     plain = (weight[..., None] * colour).sum(0) / weight.sum(0).clamp_min(1e-9)[:, None]
     return torch.where((total > 0)[:, None], robust, plain)
+
+
+def select_weights(weights: torch.Tensor, temperature: float = SELECT) -> torch.Tensor:
+    """
+    Views' weights (K, N) sharpened towards each texel's best view: a softmax over their logs at ``temperature``
+    (so in proportion to weight ** (1 / temperature)), nothing where a view had no weight. A temperature of 0 or
+    less leaves them as they are.
+    """
+    if temperature <= 0:
+        return weights
+    logs = torch.log(weights.clamp_min(1e-12)) / temperature
+    return torch.softmax(logs, 0) * (weights > 0).float()
 
 
 def compose(texture: torch.Tensor, tex: Texels, colour: torch.Tensor, amount: torch.Tensor) -> torch.Tensor:
@@ -1023,6 +1171,9 @@ class Picture:
     azimuth: float  # the picture's camera (0 and ELEVATION when the projection didn't find it)
     elevation: float
     report: dict
+    # (N, 3) linear: the picture's own colour at each covered texel, before the projection matched its exposure to
+    # the texture's (None where not applied); the joint colour match's anchor, where ``weight`` says it saw well
+    colour: Optional[torch.Tensor] = None
 
 
 def project_picture(mesh: Any, cutout: Any, tex: Texels, texture: torch.Tensor, device: Any) -> Picture:
@@ -1048,15 +1199,21 @@ def project_picture(mesh: Any, cutout: Any, tex: Texels, texture: torch.Tensor, 
     debug: dict = {}
     _, report = projection.project_picture(stand_in, cutout, device=device, debug=debug)
     weight = torch.zeros(tex.flat.numel(), device=device)
+    colour = None
     azimuth, elevation = 0.0, ELEVATION
     painted = texture
     if report.get("applied"):
         painted = as_tensor(stand_in.visual.material.baseColorTexture, device)
         if tuple(painted.shape[:2]) != tex.size:
             raise ValueError("the projection changed the texture's size")
+        at = debug["flat"].to(device)
         full = torch.zeros(tex.size[0] * tex.size[1], device=device)
-        full[debug["flat"].to(device)] = debug["weight"].to(device).float()
+        full[at] = debug["weight"].to(device).float()
         weight = full[tex.flat]
+        if debug.get("picture_linear") is not None:
+            full_colour = torch.zeros((tex.size[0] * tex.size[1], 3), device=device)
+            full_colour[at] = debug["picture_linear"].to(device).float()
+            colour = full_colour[tex.flat]
         params = debug["params"][0]
         azimuth, elevation = float(params[0]) % 360, float(params[1])
     elif debug.get("params") is not None:
@@ -1064,7 +1221,7 @@ def project_picture(mesh: Any, cutout: Any, tex: Texels, texture: torch.Tensor, 
         params = debug["params"][0]
         azimuth, elevation = float(params[0]) % 360, float(params[1])
     summary = projection.summary(report)
-    return Picture(texture=painted, weight=weight, azimuth=azimuth, elevation=elevation, report=summary)
+    return Picture(texture=painted, weight=weight, azimuth=azimuth, elevation=elevation, report=summary, colour=colour)
 
 
 # --- The painter --------------------------------------------------------------------------------------
@@ -1090,6 +1247,7 @@ class View:
     joint_gains: Optional[list] = None  # the joint colour match's, when it ran (these replace ``gains``)
     texels: int = 0  # covered texels it set more than half of, when it went in
     seconds: dict = field(default_factory=dict)
+    skipped: Optional[str] = None  # why it wasn't painted at all
 
     def as_dict(self) -> dict:
         return {
@@ -1100,6 +1258,7 @@ class View:
             "joint_gains": self.joint_gains,
             "texels": self.texels,
             "seconds": self.seconds,
+            **({"skipped": self.skipped} if self.skipped else {}),
         }
 
 
@@ -1129,6 +1288,9 @@ def paint_views(
     full_weight: float = FULL_WEIGHT,
     match_colour: bool = True,
     joint: bool = True,
+    colour_model: str = "tone",
+    anchor: str = "picture",
+    select: float = SELECT,
     device: Optional[Any] = None,
     log: Callable[[str], None] = print,
     **camera_options: Any,
@@ -1140,12 +1302,21 @@ def paint_views(
     model sees it). ``cameras`` defaults to ``ring`` round the picture's camera (``camera_options`` go to
     ``ring``: elevation, around, top, bottom, perspective, margin, pixels); they are painted nearest the
     picture first. Each view gets ``attempts`` tries (seeds ``seed + 100 * view + attempt``) to reach
-    ``min_iou`` with no more than ``max_novelty``. ``match_colour`` scales each view to the colours already
+    ``min_iou`` with no more than ``max_novelty``. ``match_colour`` brings each view to the colours already
     established, for the renders of the views after it; with ``joint`` the final blend instead takes every
-    view's own colours scaled by gains solved for all views together (joint_gains: they agree where they
-    overlap, and with the picture's paint). The mesh isn't changed. The result has the views blended by
-    weight (``texture``) and robustly (``robust``).
+    view's own colours brought to agree by a match solved for all views together: they agree where they overlap,
+    and with the ``anchor``. ``colour_model`` is what a match changes: "tone" brightness and saturation only
+    (tone, joint_tone: a grey stays grey), "gains" each channel (gains, joint_gains). ``anchor`` is "picture"
+    (the picture's own colour where it saw the surface well), "paint" (the picture's paint as the projection
+    left it, where it used the picture: run 5's) or "none" (the views only agree with each other). The final
+    blend sharpens the views' weights by ``select`` (select_weights), so each texel takes mostly its best view.
+    A bottom view whose render is dark (DARK_BOTTOM) isn't painted. The mesh isn't changed. The result has the
+    views blended by weight (``texture``) and robustly (``robust``).
     """
+    if colour_model not in ("tone", "gains"):
+        raise ValueError(f"unknown colour model {colour_model!r}")
+    if anchor not in ("picture", "paint", "none"):
+        raise ValueError(f"unknown anchor {anchor!r}")
     device = _device(device)
     started = time.perf_counter()
     timings: dict = {}
@@ -1172,10 +1343,18 @@ def paint_views(
         ordered = by_angle(cameras, picture.azimuth, picture.elevation)
 
         protect = projection._smoothstep(PROTECT[0], PROTECT[1], picture.weight)
-        anchor = picture.texture
-        current = anchor
-        established = projection._srgb_to_linear(anchor.reshape(-1, 3)[tex.flat])
+        painted_picture = picture.texture
+        current = painted_picture
+        paint_colour = projection._srgb_to_linear(painted_picture.reshape(-1, 3)[tex.flat])
+        established = paint_colour
         confidence = protect.clone()
+        # What the views' colours are held to: the picture's own colour where it saw the surface well, or its paint
+        if anchor == "picture" and picture.colour is not None:
+            held, held_weight = picture.colour, picture.weight
+        elif anchor == "paint":
+            held, held_weight = paint_colour, protect
+        else:
+            held, held_weight = paint_colour, torch.zeros_like(protect)
         blend = Blend(tex.flat.numel(), device)
         views: list[View] = []
         weights: list = []  # (view, its weight at each texel), for the shares at the end
@@ -1192,6 +1371,14 @@ def paint_views(
                 nearest = min(accepted, key=lambda v: angle_between(v.camera.direction(), camera.direction()))
                 neighbour = nearest.aligned
             about = {"name": camera.name, "side": describe(camera, picture.azimuth, picture.elevation), "colours": colours}
+            if camera.name == "bottom" and shot.mask.any():
+                dark = float(projection._luma(shot.image[shot.mask]).median())
+                if dark < DARK_BOTTOM:
+                    view.skipped = f"a dark underside (median luminance {dark:.2f})"
+                    log(f"[paint] {camera.name}: not painted, {view.skipped}")
+                    views.append(view)
+                    clock("views_s")
+                    continue
             chosen = None
             for attempt in range(max(1, attempts)):
                 attempt_seed = seed + 100 * number + attempt
@@ -1227,16 +1414,27 @@ def paint_views(
             samples = view_samples(geom, tex, camera, aligned, shot.mask & aligned_mask)
             raw.append((view, Samples(weight=samples.weight, colour=samples.colour.clone())))
             if match_colour:
-                found = gains(samples.colour, established, samples.weight * (confidence >= CONFIDENT).float() * confidence)
+                # Matched to what's established, with the anchor's colour where the picture is what's established
+                target = established
+                if anchor == "picture" and picture.colour is not None:
+                    target = established + protect[:, None] * (picture.colour - established)
+                sure = samples.weight * (confidence >= CONFIDENT).float() * confidence
+                if colour_model == "tone":
+                    found = tone(samples.colour, target, sure)
+                    if found is not None:
+                        samples.colour = apply_tone(samples.colour, found)
+                else:
+                    found = gains(samples.colour, target, sure)
+                    if found is not None:
+                        samples.colour = (samples.colour * found).clamp(0, 1)
                 if found is not None:
-                    samples.colour = (samples.colour * found).clamp(0, 1)
                     view.gains = [round(float(g), 3) for g in found]
             blend.add(samples)
             weights.append((view, samples.weight))
             kept.append(samples)
             # The next render shows the views over the picture's paint (kept where the picture was used)
             amount = blend.amount(full_weight) * (1 - protect)
-            current = compose(anchor, tex, blend.colour(), amount)
+            current = compose(painted_picture, tex, blend.colour(), amount)
             established = projection._srgb_to_linear(current.reshape(-1, 3)[tex.flat])
             confidence = torch.maximum(protect, blend.amount(full_weight))
             view.seconds["bake_s"] = round(time.perf_counter() - bake_started, 3)
@@ -1246,26 +1444,43 @@ def paint_views(
         # The views over the original texture: the picture's projection goes on top afterwards
         joint_report = None
         if joint and match_colour and raw:
-            found = joint_gains(
-                [s for _, s in raw], projection._srgb_to_linear(anchor.reshape(-1, 3)[tex.flat]), protect
-            )
+            solve = joint_tone if colour_model == "tone" else joint_gains
+            found = solve([s for _, s in raw], held, held_weight)
             blend = Blend(tex.flat.numel(), device)
             kept = []
             for (view, samples), gain in zip(raw, found):
-                matched = Samples(weight=samples.weight, colour=(samples.colour * gain).clamp(0, 1))
+                if colour_model == "tone":
+                    colour = apply_tone(samples.colour, gain)
+                else:
+                    colour = (samples.colour * gain).clamp(0, 1)
+                matched = Samples(weight=samples.weight, colour=colour)
                 blend.add(matched)
                 kept.append(matched)
                 view.joint_gains = [round(float(g), 3) for g in gain]
-            joint_report = {view.camera.name: view.joint_gains for view, _ in raw}
+            joint_report = {
+                "model": colour_model,
+                "anchor": anchor if float(held_weight.sum()) > 0 else "none",
+                "views": {view.camera.name: view.joint_gains for view, _ in raw},
+            }
             clock("joint_s")
         del raw
         amount = blend.amount(full_weight)
+        selected = kept
+        if kept and select > 0:
+            # Each texel mostly from its best view
+            sharp = select_weights(torch.stack([s.weight for s in kept]), select)
+            selected = [Samples(weight=w, colour=s.colour) for w, s in zip(sharp, kept)]
+            del sharp
+            blend = Blend(tex.flat.numel(), device)
+            for samples in selected:
+                blend.add(samples)
         final = compose(texture, tex, blend.colour(), amount)
-        robust = compose(texture, tex, robust_colour(kept), amount) if kept else final
-        del kept
-        for view, weight in weights:
-            view.texels = int((amount * weight / blend.total.clamp_min(1e-9) > 0.5).sum())
-        del weights
+        # Robustly: the median over the views' own weights decides which views a texel may take, then the best of those
+        robust = compose(texture, tex, robust_colour(kept, select=select), amount) if kept else final
+        # Each view's share: the texels it set more than half of (kept follows the accepted views' order)
+        for (view, _), samples in zip(weights, selected):
+            view.texels = int((amount * samples.weight / blend.total.clamp_min(1e-9) > 0.5).sum())
+        del kept, selected, weights
         clock("compose_s")
 
     report = {
@@ -1278,6 +1493,7 @@ def paint_views(
         "changed": int((amount > 0.5).sum()),
         "changed_share": round(float((amount > 0.5).float().mean()), 4),
         "joint_gains": joint_report,
+        "select": select,
         "flipped": geom.flipped,
         "timings": {**timings, "total_s": round(time.perf_counter() - started, 3)},
     }

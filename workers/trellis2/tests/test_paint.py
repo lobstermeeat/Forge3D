@@ -493,22 +493,29 @@ def test_paint_views_leaves_out_a_view_that_draws_what_the_render_does_not_have(
 
 def test_paint_views_scales_later_views_to_the_first():
     mesh = box()
-    colours = iter([(40, 160, 220)] + [(20, 80, 110)] * 10)  # later views darker
-    calls = []
+    colours = None  # set per run below: the first view's colour, then later views darker
 
     def paint(render, picture, neighbour, seed, view):
-        calls.append(seed)
         colour = next(colours)
         painter, _ = flat_painter(colour)
         return painter(render, picture, neighbour, seed, view)
 
-    result = P.paint_views(mesh, no_picture(), paint, device="cpu", around=8, top=False, bottom=False, log=lambda _: None, **small())
-    gains = {view.camera.name: view.gains for view in result.views}
-    assert gains["a000"] is None  # nothing established before the first view
-    # The two views either side of it see the first view's side at 45 degrees: brought up towards it
-    assert min(gains["a045"]) > 1.2 and min(gains["a315"]) > 1.2
-    # A view that shares nothing sure with the views before it (a box's next side, seen square on) keeps its colour
-    assert gains["a090"] is None or max(abs(g - 1) for g in gains["a090"]) < 0.05
+    for model in ("gains", "tone"):
+        colours = iter([(40, 160, 220)] + [(20, 80, 110)] * 10)
+        result = P.paint_views(
+            mesh, no_picture(), paint, device="cpu", around=8, top=False, bottom=False, log=lambda _: None,
+            colour_model=model, **small(),
+        )
+        gains = {view.camera.name: view.gains for view in result.views}
+        assert gains["a000"] is None  # nothing established before the first view
+        # The two views either side of it see the first view's side at 45 degrees: brought up towards it (per
+        # channel, or in brightness with about the same saturation: the darker paint is nearly the same colour)
+        brought = [gains["a045"], gains["a315"]] if model == "gains" else [gains["a045"][:1], gains["a315"][:1]]
+        assert all(min(g) > 1.2 for g in brought), gains
+        if model == "tone":
+            assert abs(gains["a045"][1] - 1) < 0.1 and abs(gains["a315"][1] - 1) < 0.1, gains
+        # A view that shares nothing sure with the views before it (a box's next side, seen square on) keeps its colour
+        assert gains["a090"] is None or max(abs(g - 1) for g in gains["a090"]) < 0.05
 
 
 # --- Moving a mesh ------------------------------------------------------------------------------------
@@ -598,3 +605,129 @@ def test_joint_gains_stay_within_the_limit():
     views = _views_of(truth, [(10.0, 10.0, 10.0)], [index >= 0])
     found = P.joint_gains(views, truth, torch.ones(n), max_gain=2.0)
     assert torch.allclose(found, torch.full((1, 3), 0.5), atol=1e-4), found
+
+
+def _toned(truth, tone):
+    """``truth`` (N, 3 linear) with a view's tone (gain, saturation) applied."""
+    return P.apply_tone(truth, torch.tensor(tone))
+
+
+def _body_and_wheels(n):
+    """A blue body (three quarters of the texels) and grey wheels, in linear light."""
+    truth = torch.empty(n, 3)
+    truth[:] = torch.tensor([0.10, 0.25, 0.55])
+    truth[3 * n // 4 :] = torch.tensor([0.12, 0.12, 0.12])
+    return truth * (0.8 + 0.4 * torch.rand(n, 1))
+
+
+def test_joint_tone_undoes_each_views_brightness_and_saturation():
+    torch.manual_seed(2)
+    n = 4000
+    truth = _body_and_wheels(n)
+    index = torch.arange(n)
+    coverage = [index < 2200, (index >= 1200) & (index < 3400), (index >= 2600) | (index < 300)]
+    tones = [(1.0, 1.0), (1.4, 1.25), (0.7, 0.8)]
+    views = [P.Samples(weight=seen.float(), colour=_toned(truth, tone)) for tone, seen in zip(tones, coverage)]
+    anchor_weight = (index < 900).float()
+    found = P.joint_tone(views, truth, anchor_weight)
+    expected = torch.tensor([[1 / g, 1 / s] for g, s in tones])
+    assert torch.allclose(found, expected, rtol=0.04), found
+
+
+def test_joint_tone_keeps_a_grey_grey_where_per_channel_gains_tint_it():
+    torch.manual_seed(3)
+    n = 4000
+    truth = _body_and_wheels(n)
+    index = torch.arange(n)
+    # Two views that see everything; the second painted the body more saturated (and so a little warmer in
+    # ratio terms) than the picture, the anchor, says
+    views = [
+        P.Samples(weight=torch.ones(n), colour=_toned(truth, (1.0, 1.0))),
+        P.Samples(weight=torch.ones(n), colour=_toned(truth, (1.0, 1.35))),
+    ]
+    anchor_weight = torch.ones(n)
+    grey = index >= 3 * n // 4
+
+    def chroma(colour):
+        luma = colour.mean(-1, keepdim=True)
+        return float(((colour - luma).abs().amax(-1) / luma.squeeze(-1)).mean())
+
+    tones = P.joint_tone(views, truth, anchor_weight)
+    toned = P.apply_tone(views[1].colour, tones[1])
+    assert chroma(toned[grey]) < 0.01  # the wheels stay grey
+    assert abs(float(tones[1, 1]) - 1 / 1.35) < 0.04  # and the body's saturation comes back to the picture's
+    gains = P.joint_gains(views, truth, anchor_weight)
+    gained = (views[1].colour * gains[1]).clamp(0, 1)
+    assert chroma(gained[grey]) > 0.1  # per-channel gains turn them a colour
+
+
+def test_tone_brings_a_view_to_what_is_established():
+    torch.manual_seed(4)
+    n = 3000
+    truth = _body_and_wheels(n)
+    view = _toned(truth, (0.6, 1.2))
+    found = P.tone(view, truth, torch.ones(n))
+    assert abs(float(found[0]) - 1 / 0.6) < 0.05 and abs(float(found[1]) - 1 / 1.2) < 0.03, found
+    # Too few texels in common: no tone
+    assert P.tone(view, truth, (torch.arange(n) < 10).float()) is None
+
+
+def test_tone_keeps_saturation_without_colour_in_common():
+    n = 2000
+    grey = torch.full((n, 3), 0.2)
+    found = P.tone(grey * 1.5, grey, torch.ones(n))
+    assert abs(float(found[0]) - 1 / 1.5) < 0.01 and float(found[1]) == 1.0, found
+
+
+def test_paint_views_says_what_the_joint_match_did():
+    mesh = box()
+    painter, _ = flat_painter()
+    result = P.paint_views(mesh, no_picture(), painter, device="cpu", around=4, top=False, bottom=False, log=lambda _: None, **small())
+    joint = result.report["joint_gains"]
+    # No picture here: nothing to hold the views to
+    assert joint["model"] == "tone" and joint["anchor"] == "none"
+    assert set(joint["views"]) == {view.camera.name for view in result.views if view.accepted}
+    assert all(len(found) == 2 for found in joint["views"].values())
+    with pytest.raises(ValueError):
+        P.paint_views(mesh, no_picture(), painter, device="cpu", colour_model="hue", log=lambda _: None, **small())
+
+
+def test_select_weights_take_each_texel_mostly_from_its_best_view():
+    weights = torch.tensor([[0.8, 0.5, 0.0, 0.3], [0.6, 0.5, 0.4, 0.0]])
+    sharp = P.select_weights(weights, 0.1)
+    assert float(sharp[0, 0]) > 0.9  # 0.8 against 0.6: nearly all the first view
+    assert torch.allclose(sharp[:, 1], torch.tensor([0.5, 0.5]))  # a tie stays a tie
+    assert float(sharp[0, 2]) == 0.0 and float(sharp[1, 2]) == 1.0  # a view with no weight gets none
+    assert float(sharp[1, 3]) == 0.0
+    assert torch.equal(P.select_weights(weights, 0.0), weights)
+
+
+def test_paint_views_leaves_a_dark_bottom_unpainted():
+    colours = {side: OLD for side in SIDES}
+    colours[(1, -1)] = (15, 15, 15)  # the underside
+    mesh = box(colours)
+    painter, calls = flat_painter()
+    result = P.paint_views(mesh, no_picture(), painter, device="cpu", around=4, top=False, bottom=True, log=lambda _: None, **small())
+    by_name = {view.camera.name: view for view in result.views}
+    assert by_name["bottom"].skipped and not by_name["bottom"].accepted
+    assert "bottom" not in [call["view"]["name"] for call in calls]
+    assert by_name["bottom"].as_dict()["skipped"].startswith("a dark underside")
+    # A bottom of the same colour as the rest is painted
+    painter, calls = flat_painter()
+    P.paint_views(box(), no_picture(), painter, device="cpu", around=4, top=False, bottom=True, log=lambda _: None, **small())
+    assert "bottom" in [call["view"]["name"] for call in calls]
+
+
+def test_robust_colour_with_select_leaves_out_a_highlight_then_takes_the_best_view():
+    n = 4
+    grey = torch.full((n, 3), 0.2)
+    shine = grey.clone()
+    shine[0] = 0.9  # view 1 drew a highlight on texel 0
+    views = [
+        P.Samples(weight=torch.tensor([0.5, 0.5, 0.9, 0.1]), colour=grey),
+        P.Samples(weight=torch.tensor([0.9, 0.5, 0.1, 0.9]), colour=shine * torch.tensor([1.0, 1.0, 1.0])),
+        P.Samples(weight=torch.tensor([0.6, 0.5, 0.2, 0.2]), colour=grey * 1.1),
+    ]
+    robust = P.robust_colour(views, select=0.1)
+    assert float(robust[0, 0]) < 0.25  # the highlight is left out though its view saw texel 0 best
+    assert abs(float(robust[2, 0]) - 0.2) < 0.01  # texel 2: nearly all view 0, the best
