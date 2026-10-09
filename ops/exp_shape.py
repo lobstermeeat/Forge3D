@@ -4,6 +4,8 @@ TRELLIS.2 with more than production's finals ask of it, on objects the painter t
 the orainge-outputs volume (p8-paint/<name>/picture.png and meta.json), so the shapes compare with today's finals
 (p8-paint/<name>/today.glb: production's 1024_cascade, 100,000 faces, 2048 texture) on the same picture and noise:
 
+- prod: production's preset on this GPU (an H100 samples differently from production's L40S);
+- t4k, f300: production's 1024_cascade with a 4096 texture, at 100,000 and 300,000 faces;
 - faces: production's 1024_cascade, exported as TRELLIS.2's README example does (1,000,000 faces, 4096 texture);
 - max: '1536_cascade' with that same export.
 
@@ -39,6 +41,10 @@ app = prod.app
 CACHE_DIR = "p8-paint"  # the painter experiment's objects: picture.png, meta.json (seed), today.glb
 OUT_DIR = "p9-shape"
 VARIANTS = {
+    # Production's final preset on this GPU, so the others compare on the same hardware's samples
+    "prod": {"pipeline_type": "1024_cascade", "max_faces": 100_000, "texture_size": 2048},
+    "t4k": {"pipeline_type": "1024_cascade", "max_faces": 100_000, "texture_size": 4096},
+    "f300": {"pipeline_type": "1024_cascade", "max_faces": 300_000, "texture_size": 4096},
     "faces": {"pipeline_type": "1024_cascade", "max_faces": 1_000_000, "texture_size": 4096},
     "max": {"pipeline_type": "1536_cascade", "max_faces": 1_000_000, "texture_size": 4096},
 }
