@@ -187,7 +187,9 @@ but the picture doesn't show (the PS5 controller's light bar, lit blue).
 **Through the app's own path.** In a staging app, `make --final --paint` (the request the server makes with
 `AI_PAINT=1`) made the BMW, the sneaker and the Coca-Cola bottle from prompt to painted final with the code as
 shipped: 9, 10 and 10 of their ten views kept, the painting step 64, 93 and 103 s from the final's side, and each
-final done 121 to 157 s after it started.
+final done 121 to 157 s after it started. With the painter's deadline and the other fixes of a code review, the
+same path painted the BMW again (9 of 10 views, 57 s) and a 240-character sneaker prompt that the earlier code
+refused (9 of 10 views, 102 s; its colours weren't held to the picture, whose camera was ambiguous).
 
 ## The recipe: Pixal3D finals, off by default
 

@@ -1,0 +1,122 @@
+# The scoreboard (Phase 9): 100 prompts of the kind Orainge's creators type, to test our pipeline blind against
+# Tripo and the other services, and every new model or fine-tune against the last. It keeps Phase 2's twenty
+# prompts and the eight real products (so earlier verdicts still compare), then adds the categories creators ask
+# for most: real products seen on TV and online, vehicles, characters and creatures, game props, food, and things
+# for a room. Typed the way people type them: short, lower case, sometimes a brand.
+#
+#   modal run --detach workers/modal_app.py::make_set --prompts workers/test-sets/benchmark.txt --name bench --pictures-only
+#
+# One run per line: a prompt, or the path of a photo relative to this file (png, jpg, webp).
+# Lines starting with # are notes, and "## " lines name a category for the scoreboard's tallies.
+
+## Real products (34)
+make a bmw car m3 model blue
+a red Nike Air Jordan 1 sneaker
+a white PlayStation 5 controller
+an iPhone 15 Pro in blue titanium
+a yellow Lamborghini Huracan
+a classic Coca-Cola glass bottle
+a Rolex Submariner watch
+a cherry red Gibson Les Paul guitar
+airpods pro case, white
+nintendo switch oled with the red and blue controllers
+a can of red bull
+starbucks iced coffee cup with a straw
+ray-ban wayfarer sunglasses
+sony wh-1000xm5 headphones in black
+a tesla cybertruck
+a white porsche 911 gt3
+nike air force 1, all white
+an apple watch with an orange sport band
+a dyson supersonic hair dryer
+a purple gameboy color
+a stanley quencher tumbler in pink
+a meta quest 3 vr headset
+a leica m6 film camera
+a mint green vintage vespa scooter
+a sunburst fender stratocaster
+a red kitchenaid stand mixer
+a labubu figure
+a dji mini drone
+a nintendo gamecube, indigo
+green crocs clogs
+a pringles can, original flavour
+red high top sneaker
+a vintage film camera
+electric guitar
+
+## Vehicles (10)
+a cute cartoon car, bright blue
+hot air balloon
+a red sports car
+a yellow school bus
+a vintage motorcycle, black and chrome
+a fighter jet, grey
+a rusty old pickup truck
+a small sailboat with white sails
+a police car
+a monster truck with huge wheels
+
+## Characters and creatures (17)
+a cute low poly fox sitting down
+chibi knight with a big helmet
+a green dragon sitting, cartoon style
+a cute robot with big round eyes
+a cartoon cat wearing a hoodie
+a samurai warrior in red armour
+an anime girl with pink hair, full body
+a goblin holding a lantern
+a fluffy teddy bear
+a realistic t-rex
+a penguin wearing a scarf
+an old wizard with a long beard and a staff
+a superhero in a red and gold suit
+a corgi sitting
+a cute axolotl plush
+a cyberpunk mercenary, full body
+a knight in shining armour, standing
+
+## Game props (16)
+a retro arcade machine
+sci-fi laser pistol, white and orange
+a wooden shield with a lion painted on it
+an astronaut helmet
+a health potion in a round glass bottle
+a skateboard with graffiti art
+a treasure chest full of gold coins
+a medieval sword with a blue gem
+a magic staff with a glowing crystal
+a sci-fi supply crate
+an old oil lantern
+a hiking backpack
+a basketball
+a katana in its sheath
+a pirate ship in a bottle
+an hourglass
+
+## Food and drink (8)
+donut with pink frosting and sprinkles
+bubble tea with tapioca pearls
+bowl of ramen with an egg and chopsticks
+a cheeseburger with lettuce and cheese
+a slice of pepperoni pizza
+a strawberry shortcake
+a sushi platter
+a chocolate ice cream cone
+
+## Home and room (15)
+gaming chair black and purple
+stack of old books with a candle on top
+a small cabin in a snowy forest
+a grey fabric sofa
+a monstera plant in a white pot
+an adjustable desk lamp
+a wooden dining chair
+a retro crt television
+a vinyl record player
+a gaming headset with rgb lights
+a mechanical keyboard with white keycaps
+a cozy armchair with a knitted blanket
+a wall clock, black and white
+a ceramic coffee mug
+a bonsai tree
