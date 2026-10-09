@@ -1,0 +1,13 @@
+[data      0s] cindyxl/ObjaversePlusPlus: [('.gitattributes', 2573), ('README.md', 9523), ('annotated_800k.json', 239181941), ('annotation_network.pth', 115396627)]
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[data      8s] Objaverse++ annotations: 789195
+[data      9s] YiboZhang2001/TexVerse: [('.gitattributes', 2967), ('README.md', 5424), ('TexVerse_id_list.txt', 28336077), ('TexVerse_pbr_id_list.txt', 5231094), ('caption.json', 473451495), ('metadata.json', 837428633)]
+[data     25s] TexVerse metadata: 0.84 GB
+[data     27s] 300000 models read
+[data     27s] 400000 models read
+[data     28s] 500000 models read
+[data     30s] {"tallies": {"models": 858669, "allowed": 705214, "allowed_annotated": 301862, "clean": 181897, "clean_style_realistic": 117527, "allowed_pbr": 148844, "clean_pbr": 54990, "clean_style_anime": 10940, "clean_style_scanned": 46787, "clean_style_cartoon": 1533, "clean_style_other": 4271, "clean_style_sci-fi": 594, "clean_style_arcade": 245}, "lists": {"allowed": 705214, "allowed_pbr": 148844, "clean": 181897, "clean_products": 44338, "clean_characters": 25526, "review": 21632}, "licences": {"cc attribution": 699075, "cc attribution-noncommercial-sharealike": 88710, "cc attribution-noncommercial": 31514, "cc attribution-sharealike": 14624, "cc attribution-noncommercial-noderivs": 11599, "cc attribution-noderivs": 7008, "cc0 public domain": 6139}}
+[data     30s] by category (allowed): {"(none)": 360652, "architecture": 66532, "characters & creatures": 64409, "cultural heritage & history": 57273, "art & abstract": 43335, "furniture & home": 43042, "science & technology": 34252, "weapons & military": 34051, "nature & plants": 28322, "animals & pets": 26429, "electronics & gadgets": 22942, "cars & vehicles": 22556, "places & travel": 15968, "people": 15638, "food & drink": 12210, "fashion & style": 11379, "sports & fitness": 3898, "music": 2771, "news & politics": 960}
+[data     30s] by category (clean): {"(none)": 75432, "characters & creatures": 19401, "cultural heritage & history": 17901, "art & abstract": 14381, "weapons & military": 14356, "architecture": 13680, "furniture & home": 13388, "science & technology": 12895, "nature & plants": 8909, "animals & pets": 8909, "electronics & gadgets": 8492, "cars & vehicles": 6436, "food & drink": 4032, "people": 3914, "fashion & style": 3469, "places & travel": 3204, "sports & fitness": 1314, "music": 917, "news & politics": 209}
+36M	ops-out/private/data
+exit status: 0
