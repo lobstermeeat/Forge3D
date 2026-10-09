@@ -1,0 +1,20 @@
+[shape] app orainge-p9-shape: 8 shapes: [{'name': 'bmw', 'variant': 'faces'}, {'name': 'bmw', 'variant': 'max'}, {'name': 'p5', 'variant': 'faces'}, {'name': 'p5', 'variant': 'max'}, {'name': 'p2', 'variant': 'faces'}, {'name': 'p2', 'variant': 'max'}, {'name': 'p6', 'variant': 'faces'}, {'name': 'p6', 'variant': 'max'}]
+[shape] TRELLIS.2 on NVIDIA H100 80GB HBM3 in 106.6 s
+[shape] TRELLIS.2 on NVIDIA H100 80GB HBM3 in 109.1 s
+[shape] bmw faces: {"name": "bmw", "variant": "faces", "settings": {"pipeline_type": "1024_cascade", "max_faces": 1000000, "texture_size": 4096}, "seed": 663008479, "triangles": 947665, "pipeline": "1024_cascade", "timings": {"generate_s": 169.457, "export_s": 117.035, "compress_s": 4.149, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9623, "colour": 0.4367, "cove
+[shape] bmw max: {"name": "bmw", "variant": "max", "settings": {"pipeline_type": "1536_cascade", "max_faces": 1000000, "texture_size": 4096}, "seed": 663008479, "triangles": 953517, "pipeline": "1536_cascade", "timings": {"generate_s": 201.431, "export_s": 163.352, "compress_s": 4.67, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9754, "colour": 0.493, "coverage":
+[shape] p5 faces: {"name": "p5", "variant": "faces", "settings": {"pipeline_type": "1024_cascade", "max_faces": 1000000, "texture_size": 4096}, "seed": 663008484, "triangles": 974824, "pipeline": "1024_cascade", "timings": {"generate_s": 18.376, "export_s": 172.503, "compress_s": 4.717, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9512, "colour": 0.256, "coverage
+[shape] p5 max: {"name": "p5", "variant": "max", "settings": {"pipeline_type": "1536_cascade", "max_faces": 1000000, "texture_size": 4096}, "seed": 663008484, "triangles": 936129, "pipeline": "1536_cascade", "timings": {"generate_s": 41.288, "export_s": 190.59, "compress_s": 4.707, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9587, "colour": 0.3847, "coverage": 0
+[shape] p2 faces: {"name": "p2", "variant": "faces", "settings": {"pipeline_type": "1024_cascade", "max_faces": 1000000, "texture_size": 4096}, "seed": 663008481, "triangles": 937762, "pipeline": "1024_cascade", "timings": {"generate_s": 18.96, "export_s": 118.44, "compress_s": 4.652, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9817, "colour": 0.7242, "coverage"
+[shape] p2 max: {"name": "p2", "variant": "max", "settings": {"pipeline_type": "1536_cascade", "max_faces": 1000000, "texture_size": 4096}, "seed": 663008481, "triangles": 951298, "pipeline": "1536_cascade", "timings": {"generate_s": 34.76, "export_s": 137.611, "compress_s": 4.72, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9798, "colour": 0.683, "coverage": 0.0
+[shape] p6 faces: {"name": "p6", "variant": "faces", "settings": {"pipeline_type": "1024_cascade", "max_faces": 1000000, "texture_size": 4096}, "seed": 663008485, "triangles": 963251, "pipeline": "1024_cascade", "timings": {"generate_s": 80.232, "export_s": 220.054, "compress_s": 4.149, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.969, "colour": 0.6542, "coverage
+[shape] p6 max: {"name": "p6", "variant": "max", "settings": {"pipeline_type": "1536_cascade", "max_faces": 1000000, "texture_size": 4096}, "seed": 663008485, "triangles": 938070, "pipeline": "1536_cascade", "timings": {"generate_s": 82.406, "export_s": 152.446, "compress_s": 4.2, "upload_s": 0.0}, "projection": {"applied": true, "reason": "applied", "iou": 0.9732, "colour": 0.6251, "coverage": 0.
+an error occurred during closing of asynchronous generator <async_generator object Synchronizer._run_generator_async at 0x7f5a80e01a60>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+an error occurred during closing of asynchronous generator <async_generator object async_merge at 0x7f5a80d4f570>
+Traceback (most recent call last):
+RuntimeError: aclose(): asynchronous generator is already running
+[shape] done: 8 of 8 shapes
+74M	ops-out/private/shape
+exit status: 0
