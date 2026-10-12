@@ -1,5 +1,13 @@
 # Forge3D — AI-Generated 4D Experiences: Plan
 
+> **Status (2026-10-12):** evaluated against the Orainge plan (`origin/phase9-model`) in
+> [`4d-vs-orainge-evaluation.md`](./4d-vs-orainge-evaluation.md). That review keeps the thesis
+> of §1–§3 (time is the missing dimension; the moat is the editor, format and feed) and replaces the
+> roadmap in §4–§7 with one that builds on the Orainge pipeline: moving meshes first, then animated
+> humanoids, then composed scenes, with splat worlds and video-to-4D behind explicit gates. This
+> document was written against `main`, which still had the Tripo/Meshy providers; the Orainge
+> branch has since replaced them with self-hosted workers.
+
 **Goal:** A user types a prompt (or drops in an image or a short video) and gets a
 *realistic, explorable 3D scene that moves over time*: they can walk the camera
 anywhere, scrub a timeline, and share it in the feed as a published experience.
